@@ -7,6 +7,8 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -63,6 +65,34 @@ func main() {
 		}
 	}
 
+	deviceType := strings.TrimSpace(os.Getenv("WAKEN_DEVICE_TYPE"))
+	if deviceType == "" {
+		deviceType = "desktop"
+	}
+	if deviceType != "desktop" && deviceType != "tablet" && deviceType != "mobile" {
+		log.Fatalf("WAKEN_DEVICE_TYPE must be desktop/tablet/mobile, got: %s", deviceType)
+	}
+
+	pushMode := strings.TrimSpace(os.Getenv("WAKEN_PUSH_MODE"))
+	if pushMode == "" {
+		pushMode = "realtime"
+	}
+	if pushMode != "realtime" && pushMode != "active" {
+		log.Fatalf("WAKEN_PUSH_MODE must be realtime/active, got: %s", pushMode)
+	}
+
+	var batteryLevel *int
+	if s := strings.TrimSpace(os.Getenv("WAKEN_BATTERY_LEVEL")); s != "" {
+		v, err := strconv.Atoi(s)
+		if err != nil {
+			log.Fatalf("WAKEN_BATTERY_LEVEL: %v", err)
+		}
+		if v < 0 || v > 100 {
+			log.Fatalf("WAKEN_BATTERY_LEVEL must be in [0,100], got: %d", v)
+		}
+		batteryLevel = &v
+	}
+
 	client := &activity.Client{BaseURL: baseURL, Token: token}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -76,8 +106,12 @@ func main() {
 	report := func(snap foreground.Snapshot) {
 		err := client.Post(ctx, activity.ReportRequest{
 			Device:       device,
+			DeviceName:   device,
+			DeviceType:   deviceType,
 			ProcessName:  snap.ProcessName,
 			ProcessTitle: snap.ProcessTitle,
+			BatteryLevel: batteryLevel,
+			PushMode:     pushMode,
 			Metadata:     meta,
 		})
 		if err != nil {

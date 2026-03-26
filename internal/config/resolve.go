@@ -2,6 +2,8 @@ package config
 
 import (
 	"bufio"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -17,6 +19,20 @@ func Resolve() (baseURL, token string, err error) {
 			baseURL = defaultBaseURL
 		}
 		return strings.TrimRight(baseURL, "/"), token, nil
+	}
+
+	if encoded := strings.TrimSpace(os.Getenv("WAKEN_CONFIG_BASE64")); encoded != "" {
+		cfg, err := FromBase64(encoded)
+		if err != nil {
+			return "", "", fmt.Errorf("解析 WAKEN_CONFIG_BASE64 失败: %w", err)
+		}
+		if strings.TrimSpace(cfg.APIToken) != "" {
+			u := EffectiveBaseURL(cfg)
+			if envURL := strings.TrimSpace(os.Getenv("WAKEN_BASE_URL")); envURL != "" {
+				u = strings.TrimRight(envURL, "/")
+			}
+			return u, strings.TrimSpace(cfg.APIToken), nil
+		}
 	}
 
 	path, err := DefaultFilePath()
@@ -38,6 +54,55 @@ func Resolve() (baseURL, token string, err error) {
 	return RunWizard(path)
 }
 
+type remoteConfig struct {
+	Endpoint string `json:"endpoint"`
+	APIKey   string `json:"apiKey"`
+
+	Token struct {
+		ReportEndpoint string `json:"reportEndpoint"`
+		Items          []struct {
+			Token string `json:"token"`
+		} `json:"items"`
+	} `json:"token"`
+}
+
+// FromBase64 decodes backend exported Base64 JSON and extracts base_url + api_token.
+func FromBase64(encoded string) (*File, error) {
+	raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(encoded))
+	if err != nil {
+		return nil, err
+	}
+	var c remoteConfig
+	if err := json.Unmarshal(raw, &c); err != nil {
+		return nil, err
+	}
+
+	token := strings.TrimSpace(c.APIKey)
+	if token == "" && len(c.Token.Items) > 0 {
+		token = strings.TrimSpace(c.Token.Items[0].Token)
+	}
+	if token == "" {
+		return nil, errors.New("base64 config missing apiKey or token.items[0].token")
+	}
+
+	endpoint := strings.TrimSpace(c.Endpoint)
+	if endpoint == "" {
+		endpoint = strings.TrimSpace(c.Token.ReportEndpoint)
+	}
+
+	baseURL := defaultBaseURL
+	if endpoint != "" {
+		baseURL = strings.TrimRight(strings.TrimSuffix(endpoint, "/api/activity"), "/")
+		if baseURL == "" {
+			baseURL = defaultBaseURL
+		}
+	}
+	return &File{
+		BaseURL:  baseURL,
+		APIToken: token,
+	}, nil
+}
+
 func isCharDevice(f *os.File) bool {
 	fi, err := f.Stat()
 	if err != nil {
@@ -51,12 +116,33 @@ func RunWizard(savePath string) (baseURL, token string, err error) {
 	fmt.Println()
 	fmt.Println("  waken-wa — 首次配置")
 	fmt.Println("  请填写 API 地址与 Token（后台 /admin → API Token）。")
+	fmt.Println("  也可直接粘贴后台一键复制的 Base64 配置。")
 	fmt.Println()
 
 	reader := bufio.NewReader(os.Stdin)
 
-	fmt.Printf("  API 地址 [%s]: ", defaultBaseURL)
+	fmt.Print("  Base64 配置(可留空): ")
 	line, err := reader.ReadString('\n')
+	if err != nil {
+		return "", "", err
+	}
+	base64Text := strings.TrimSpace(strings.TrimRight(line, "\r\n"))
+	if base64Text != "" {
+		cfg, err := FromBase64(base64Text)
+		if err != nil {
+			return "", "", fmt.Errorf("Base64 配置无效: %w", err)
+		}
+		f := &File{BaseURL: EffectiveBaseURL(cfg), APIToken: cfg.APIToken}
+		if err := Save(savePath, f); err != nil {
+			fmt.Fprintf(os.Stderr, "  警告：无法保存配置：%v\n", err)
+		} else {
+			fmt.Printf("\n  已保存到 %s\n\n", savePath)
+		}
+		return f.BaseURL, f.APIToken, nil
+	}
+
+	fmt.Printf("  API 地址 [%s]: ", defaultBaseURL)
+	line, err = reader.ReadString('\n')
 	if err != nil {
 		return "", "", err
 	}
