@@ -9,12 +9,6 @@ import (
 
 const defaultBaseURL = "http://localhost:3000"
 
-// File is persisted JSON next to the user config dir.
-type File struct {
-	BaseURL  string `json:"base_url"`
-	APIToken string `json:"api_token"`
-}
-
 // DefaultFilePath returns e.g. %APPDATA%/waken-wa/config.json on Windows.
 func DefaultFilePath() (string, error) {
 	dir, err := os.UserConfigDir()

@@ -54,18 +54,6 @@ func Resolve() (baseURL, token string, err error) {
 	return RunWizard(path)
 }
 
-type remoteConfig struct {
-	Endpoint string `json:"endpoint"`
-	APIKey   string `json:"apiKey"`
-
-	Token struct {
-		ReportEndpoint string `json:"reportEndpoint"`
-		Items          []struct {
-			Token string `json:"token"`
-		} `json:"items"`
-	} `json:"token"`
-}
-
 // FromBase64 decodes backend exported Base64 JSON and extracts base_url + api_token.
 func FromBase64(encoded string) (*File, error) {
 	raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(encoded))
