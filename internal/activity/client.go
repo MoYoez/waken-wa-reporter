@@ -18,8 +18,8 @@ func (c *Client) Post(ctx context.Context, req ReportRequest) error {
 	if c.Token == "" {
 		return fmt.Errorf("activity: empty token")
 	}
-	if req.Device == "" || req.ProcessName == "" {
-		return fmt.Errorf("activity: device and process_name are required")
+	if req.GeneratedHashKey == "" || req.ProcessName == "" {
+		return fmt.Errorf("activity: generatedHashKey and process_name are required")
 	}
 
 	base := strings.TrimRight(c.BaseURL, "/")

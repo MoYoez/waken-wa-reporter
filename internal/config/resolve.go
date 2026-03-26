@@ -2,7 +2,9 @@ package config
 
 import (
 	"bufio"
+	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -99,6 +101,67 @@ func isCharDevice(f *os.File) bool {
 	return fi.Mode()&os.ModeCharDevice != 0
 }
 
+// ResolveDeviceName resolves a user-facing device name.
+// Priority: env WAKEN_DEVICE_NAME > saved file config > empty.
+func ResolveDeviceName() (string, error) {
+	if v := strings.TrimSpace(os.Getenv("WAKEN_DEVICE_NAME")); v != "" {
+		return v, nil
+	}
+
+	path, err := DefaultFilePath()
+	if err != nil {
+		return "", err
+	}
+	f, err := Load(path)
+	if err != nil {
+		return "", nil
+	}
+	return strings.TrimSpace(f.DeviceName), nil
+}
+
+// ResolveGeneratedHashKey resolves a stable generatedHashKey.
+// Priority: env WAKEN_GENERATED_HASH_KEY > saved file config > auto-generate and save.
+func ResolveGeneratedHashKey() (string, error) {
+	if v := strings.TrimSpace(os.Getenv("WAKEN_GENERATED_HASH_KEY")); v != "" {
+		return v, nil
+	}
+
+	path, err := DefaultFilePath()
+	if err != nil {
+		return "", err
+	}
+
+	f, err := Load(path)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return "", err
+		}
+		f = &File{}
+	}
+
+	if v := strings.TrimSpace(f.GeneratedHashKey); v != "" {
+		return v, nil
+	}
+
+	key, err := generateRandomHashKey()
+	if err != nil {
+		return "", err
+	}
+	f.GeneratedHashKey = key
+	if err := Save(path, f); err != nil {
+		return "", err
+	}
+	return key, nil
+}
+
+func generateRandomHashKey() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
 // RunWizard prompts for API base URL and token, then saves to savePath.
 func RunWizard(savePath string) (baseURL, token string, err error) {
 	fmt.Println()
@@ -120,7 +183,14 @@ func RunWizard(savePath string) (baseURL, token string, err error) {
 		if err != nil {
 			return "", "", fmt.Errorf("Base64 配置无效: %w", err)
 		}
-		f := &File{BaseURL: EffectiveBaseURL(cfg), APIToken: cfg.APIToken}
+		fmt.Print("  设备名称(可留空): ")
+		line, err = reader.ReadString('\n')
+		if err != nil {
+			return "", "", err
+		}
+		deviceName := strings.TrimSpace(strings.TrimRight(line, "\r\n"))
+
+		f := &File{BaseURL: EffectiveBaseURL(cfg), APIToken: cfg.APIToken, DeviceName: deviceName}
 		if err := Save(savePath, f); err != nil {
 			fmt.Fprintf(os.Stderr, "  警告：无法保存配置：%v\n", err)
 		} else {
@@ -150,7 +220,14 @@ func RunWizard(savePath string) (baseURL, token string, err error) {
 		return "", "", errors.New("必须填写 API Token")
 	}
 
-	f := &File{BaseURL: baseURL, APIToken: token}
+	fmt.Print("  设备名称(可留空): ")
+	line, err = reader.ReadString('\n')
+	if err != nil {
+		return "", "", err
+	}
+	deviceName := strings.TrimSpace(strings.TrimRight(line, "\r\n"))
+
+	f := &File{BaseURL: baseURL, APIToken: token, DeviceName: deviceName}
 	if err := Save(savePath, f); err != nil {
 		fmt.Fprintf(os.Stderr, "  警告：无法保存配置：%v\n", err)
 	} else {

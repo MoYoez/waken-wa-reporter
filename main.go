@@ -36,13 +36,30 @@ func main() {
 		log.Fatal(err)
 	}
 
-	device := os.Getenv("WAKEN_DEVICE")
+	deviceName, err := config.ResolveDeviceName()
+	if err != nil {
+		log.Fatalf("resolve device name: %v", err)
+	}
+	generatedHashKey, err := config.ResolveGeneratedHashKey()
+	if err != nil {
+		log.Fatalf("resolve generated hash key: %v", err)
+	}
+
+	device := strings.TrimSpace(os.Getenv("WAKEN_DEVICE"))
 	if device == "" {
-		h, err := os.Hostname()
-		if err != nil {
-			log.Fatalf("hostname: %v", err)
+		if deviceName != "" {
+			device = deviceName
+		} else {
+			h, err := os.Hostname()
+			if err != nil {
+				log.Fatalf("hostname: %v", err)
+			}
+			device = h
 		}
-		device = h
+	}
+
+	if deviceName == "" {
+		deviceName = device
 	}
 
 	poll := 2 * time.Second
@@ -105,14 +122,15 @@ func main() {
 
 	report := func(snap foreground.Snapshot) {
 		err := client.Post(ctx, activity.ReportRequest{
-			Device:       device,
-			DeviceName:   device,
-			DeviceType:   deviceType,
-			ProcessName:  snap.ProcessName,
-			ProcessTitle: snap.ProcessTitle,
-			BatteryLevel: batteryLevel,
-			PushMode:     pushMode,
-			Metadata:     meta,
+			GeneratedHashKey: generatedHashKey,
+			Device:           device,
+			DeviceName:       deviceName,
+			DeviceType:       deviceType,
+			ProcessName:      snap.ProcessName,
+			ProcessTitle:     snap.ProcessTitle,
+			BatteryLevel:     batteryLevel,
+			PushMode:         pushMode,
+			Metadata:         meta,
 		})
 		if err != nil {
 			log.Printf("report failed: %v", err)

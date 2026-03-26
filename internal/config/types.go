@@ -2,8 +2,10 @@ package config
 
 // File is persisted JSON next to the user config dir.
 type File struct {
-	BaseURL  string `json:"base_url"`
-	APIToken string `json:"api_token"`
+	BaseURL          string `json:"base_url"`
+	APIToken         string `json:"api_token"`
+	DeviceName       string `json:"device_name,omitempty"`
+	GeneratedHashKey string `json:"generated_hash_key,omitempty"`
 }
 
 type remoteConfig struct {
