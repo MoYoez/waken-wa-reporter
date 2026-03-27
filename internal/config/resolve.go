@@ -9,8 +9,14 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 )
+
+// DefaultPollIntervalMs and DefaultHeartbeatIntervalMs match main historical defaults (2s poll, 60s heartbeat).
+const DefaultPollIntervalMs = 2000
+const DefaultHeartbeatIntervalMs = 60000
 
 // Resolve returns base URL and API token. Priority: env WAKEN_* > saved file > interactive wizard.
 func Resolve() (baseURL, token string, err error) {
@@ -119,6 +125,99 @@ func ResolveDeviceName() (string, error) {
 	return strings.TrimSpace(f.DeviceName), nil
 }
 
+// EffectivePollInterval returns poll duration from file (nil or invalid → default).
+func EffectivePollInterval(f *File) time.Duration {
+	if f == nil || f.PollIntervalMs == nil || *f.PollIntervalMs < 1 {
+		return time.Duration(DefaultPollIntervalMs) * time.Millisecond
+	}
+	return time.Duration(*f.PollIntervalMs) * time.Millisecond
+}
+
+// EffectiveHeartbeatInterval returns heartbeat duration and whether it is enabled (file only).
+func EffectiveHeartbeatInterval(f *File) (d time.Duration, enabled bool) {
+	if f == nil || f.HeartbeatIntervalMs == nil {
+		return time.Duration(DefaultHeartbeatIntervalMs) * time.Millisecond, true
+	}
+	ms := *f.HeartbeatIntervalMs
+	if ms <= 0 {
+		return 0, false
+	}
+	return time.Duration(ms) * time.Millisecond, true
+}
+
+// ResolvePollInterval: env WAKEN_POLL_INTERVAL (ParseDuration) overrides; else config file; else default.
+func ResolvePollInterval() (time.Duration, error) {
+	if s := strings.TrimSpace(os.Getenv("WAKEN_POLL_INTERVAL")); s != "" {
+		return time.ParseDuration(s)
+	}
+	path, err := DefaultFilePath()
+	if err != nil {
+		return time.Duration(DefaultPollIntervalMs) * time.Millisecond, nil
+	}
+	f, err := Load(path)
+	if err != nil {
+		return time.Duration(DefaultPollIntervalMs) * time.Millisecond, nil
+	}
+	return EffectivePollInterval(f), nil
+}
+
+// ResolveHeartbeatInterval: env WAKEN_HEARTBEAT_INTERVAL overrides; else config file; else default.
+func ResolveHeartbeatInterval() (d time.Duration, enabled bool, err error) {
+	if s := strings.TrimSpace(os.Getenv("WAKEN_HEARTBEAT_INTERVAL")); s != "" {
+		dur, err := time.ParseDuration(s)
+		if err != nil {
+			return 0, false, err
+		}
+		return dur, dur > 0, nil
+	}
+	path, err := DefaultFilePath()
+	if err != nil {
+		return time.Duration(DefaultHeartbeatIntervalMs) * time.Millisecond, true, nil
+	}
+	f, err := Load(path)
+	if err != nil {
+		return time.Duration(DefaultHeartbeatIntervalMs) * time.Millisecond, true, nil
+	}
+	d, en := EffectiveHeartbeatInterval(f)
+	return d, en, nil
+}
+
+func promptIntervals(reader *bufio.Reader) (pollMs, heartbeatMs int, err error) {
+	pollMs = DefaultPollIntervalMs
+	fmt.Printf("  轮询间隔毫秒 [%d]: ", DefaultPollIntervalMs)
+	line, err := reader.ReadString('\n')
+	if err != nil {
+		return 0, 0, err
+	}
+	if s := strings.TrimSpace(strings.TrimRight(line, "\r\n")); s != "" {
+		v, err := strconv.Atoi(s)
+		if err != nil || v < 1 {
+			return 0, 0, fmt.Errorf("轮询间隔须为 >=1 的整数（毫秒）")
+		}
+		pollMs = v
+	}
+
+	heartbeatMs = DefaultHeartbeatIntervalMs
+	fmt.Printf("  心跳间隔毫秒 [%d，0=关闭]: ", DefaultHeartbeatIntervalMs)
+	line, err = reader.ReadString('\n')
+	if err != nil {
+		return 0, 0, err
+	}
+	if s := strings.TrimSpace(strings.TrimRight(line, "\r\n")); s != "" {
+		v, err := strconv.Atoi(s)
+		if err != nil || v < 0 {
+			return 0, 0, fmt.Errorf("心跳间隔须为 >=0 的整数，0 表示关闭")
+		}
+		heartbeatMs = v
+	}
+	return pollMs, heartbeatMs, nil
+}
+
+func setIntervalFields(f *File, pollMs, heartbeatMs int) {
+	f.PollIntervalMs = &pollMs
+	f.HeartbeatIntervalMs = &heartbeatMs
+}
+
 // ResolveGeneratedHashKey resolves a stable generatedHashKey.
 // Priority: env WAKEN_GENERATED_HASH_KEY > saved file config > auto-generate and save.
 func ResolveGeneratedHashKey() (string, error) {
@@ -190,7 +289,13 @@ func RunWizard(savePath string) (baseURL, token string, err error) {
 		}
 		deviceName := strings.TrimSpace(strings.TrimRight(line, "\r\n"))
 
+		pollMs, hbMs, err := promptIntervals(reader)
+		if err != nil {
+			return "", "", err
+		}
+
 		f := &File{BaseURL: EffectiveBaseURL(cfg), APIToken: cfg.APIToken, DeviceName: deviceName}
+		setIntervalFields(f, pollMs, hbMs)
 		if err := Save(savePath, f); err != nil {
 			fmt.Fprintf(os.Stderr, "  警告：无法保存配置：%v\n", err)
 		} else {
@@ -227,7 +332,13 @@ func RunWizard(savePath string) (baseURL, token string, err error) {
 	}
 	deviceName := strings.TrimSpace(strings.TrimRight(line, "\r\n"))
 
+	pollMs, hbMs, err := promptIntervals(reader)
+	if err != nil {
+		return "", "", err
+	}
+
 	f := &File{BaseURL: baseURL, APIToken: token, DeviceName: deviceName}
+	setIntervalFields(f, pollMs, hbMs)
 	if err := Save(savePath, f); err != nil {
 		fmt.Fprintf(os.Stderr, "  警告：无法保存配置：%v\n", err)
 	} else {

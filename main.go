@@ -62,13 +62,14 @@ func main() {
 		deviceName = device
 	}
 
-	poll := 2 * time.Second
-	if s := os.Getenv("WAKEN_POLL_INTERVAL"); s != "" {
-		d, err := time.ParseDuration(s)
-		if err != nil {
-			log.Fatalf("WAKEN_POLL_INTERVAL: %v", err)
-		}
-		poll = d
+	poll, err := config.ResolvePollInterval()
+	if err != nil {
+		log.Fatalf("poll interval: %v", err)
+	}
+
+	heartbeat, heartbeatEnabled, err := config.ResolveHeartbeatInterval()
+	if err != nil {
+		log.Fatalf("heartbeat interval: %v", err)
 	}
 
 	meta := map[string]any{"source": "waken-wa"}
@@ -119,8 +120,9 @@ func main() {
 	defer ticker.Stop()
 
 	var last *foreground.Snapshot
+	var lastReport time.Time
 
-	report := func(snap foreground.Snapshot) {
+	report := func(snap foreground.Snapshot, heartbeat bool) bool {
 		err := client.Post(ctx, activity.ReportRequest{
 			GeneratedHashKey: generatedHashKey,
 			Device:           device,
@@ -134,9 +136,14 @@ func main() {
 		})
 		if err != nil {
 			log.Printf("report failed: %v", err)
-			return
+			return false
 		}
-		log.Printf("activity reported: %s", snap.ProcessName)
+		if heartbeat {
+			log.Printf("activity heartbeat: %s", snap.ProcessName)
+		} else {
+			log.Printf("activity reported: %s", snap.ProcessName)
+		}
+		return true
 	}
 
 	if snap, err := foreground.GetSnapshot(); err != nil {
@@ -144,7 +151,8 @@ func main() {
 	} else {
 		cp := snap
 		last = &cp
-		report(snap)
+		lastReport = time.Now()
+		report(snap, false)
 	}
 
 	for {
@@ -158,12 +166,20 @@ func main() {
 				log.Printf("foreground: %v", err)
 				continue
 			}
-			if last != nil && last.ProcessName == snap.ProcessName && last.ProcessTitle == snap.ProcessTitle {
+			same := last != nil && last.ProcessName == snap.ProcessName && last.ProcessTitle == snap.ProcessTitle
+			if same {
+				if heartbeatEnabled && time.Since(lastReport) >= heartbeat {
+					if report(snap, true) {
+						lastReport = time.Now()
+					}
+				}
 				continue
 			}
 			cp := snap
 			last = &cp
-			report(snap)
+			if report(snap, false) {
+				lastReport = time.Now()
+			}
 		}
 	}
 }
