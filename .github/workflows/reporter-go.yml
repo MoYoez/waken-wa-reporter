@@ -35,22 +35,14 @@ jobs:
           else
             go build -v -trimpath -ldflags="-s -w" -o waken-wa-reporter .
             chmod +x waken-wa-reporter
-            zip -q waken-wa-reporter-macos.zip waken-wa-reporter
           fi
-
-      - name: Zip (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: Compress-Archive -Path waken-wa-reporter.exe -DestinationPath waken-wa-reporter-windows-amd64.zip -Force
 
       - name: Upload artifact (Windows)
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
           name: waken-wa-reporter-windows-amd64
-          path: |
-            waken-wa-reporter.exe
-            waken-wa-reporter-windows-amd64.zip
+          path: waken-wa-reporter.exe
           if-no-files-found: error
 
       - name: Upload artifact (macOS)
@@ -58,7 +50,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: waken-wa-reporter-macos
-          path: |
-            waken-wa-reporter
-            waken-wa-reporter-macos.zip
+          path: waken-wa-reporter
           if-no-files-found: error

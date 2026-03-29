@@ -115,7 +115,7 @@ go build -o waken-wa-reporter .
 
 ## CI 构建产物
 
-本仓库 [`.github/workflows/reporter-go.yml`](.github/workflows/reporter-go.yml) 在 push / PR 时构建 **Windows**（`waken-wa-reporter.exe` 与 zip）与 **macOS** 二进制（zip）。可在 GitHub Actions 运行结果中下载 **Artifacts**。
+本仓库 [`.github/workflows/reporter-go.yml`](.github/workflows/reporter-go.yml) 在 push / PR 时产出 **Windows**（`waken-wa-reporter.exe`）与 **macOS**（`waken-wa-reporter`）可执行文件 Artifacts
 
 ## License
 
