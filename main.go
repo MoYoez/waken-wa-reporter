@@ -8,17 +8,17 @@ import (
 	"log"
 	"maps"
 	"os"
+	"os/exec"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/MoYoez/waken-wa-reporter/internal/activity"
-	"github.com/MoYoez/waken-wa-reporter/internal/background"
 	"github.com/MoYoez/waken-wa-reporter/internal/cliutil"
 	"github.com/MoYoez/waken-wa-reporter/internal/config"
-	"github.com/MoYoez/waken-wa-reporter/internal/openurl"
 	"github.com/MoYoez/waken-wa-reporter/internal/platform/foreground"
 	"github.com/MoYoez/waken-wa-reporter/internal/platform/media"
 	"golang.org/x/term"
@@ -43,6 +43,21 @@ func formatMediaForLog(m media.Info) string {
 		return ""
 	}
 	return strings.Join(parts, " — ")
+}
+
+// openBrowser opens url in the system default handler (best-effort).
+func openBrowser(url string) error {
+	if strings.TrimSpace(url) == "" {
+		return errors.New("open browser: empty url")
+	}
+	switch runtime.GOOS {
+	case "darwin":
+		return exec.Command("open", url).Start()
+	case "windows":
+		return exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	default:
+		return exec.Command("xdg-open", url).Start()
+	}
 }
 
 func resolveApprovalRetryInterval() time.Duration {
@@ -71,24 +86,14 @@ func maybeOpenApprovalURL(url string) {
 	if strings.TrimSpace(os.Getenv("WAKEN_OPEN_APPROVAL")) != "1" {
 		return
 	}
-	if err := openurl.InBrowser(url); err != nil {
+	if err := openBrowser(url); err != nil {
 		log.Printf("approval: could not open browser: %v", err)
 	}
 }
 
 func main() {
 	setup := flag.Bool("setup", false, "run interactive setup (URL + API token), save, and exit")
-	runInBackground := flag.Bool("background", false, "detach from terminal and run in background (no tray; see README)")
 	flag.Parse()
-
-	isBackgroundChild := os.Getenv("WAKEN_BACKGROUND_CHILD") != ""
-
-	if !isBackgroundChild && *runInBackground {
-		if err := background.SpawnDetached(os.Args[1:]); err != nil {
-			log.Fatalf("background: %v", err)
-		}
-		os.Exit(0)
-	}
 
 	if *setup {
 		path, err := config.DefaultFilePath()

@@ -46,12 +46,6 @@ go build -o waken-wa-reporter .
 ./waken-wa-reporter
 ```
 
-后台运行（无系统托盘；子进程带 `WAKEN_BACKGROUND_CHILD=1`，与前台控制台分离）：
-
-```bash
-./waken-wa-reporter -background
-```
-
 若未设置 Token 且无可用配置文件，且标准输入非 TTY（例如作为服务运行），程序会退出并提示先设置 `WAKEN_API_TOKEN` 或完成本地配置。
 
 ### 轮询间隔与心跳间隔
@@ -76,7 +70,7 @@ go build -o waken-wa-reporter .
 
 ### 系统托盘
 
-当前版本**不包含**系统托盘图标；后台请使用 `-background` 或操作系统自带的任务计划 / launchd / systemd 等方式托管。托盘菜单（退出、打开日志等）可作为后续迭代。
+当前版本**不包含**系统托盘图标；后台运行请使用操作系统自带的任务计划 / launchd / systemd 等方式托管。托盘菜单（退出、打开日志等）可作为后续迭代。
 
 ## 配置方式
 
