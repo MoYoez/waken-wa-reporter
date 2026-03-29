@@ -28,11 +28,19 @@
 
 ## 构建与运行
 
+### 预编译使用
+
+前往项目 [发布页](https://github.com/MoYoez/waken-wa-reporter/releases) 下载适合你操作系统的预编译版本。
+
+### 从 源码 编译
+
 在项目根目录执行：
 
 ```bash
 go build -o waken-wa-reporter .
 ```
+
+## 使用
 
 首次在终端中交互式写入配置（API 地址、Token、设备名、轮询/心跳间隔等）：
 
