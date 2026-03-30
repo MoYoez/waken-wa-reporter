@@ -388,6 +388,36 @@ function tryDeviceBatteryPercent() {
   return null;
 }
 
+/**
+ * Whether the device is charging (AC/USB/wireless) or in CHARGING state.
+ * Returns null if the sticky broadcast cannot be read (omit is_charging on POST).
+ */
+function tryDeviceBatteryCharging() {
+  try {
+    importClass(android.content.Intent);
+    importClass(android.content.IntentFilter);
+    importClass(android.os.BatteryManager);
+    var intent = context.registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+    if (!intent) {
+      return null;
+    }
+    var plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0);
+    var status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+    if (plugged !== 0) {
+      return true;
+    }
+    if (status === BatteryManager.BATTERY_STATUS_CHARGING) {
+      return true;
+    }
+    if (status >= 0) {
+      return false;
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
 function buildUrl(base) {
   var b = String(base || "").replace(/\/+$/, "");
   return b + ACTIVITY_PATH;
@@ -499,6 +529,10 @@ function buildBody(processName, processTitle) {
   var batt = tryDeviceBatteryPercent();
   if (batt !== null) {
     body.battery_level = batt;
+  }
+  var charging = tryDeviceBatteryCharging();
+  if (charging !== null) {
+    body.is_charging = charging;
   }
   return body;
 }
