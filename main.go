@@ -50,7 +50,7 @@ func formatMediaForLog(m media.Info) string {
 // openBrowser opens url in the system default handler (best-effort).
 func openBrowser(url string) error {
 	if strings.TrimSpace(url) == "" {
-		return errors.New("open browser: empty url")
+		return errors.New("打开浏览器失败：URL 为空")
 	}
 	switch runtime.GOOS {
 	case "darwin":
@@ -80,7 +80,7 @@ func maybeWriteApprovalURLFile(url string) {
 		return
 	}
 	if err := os.WriteFile(path, []byte(url+"\n"), 0o600); err != nil {
-		log.Printf("approval: could not write %s: %v", path, err)
+		log.Printf("审核：无法写入 %s：%v", path, err)
 	}
 }
 
@@ -89,7 +89,7 @@ func maybeOpenApprovalURL(url string) {
 		return
 	}
 	if err := openBrowser(url); err != nil {
-		log.Printf("approval: could not open browser: %v", err)
+		log.Printf("审核：无法打开浏览器：%v", err)
 	}
 }
 
@@ -115,11 +115,11 @@ func main() {
 
 	deviceName, err := config.ResolveDeviceName()
 	if err != nil {
-		log.Fatalf("resolve device name: %v", err)
+		log.Fatalf("解析设备名称失败：%v", err)
 	}
 	generatedHashKey, err := config.ResolveGeneratedHashKey()
 	if err != nil {
-		log.Fatalf("resolve generated hash key: %v", err)
+		log.Fatalf("解析设备身份牌失败：%v", err)
 	}
 
 	device := strings.TrimSpace(os.Getenv("WAKEN_DEVICE"))
@@ -129,7 +129,7 @@ func main() {
 		} else {
 			h, err := os.Hostname()
 			if err != nil {
-				log.Fatalf("hostname: %v", err)
+				log.Fatalf("读取主机名失败：%v", err)
 			}
 			device = h
 		}
@@ -141,12 +141,12 @@ func main() {
 
 	poll, err := config.ResolvePollInterval()
 	if err != nil {
-		log.Fatalf("poll interval: %v", err)
+		log.Fatalf("解析轮询间隔失败：%v", err)
 	}
 
 	heartbeat, heartbeatEnabled, err := config.ResolveHeartbeatInterval()
 	if err != nil {
-		log.Fatalf("heartbeat interval: %v", err)
+		log.Fatalf("解析心跳间隔失败：%v", err)
 	}
 
 	meta := map[string]any{"source": "waken-wa"}
@@ -158,7 +158,7 @@ func main() {
 	if s := os.Getenv("WAKEN_METADATA"); s != "" {
 		var extra map[string]any
 		if err := json.Unmarshal([]byte(s), &extra); err != nil {
-			log.Fatalf("WAKEN_METADATA: %v", err)
+			log.Fatalf("解析 WAKEN_METADATA 失败：%v", err)
 		}
 		activity.MergeMetadata(meta, extra)
 	}
@@ -168,7 +168,7 @@ func main() {
 		deviceType = "desktop"
 	}
 	if deviceType != "desktop" && deviceType != "tablet" && deviceType != "mobile" {
-		log.Fatalf("WAKEN_DEVICE_TYPE must be desktop/tablet/mobile, got: %s", deviceType)
+		log.Fatalf("WAKEN_DEVICE_TYPE 只能是 desktop/tablet/mobile，当前为：%s", deviceType)
 	}
 
 	pushMode := strings.TrimSpace(os.Getenv("WAKEN_PUSH_MODE"))
@@ -176,17 +176,17 @@ func main() {
 		pushMode = "realtime"
 	}
 	if pushMode != "realtime" && pushMode != "active" {
-		log.Fatalf("WAKEN_PUSH_MODE must be realtime/active, got: %s", pushMode)
+		log.Fatalf("WAKEN_PUSH_MODE 只能是 realtime/active，当前为：%s", pushMode)
 	}
 
 	var batteryLevel *int
 	if s := strings.TrimSpace(os.Getenv("WAKEN_BATTERY_LEVEL")); s != "" {
 		v, err := strconv.Atoi(s)
 		if err != nil {
-			log.Fatalf("WAKEN_BATTERY_LEVEL: %v", err)
+			log.Fatalf("解析 WAKEN_BATTERY_LEVEL 失败：%v", err)
 		}
 		if v < 0 || v > 100 {
-			log.Fatalf("WAKEN_BATTERY_LEVEL must be in [0,100], got: %d", v)
+			log.Fatalf("WAKEN_BATTERY_LEVEL 必须在 [0,100] 范围内，当前为：%d", v)
 		}
 		batteryLevel = &v
 	}
@@ -195,7 +195,7 @@ func main() {
 
 	bypassProxy, err := config.ResolveBypassSystemProxy()
 	if err != nil {
-		log.Fatalf("config: %v", err)
+		log.Fatalf("读取配置失败：%v", err)
 	}
 	client := &activity.Client{BaseURL: baseURL, Token: token}
 	if bypassProxy {
@@ -224,13 +224,13 @@ func main() {
 		pendingMode = true
 		lastPendingRetry = time.Now()
 		if p.Message != "" {
-			log.Printf("approval: %s", p.Message)
+			log.Printf("审核：%s", p.Message)
 		}
 		if !bannerShown {
 			if term.IsTerminal(int(os.Stdout.Fd())) {
 				cliutil.PrintApprovalBanner(p.ApprovalURL)
 			} else {
-				log.Printf("approval URL (non-TTY): %s", p.ApprovalURL)
+				log.Printf("审核链接（非终端环境）：%s", p.ApprovalURL)
 			}
 			bannerShown = true
 		}
@@ -246,7 +246,7 @@ func main() {
 				reportMeta["play_source"] = "system_media"
 			}
 		} else if merr != nil && !errors.Is(merr, media.ErrNoMedia) && !errors.Is(merr, media.ErrUnsupported) {
-			log.Printf("media: %v", merr)
+			log.Printf("媒体信息：%v", merr)
 		}
 		err := client.Post(ctx, activity.ReportRequest{
 			GeneratedHashKey: generatedHashKey,
@@ -265,19 +265,19 @@ func main() {
 			if errors.As(err, &p) {
 				return err
 			}
-			log.Printf("report failed: %v", err)
+			log.Printf("上报失败：%v", err)
 			return err
 		}
 		mediaSuffix := ""
 		if merr == nil {
 			if s := formatMediaForLog(minfo); s != "" {
-				mediaSuffix = " | media: " + s
+				mediaSuffix = " | 媒体： " + s
 			}
 		}
 		if heartbeat {
-			log.Printf("activity heartbeat: %s%s", snap.ProcessName, mediaSuffix)
+			log.Printf("活动心跳：%s%s", snap.ProcessName, mediaSuffix)
 		} else {
-			log.Printf("activity reported: %s%s", snap.ProcessName, mediaSuffix)
+			log.Printf("活动已上报：%s%s", snap.ProcessName, mediaSuffix)
 		}
 		return nil
 	}
@@ -290,7 +290,7 @@ func main() {
 	}
 
 	if snap, err := foreground.GetSnapshot(); err != nil {
-		log.Printf("foreground: %v", err)
+		log.Printf("前台应用：%v", err)
 	} else {
 		minfo, merr := media.GetNowPlaying()
 		sig := mediaSignature(minfo, merr)
@@ -307,7 +307,7 @@ func main() {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("shutting down")
+			log.Println("正在退出")
 			return
 		case <-ticker.C:
 			if pendingMode {
@@ -317,7 +317,7 @@ func main() {
 				lastPendingRetry = time.Now()
 				snap, err := foreground.GetSnapshot()
 				if err != nil {
-					log.Printf("foreground: %v", err)
+					log.Printf("前台应用：%v", err)
 					continue
 				}
 				minfo, merr := media.GetNowPlaying()
@@ -330,7 +330,7 @@ func main() {
 					continue
 				}
 				pendingMode = false
-				log.Println("device approved; resuming normal reporting")
+				log.Println("设备已通过审核，恢复正常上报")
 				last = &lastState{snap: snap, mediaSig: mediaSignature(minfo, merr)}
 				lastReport = time.Now()
 				continue
@@ -338,7 +338,7 @@ func main() {
 
 			snap, err := foreground.GetSnapshot()
 			if err != nil {
-				log.Printf("foreground: %v", err)
+				log.Printf("前台应用：%v", err)
 				continue
 			}
 			minfo, merr := media.GetNowPlaying()

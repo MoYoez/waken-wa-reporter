@@ -10,13 +10,13 @@ import (
 func PrintApprovalBanner(approvalURL string) {
 	fmt.Fprintln(os.Stdout, "")
 	fmt.Fprintln(os.Stdout, "  +----------------------------------------------------------------+")
-	fmt.Fprintln(os.Stdout, "  | Device pending admin approval                                  |")
-	fmt.Fprintln(os.Stdout, "  | Reporting is paused until an admin approves this device.        |")
+	fmt.Fprintln(os.Stdout, "  | 设备正在等待管理员审核                                         |")
+	fmt.Fprintln(os.Stdout, "  | 在审核通过前，上报已暂停。                                     |")
 	fmt.Fprintln(os.Stdout, "  +----------------------------------------------------------------+")
-	fmt.Fprintln(os.Stdout, "  Approval URL:")
+	fmt.Fprintln(os.Stdout, "  审核链接：")
 	u := strings.TrimSpace(approvalURL)
 	if u == "" {
-		fmt.Fprintln(os.Stdout, "  (empty)")
+		fmt.Fprintln(os.Stdout, "  （空）")
 	} else {
 		// Single line so query strings (e.g. &hash=…) are not split mid-value.
 		fmt.Fprintf(os.Stdout, "  %s\n", u)
