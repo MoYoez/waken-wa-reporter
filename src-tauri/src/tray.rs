@@ -13,6 +13,12 @@ pub fn show_main_window(app: &AppHandle) -> Result<(), String> {
     let window = app
         .get_webview_window("main")
         .ok_or_else(|| "未找到主窗口。".to_string())?;
+
+    #[cfg(target_os = "macos")]
+    {
+        let _ = app.set_dock_visibility(false);
+    }
+
     let _ = window.set_skip_taskbar(false);
     let _ = window.unminimize();
     let _ = window.show();

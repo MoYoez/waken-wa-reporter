@@ -8,16 +8,22 @@ mod reporter_config;
 mod state_store;
 mod tray;
 
-use tauri::{Manager, WindowEvent};
+use tauri::{Manager, RunEvent, WindowEvent};
 
 use realtime_reporter::{config_is_ready, ReporterRuntime};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .manage(ReporterRuntime::new())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            {
+                let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                let _ = app.set_dock_visibility(false);
+            }
+
             tray::setup_tray(&app.handle())
                 .map_err(|error| -> Box<dyn std::error::Error> { error.into() })?;
 
@@ -57,6 +63,13 @@ pub fn run() {
             commands::run_platform_self_test,
             commands::discover_existing_reporter_config
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(|app_handle, event| {
+        #[cfg(target_os = "macos")]
+        if let RunEvent::Reopen { .. } = event {
+            let _ = tray::show_main_window(app_handle);
+        }
+    });
 }
