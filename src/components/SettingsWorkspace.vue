@@ -27,6 +27,7 @@ const configReady = computed(
 defineEmits<{
   "update:modelValue": [value: ClientConfig];
   imported: [message: string];
+  save: [];
   startReporter: [];
   stopReporter: [];
 }>();
@@ -70,6 +71,7 @@ async function handleSelfTest() {
         <p class="hero-copy">在这里完成连接、设备身份和后台同步设置，让这台客户端稳定接入你的 Waken-Wa。</p>
       </div>
       <div class="hero-actions">
+        <Button label="保存设置" icon="pi pi-save" severity="secondary" @click="$emit('save')" />
         <Tag :value="reporterSnapshot.running ? '运行中' : '未启动'" :severity="reporterSnapshot.running ? 'success' : 'warn'" rounded />
       </div>
     </header>

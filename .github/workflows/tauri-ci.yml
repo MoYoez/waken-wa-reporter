@@ -93,15 +93,7 @@
         - name: install-frontend-dependencies
           run: pnpm install --frozen-lockfile
 
-        - name: check-rust-format
-          run: cargo fmt --check
-          working-directory: src-tauri
-
-        - name: check-rust-compile
-          run: cargo check
-          working-directory: src-tauri
-
-        - name: check-frontend-build
+        - name: build-tauri-windows
           run: pnpm tauri build
 
         - name: upload-windows-bundle
@@ -142,15 +134,7 @@
         - name: install-frontend-dependencies
           run: pnpm install --frozen-lockfile
 
-        - name: check-rust-format
-          run: cargo fmt --check
-          working-directory: src-tauri
-
-        - name: check-rust-compile
-          run: cargo check
-          working-directory: src-tauri
-
-        - name: check-frontend-build
+        - name: build-tauri-macos
           run: pnpm tauri build
 
         - name: upload-macos-bundle

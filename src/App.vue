@@ -36,6 +36,7 @@ type AppSection = "overview" | "settings" | "activity" | "realtime" | "inspirati
 const toast = useToast();
 
 const config = ref<ClientConfig>(defaultClientConfig());
+const onboardingDraftConfig = ref<ClientConfig>(defaultClientConfig());
 const recentPresets = ref<RecentPreset[]>([]);
 const activeSection = ref<AppSection>("overview");
 const hydrated = ref(false);
@@ -92,6 +93,7 @@ function handlePresetSaved(preset: RecentPreset) {
       item.process_title !== preset.process_title,
   );
   recentPresets.value = [preset, ...deduped].slice(0, 6);
+  void persistAppState();
 }
 
 function notifyImport(message: string) {
@@ -106,21 +108,24 @@ function notifyImport(message: string) {
 function closeOnboarding() {
   onboardingSetupMode.value = false;
   onboardingDismissed.value = true;
+  void persistAppState();
 }
 
 function startSetup() {
   reporterConfigPromptHandled.value = true;
+  onboardingDraftConfig.value = { ...config.value };
   onboardingSetupMode.value = true;
 }
 
 function skipExistingReporterConfig() {
   reporterConfigPromptHandled.value = true;
+  void persistAppState();
 }
 
 async function useExistingReporterConfig() {
   if (!existingReporterConfig.value?.config) return;
   importingReporterConfig.value = true;
-  config.value = { ...existingReporterConfig.value.config };
+  onboardingDraftConfig.value = { ...existingReporterConfig.value.config };
   reporterConfigPromptHandled.value = true;
   importingReporterConfig.value = false;
   toast.add({
@@ -130,6 +135,38 @@ async function useExistingReporterConfig() {
     life: 3500,
   });
   onboardingSetupMode.value = true;
+}
+
+async function persistAppState(configOverride?: ClientConfig) {
+  await saveAppState(
+    configOverride ?? config.value,
+    recentPresets.value,
+    onboardingDismissed.value,
+    reporterConfigPromptHandled.value,
+  );
+}
+
+async function handleSaveSettings() {
+  await persistAppState();
+  toast.add({
+    severity: "success",
+    summary: "设置已保存",
+    detail: "当前配置已写入本地。",
+    life: 2500,
+  });
+}
+
+async function completeOnboardingSetup() {
+  config.value = { ...onboardingDraftConfig.value };
+  onboardingDismissed.value = true;
+  onboardingSetupMode.value = false;
+  await persistAppState(config.value);
+  toast.add({
+    severity: "success",
+    summary: "设置已完成",
+    detail: "欢迎开始使用桌面客户端。",
+    life: 2500,
+  });
 }
 
 async function refreshReporterSnapshot() {
@@ -193,15 +230,6 @@ async function handleStopReporter() {
 }
 
 watch(
-  [config, recentPresets, onboardingDismissed, reporterConfigPromptHandled],
-  async ([nextConfig, nextPresets, nextDismissed, nextReporterPromptHandled]) => {
-    if (!hydrated.value) return;
-    await saveAppState(nextConfig, nextPresets, nextDismissed, nextReporterPromptHandled);
-  },
-  { deep: true },
-);
-
-watch(
   () => [
     reporterSnapshot.value.lastPendingApprovalMessage,
     reporterSnapshot.value.lastPendingApprovalUrl,
@@ -220,6 +248,7 @@ watch(
 onMounted(async () => {
   const state = await loadAppState();
   config.value = state.config;
+  onboardingDraftConfig.value = { ...state.config };
   recentPresets.value = state.recentPresets;
   onboardingDismissed.value = state.onboardingDismissed;
   reporterConfigPromptHandled.value = state.reporterConfigPromptHandled ?? false;
@@ -313,16 +342,20 @@ onBeforeUnmount(() => {
             填好接入配置后，就可以开始使用桌面客户端；你也可以先导入现有配置，再按需要微调。
           </p>
           <ConnectionPanel
-            :model-value="config"
-            @update:model-value="config = $event"
+            :model-value="onboardingDraftConfig"
+            @update:model-value="onboardingDraftConfig = $event"
             @imported="notifyImport"
           />
           <div class="actions-row">
             <Button
               label="完成并开始使用"
               icon="pi pi-check"
-              :disabled="!readiness"
-              @click="closeOnboarding"
+              :disabled="!(
+                onboardingDraftConfig.baseUrl.trim() &&
+                onboardingDraftConfig.apiToken.trim() &&
+                onboardingDraftConfig.generatedHashKey.trim()
+              )"
+              @click="completeOnboardingSetup"
             />
             <Button
               label="返回上一步"
@@ -408,6 +441,7 @@ onBeforeUnmount(() => {
         :reporter-busy="reporterBusy"
         @update:model-value="config = $event"
         @imported="notifyImport"
+        @save="handleSaveSettings"
         @start-reporter="handleStartReporter"
         @stop-reporter="handleStopReporter"
       />

@@ -232,12 +232,20 @@ select {
 
 .onboarding-panel {
   padding: 28px;
+  max-height: min(88vh, 920px);
   border-radius: 28px;
   background: linear-gradient(180deg, rgba(255, 251, 245, 0.98), rgba(246, 239, 229, 0.96));
   border: 1px solid rgba(154, 131, 102, 0.12);
   box-shadow: 0 20px 50px rgba(100, 80, 54, 0.12);
   display: grid;
   gap: 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+}
+
+.onboarding-panel::-webkit-scrollbar {
+  display: none;
 }
 
 .onboarding-panel h3 {
