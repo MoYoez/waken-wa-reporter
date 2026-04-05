@@ -11,8 +11,23 @@ pub fn get_now_playing() -> Result<MediaInfo, String> {
 
 pub fn run_self_test() -> PlatformSelfTestResult {
     build_self_test_result(
-        make_probe(false, "前台应用采集不支持", "当前平台暂不支持实时采集。", Vec::new()),
-        make_probe(false, "窗口标题采集不支持", "当前平台暂不支持实时采集。", Vec::new()),
-        make_probe(false, "媒体采集不支持", "当前平台暂不支持实时采集。", Vec::new()),
+        make_probe(
+            false,
+            "前台应用采集不支持",
+            "当前平台暂不支持实时采集。",
+            Vec::new(),
+        ),
+        make_probe(
+            false,
+            "窗口标题采集不支持",
+            "当前平台暂不支持实时采集。",
+            Vec::new(),
+        ),
+        make_probe(
+            false,
+            "媒体采集不支持",
+            "当前平台暂不支持实时采集。",
+            Vec::new(),
+        ),
     )
 }

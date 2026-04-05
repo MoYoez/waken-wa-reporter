@@ -48,8 +48,14 @@ pub fn parse_import_payload(input: &str) -> Result<ImportedIntegrationConfig, St
         })
     });
 
-    let legacy_endpoint = raw.get("endpoint").and_then(Value::as_str).map(str::to_string);
-    let legacy_api_key = raw.get("apiKey").and_then(Value::as_str).map(str::to_string);
+    let legacy_endpoint = raw
+        .get("endpoint")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    let legacy_api_key = raw
+        .get("apiKey")
+        .and_then(Value::as_str)
+        .map(str::to_string);
     let legacy_token_name = raw
         .get("tokenName")
         .and_then(Value::as_str)

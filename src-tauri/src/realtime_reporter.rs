@@ -234,7 +234,11 @@ fn run_reporter_loop(
                                 &state,
                                 &mut sequence_seed,
                                 "success",
-                                if is_heartbeat { "活动心跳" } else { "活动已上报" },
+                                if is_heartbeat {
+                                    "活动心跳"
+                                } else {
+                                    "活动已上报"
+                                },
                                 &detail,
                                 serde_json::to_value(&payload).ok(),
                             );
@@ -317,10 +321,21 @@ pub fn config_is_ready(config: &ClientConfig) -> bool {
     validate_reporter_config(config).is_ok()
 }
 
-fn build_log_detail(snapshot: &ForegroundSnapshot, media: &MediaInfo, is_heartbeat: bool) -> String {
-    let action = if is_heartbeat { "心跳上报" } else { "活动上报" };
+fn build_log_detail(
+    snapshot: &ForegroundSnapshot,
+    media: &MediaInfo,
+    is_heartbeat: bool,
+) -> String {
+    let action = if is_heartbeat {
+        "心跳上报"
+    } else {
+        "活动上报"
+    };
     if media.is_empty() {
-        format!("{action}：{} / {}", snapshot.process_name, snapshot.process_title)
+        format!(
+            "{action}：{} / {}",
+            snapshot.process_name, snapshot.process_title
+        )
     } else {
         format!(
             "{action}：{} / {} | 媒体：{}",
@@ -492,7 +507,12 @@ fn post_activity_blocking(
         .and_then(Value::as_bool)
         .unwrap_or(true);
 
-    if status == 202 && parsed.get("pending").and_then(Value::as_bool).unwrap_or(false) {
+    if status == 202
+        && parsed
+            .get("pending")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    {
         let message = parsed
             .get("error")
             .and_then(Value::as_str)

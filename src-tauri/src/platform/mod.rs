@@ -25,7 +25,9 @@ pub struct MediaInfo {
 
 impl MediaInfo {
     pub fn is_empty(&self) -> bool {
-        self.title.trim().is_empty() && self.artist.trim().is_empty() && self.album.trim().is_empty()
+        self.title.trim().is_empty()
+            && self.artist.trim().is_empty()
+            && self.album.trim().is_empty()
     }
 
     pub fn signature(&self) -> String {
@@ -51,8 +53,14 @@ impl MediaInfo {
             map.insert("title".into(), Value::String(self.title.trim().to_string()));
         }
         if !self.artist.trim().is_empty() {
-            map.insert("artist".into(), Value::String(self.artist.trim().to_string()));
-            map.insert("singer".into(), Value::String(self.artist.trim().to_string()));
+            map.insert(
+                "artist".into(),
+                Value::String(self.artist.trim().to_string()),
+            );
+            map.insert(
+                "singer".into(),
+                Value::String(self.artist.trim().to_string()),
+            );
         }
         if !self.album.trim().is_empty() {
             map.insert("album".into(), Value::String(self.album.trim().to_string()));
@@ -75,19 +83,19 @@ impl MediaInfo {
     }
 }
 
-#[cfg(target_os = "windows")]
-pub use windows::{get_foreground_snapshot, get_now_playing};
 #[cfg(target_os = "macos")]
 pub use macos::{get_foreground_snapshot, get_now_playing};
 #[cfg(not(any(target_os = "windows", target_os = "macos")))]
 pub use stub::{get_foreground_snapshot, get_now_playing};
-
 #[cfg(target_os = "windows")]
-pub use windows::run_self_test;
+pub use windows::{get_foreground_snapshot, get_now_playing};
+
 #[cfg(target_os = "macos")]
 pub use macos::run_self_test;
 #[cfg(not(any(target_os = "windows", target_os = "macos")))]
 pub use stub::run_self_test;
+#[cfg(target_os = "windows")]
+pub use windows::run_self_test;
 
 pub fn platform_name() -> &'static str {
     #[cfg(target_os = "windows")]
@@ -104,7 +112,12 @@ pub fn platform_name() -> &'static str {
     }
 }
 
-pub fn make_probe(success: bool, summary: impl Into<String>, detail: impl Into<String>, guidance: Vec<String>) -> PlatformProbeResult {
+pub fn make_probe(
+    success: bool,
+    summary: impl Into<String>,
+    detail: impl Into<String>,
+    guidance: Vec<String>,
+) -> PlatformProbeResult {
     PlatformProbeResult {
         success,
         summary: summary.into(),

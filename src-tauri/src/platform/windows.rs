@@ -7,8 +7,8 @@ use crate::models::PlatformSelfTestResult;
 
 #[cfg(target_os = "windows")]
 use windows::{
-    Media::Control::GlobalSystemMediaTransportControlsSessionManager,
     core::{HRESULT, PWSTR},
+    Media::Control::GlobalSystemMediaTransportControlsSessionManager,
     Win32::{
         Foundation::{CloseHandle, MAX_PATH},
         System::{
@@ -254,12 +254,9 @@ pub fn run_self_test() -> PlatformSelfTestResult {
     };
 
     let media = match get_now_playing() {
-        Ok(info) if !info.is_empty() => make_probe(
-            true,
-            "媒体采集正常",
-            info.summary(),
-            Vec::new(),
-        ),
+        Ok(info) if !info.is_empty() => {
+            make_probe(true, "媒体采集正常", info.summary(), Vec::new())
+        }
         Ok(_) => make_probe(
             true,
             "当前没有播放中的媒体",

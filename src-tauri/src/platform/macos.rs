@@ -1,4 +1,4 @@
-use std::ffi::{CStr, c_char};
+use std::ffi::{c_char, CStr};
 use std::process::Command;
 
 use super::{build_self_test_result, make_probe, ForegroundSnapshot, MediaInfo};
@@ -121,7 +121,9 @@ pub fn run_self_test() -> PlatformSelfTestResult {
     );
 
     let media = match get_now_playing() {
-        Ok(info) if !info.is_empty() => make_probe(true, "媒体采集正常", info.summary(), Vec::new()),
+        Ok(info) if !info.is_empty() => {
+            make_probe(true, "媒体采集正常", info.summary(), Vec::new())
+        }
         Ok(_) => make_probe(
             true,
             "当前没有播放中的媒体",

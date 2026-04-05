@@ -1,0 +1,161 @@
+  name: Tauri CI
+
+  on:
+    push:
+      branches:
+        - tauri-desktop
+    pull_request:
+    workflow_dispatch:
+
+  permissions:
+    contents: read
+
+  concurrency:
+    group: tauri-ci-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+  env:
+    NODE_VERSION: "20"
+    PNPM_VERSION: "9"
+
+  jobs:
+    quality:
+      name: code-quality
+      runs-on: windows-latest
+
+      steps:
+        - name: checkout-code
+          uses: actions/checkout@v4
+
+        - name: install-pnpm
+          uses: pnpm/action-setup@v4
+          with:
+            version: ${{ env.PNPM_VERSION }}
+
+        - name: install-nodejs
+          uses: actions/setup-node@v4
+          with:
+            node-version: ${{ env.NODE_VERSION }}
+            cache: pnpm
+
+        - name: install-rust-toolchain
+          uses: dtolnay/rust-toolchain@stable
+          with:
+            components: rustfmt
+
+        - name: rust-cache
+          uses: Swatinem/rust-cache@v2
+          with:
+            workspaces: src-tauri -> target
+
+        - name: install-frontend-dependencies
+          run: pnpm install --frozen-lockfile
+
+        - name: check-rust-format
+          run: cargo fmt --check
+          working-directory: src-tauri
+
+        - name: check-rust-compile
+          run: cargo check
+          working-directory: src-tauri
+
+        - name: check-frontend-build
+          run: pnpm build
+
+    build-windows:
+      name: build-windows
+      runs-on: windows-latest
+      needs: quality
+
+      steps:
+        - name: checkout-code
+          uses: actions/checkout@v4
+
+        - name: install-pnpm
+          uses: pnpm/action-setup@v4
+          with:
+            version: ${{ env.PNPM_VERSION }}
+
+        - name: install-nodejs
+          uses: actions/setup-node@v4
+          with:
+            node-version: ${{ env.NODE_VERSION }}
+            cache: pnpm
+
+        - name: install-rust-toolchain
+          uses: dtolnay/rust-toolchain@stable
+
+        - name: rust-cache
+          uses: Swatinem/rust-cache@v2
+          with:
+            workspaces: src-tauri -> target
+
+        - name: install-frontend-dependencies
+          run: pnpm install --frozen-lockfile
+
+        - name: check-rust-format
+          run: cargo fmt --check
+          working-directory: src-tauri
+
+        - name: check-rust-compile
+          run: cargo check
+          working-directory: src-tauri
+
+        - name: check-frontend-build
+          run: pnpm tauri build
+
+        - name: upload-windows-bundle
+          uses: actions/upload-artifact@v4
+          with:
+            name: tauri-windows-bundle
+            path: src-tauri/target/release/bundle/**
+            if-no-files-found: error
+
+    build-macos:
+      name: build-macos
+      runs-on: macos-latest
+      needs: quality
+
+      steps:
+        - name: checkout-code
+          uses: actions/checkout@v4
+
+        - name: install-pnpm
+          uses: pnpm/action-setup@v4
+          with:
+            version: ${{ env.PNPM_VERSION }}
+
+        - name: install-nodejs
+          uses: actions/setup-node@v4
+          with:
+            node-version: ${{ env.NODE_VERSION }}
+            cache: pnpm
+
+        - name: install-rust-toolchain
+          uses: dtolnay/rust-toolchain@stable
+
+        - name: rust-cache
+          uses: Swatinem/rust-cache@v2
+          with:
+            workspaces: src-tauri -> target
+
+        - name: install-frontend-dependencies
+          run: pnpm install --frozen-lockfile
+
+        - name: check-rust-format
+          run: cargo fmt --check
+          working-directory: src-tauri
+
+        - name: check-rust-compile
+          run: cargo check
+          working-directory: src-tauri
+
+        - name: check-frontend-build
+          run: pnpm tauri build
+
+        - name: upload-macos-bundle
+          uses: actions/upload-artifact@v4
+          with:
+            name: tauri-macos-bundle
+            path: src-tauri/target/release/bundle/**
+            if-no-files-found: error

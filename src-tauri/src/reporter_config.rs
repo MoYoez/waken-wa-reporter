@@ -36,7 +36,9 @@ fn reporter_config_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(base.join("waken-wa").join("config.json"))
 }
 
-pub fn discover_existing_reporter_config(app: &AppHandle) -> Result<ExistingReporterConfig, String> {
+pub fn discover_existing_reporter_config(
+    app: &AppHandle,
+) -> Result<ExistingReporterConfig, String> {
     let path = reporter_config_path(app)?;
     if !path.exists() {
         return Ok(ExistingReporterConfig {
@@ -46,8 +48,8 @@ pub fn discover_existing_reporter_config(app: &AppHandle) -> Result<ExistingRepo
         });
     }
 
-    let content = fs::read_to_string(&path)
-        .map_err(|error| format!("读取 reporter 配置失败：{error}"))?;
+    let content =
+        fs::read_to_string(&path).map_err(|error| format!("读取 reporter 配置失败：{error}"))?;
     let parsed: ReporterConfigFile = serde_json::from_str(&content)
         .map_err(|error| format!("解析 reporter 配置失败：{error}"))?;
 

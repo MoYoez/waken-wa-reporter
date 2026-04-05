@@ -5,15 +5,13 @@ use crate::{
     http_client::request_json,
     import_config::parse_import_payload,
     models::{
-        ActivityPayload, ApiResult, AppStatePayload, ClientConfig, ImportedIntegrationConfig,
-        ExistingReporterConfig, InspirationEntryCreateInput, PlatformSelfTestResult,
+        ActivityPayload, ApiResult, AppStatePayload, ClientConfig, ExistingReporterConfig,
+        ImportedIntegrationConfig, InspirationEntryCreateInput, PlatformSelfTestResult,
         RealtimeReporterSnapshot,
     },
     platform,
-    reporter_config,
     realtime_reporter::{snapshot_result, ReporterRuntime},
-    state_store,
-    tray,
+    reporter_config, state_store, tray,
 };
 
 #[tauri::command]
@@ -27,7 +25,9 @@ pub fn save_app_state(app: AppHandle, payload: AppStatePayload) -> Result<(), St
 }
 
 #[tauri::command]
-pub fn parse_imported_integration_config(input: String) -> Result<ImportedIntegrationConfig, String> {
+pub fn parse_imported_integration_config(
+    input: String,
+) -> Result<ImportedIntegrationConfig, String> {
     parse_import_payload(&input)
 }
 

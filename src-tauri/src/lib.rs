@@ -3,8 +3,8 @@ mod http_client;
 mod import_config;
 mod models;
 mod platform;
-mod reporter_config;
 mod realtime_reporter;
+mod reporter_config;
 mod state_store;
 mod tray;
 
