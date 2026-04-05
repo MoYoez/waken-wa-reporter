@@ -94,13 +94,16 @@
           run: pnpm install --frozen-lockfile
 
         - name: build-tauri-windows
-          run: pnpm tauri build
+          run: pnpm tauri build --bundles msi,appx
 
-        - name: upload-windows-bundle
+        - name: upload-windows-installers
           uses: actions/upload-artifact@v4
           with:
-            name: tauri-windows-bundle
-            path: src-tauri/target/release/bundle/**
+            name: tauri-windows-installers
+            path: |
+              src-tauri/target/release/bundle/msi/*.msi
+              src-tauri/target/release/bundle/appx/*.msix
+              src-tauri/target/release/bundle/appx/*.appx
             if-no-files-found: error
 
     build-macos:
@@ -135,11 +138,11 @@
           run: pnpm install --frozen-lockfile
 
         - name: build-tauri-macos
-          run: pnpm tauri build
+          run: pnpm tauri build --bundles dmg
 
-        - name: upload-macos-bundle
+        - name: upload-macos-dmg
           uses: actions/upload-artifact@v4
           with:
-            name: tauri-macos-bundle
-            path: src-tauri/target/release/bundle/**
+            name: tauri-macos-dmg
+            path: src-tauri/target/release/bundle/dmg/*.dmg
             if-no-files-found: error
