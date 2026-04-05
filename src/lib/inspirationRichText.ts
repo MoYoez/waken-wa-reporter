@@ -14,6 +14,7 @@ export interface LexicalRoot {
 }
 
 const MARKDOWN_IMAGE_RE = /!\[[^\]]*\]\(([^)]+)\)/g;
+const MARKDOWN_LINK_RE = /\[([^\]]+)\]\(([^)]+)\)/g;
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -210,6 +211,21 @@ export function stripMarkdownImages(markdown: string) {
   return markdown.replace(MARKDOWN_IMAGE_RE, "");
 }
 
+function stripMarkdownForPreview(markdown: string) {
+  return markdown
+    .replace(/```([\s\S]*?)```/g, "$1")
+    .replace(MARKDOWN_IMAGE_RE, "")
+    .replace(MARKDOWN_LINK_RE, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/~~([^~]+)~~/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/_([^_]+)_/g, "$1")
+    .replace(/^\s{0,3}(#{1,6}\s+|>\s?|-+\s+|\*+\s+|\d+\.\s+)/gm, "")
+    .replace(/^\s{0,3}([-*_]){3,}\s*$/gm, "");
+}
+
 export function sanitizeEntryContent(content: string) {
   return stripMarkdownImages(content)
     .replace(/\n{3,}/g, "\n\n")
@@ -342,8 +358,8 @@ export function previewInspirationContent(
   contentLexical: string | null | undefined,
   limit = 180,
 ) {
-  const base = lexicalTextContent(contentLexical) || sanitizeEntryContent(content);
-  const normalized = base.replace(/\s+/g, " ").trim();
+  const raw = lexicalTextContent(contentLexical) || content;
+  const normalized = stripMarkdownForPreview(raw).replace(/\s+/g, " ").trim();
   if (!normalized) return "";
   if (normalized.length <= limit) return normalized;
   return `${normalized.slice(0, limit).trimEnd()}...`;

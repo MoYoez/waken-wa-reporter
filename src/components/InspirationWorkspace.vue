@@ -105,10 +105,7 @@ function lexicalOf(entry: InspirationEntry | null | undefined) {
 }
 
 function extractPreviewImage(entry: InspirationEntry) {
-  if (entry.imageDataUrl?.trim()) return resolveAssetUrl(entry.imageDataUrl);
-
-  const match = contentOf(entry).match(/!\[[^\]]*]\(([^)]+)\)/);
-  return resolveAssetUrl(match?.[1] ?? "");
+  return resolveAssetUrl(entry.imageDataUrl?.trim() ?? "");
 }
 
 function resolveAssetUrl(rawUrl: string) {
@@ -620,7 +617,6 @@ async function submitEntry() {
                   v-if="inlineImageDataUrl.trim()"
                   :src="inlineImageDataUrl"
                   alt="Draft cover"
-                  preview
                   image-class="entry-detail-image"
                 />
 
@@ -675,7 +671,6 @@ async function submitEntry() {
           <Image
             :src="inlineImageDataUrl"
             alt="Inspiration cover"
-            preview
             image-class="inline-preview-image"
           />
         </div>
@@ -712,7 +707,6 @@ async function submitEntry() {
               v-if="extractPreviewImage(entry)"
               :src="extractPreviewImage(entry)"
               alt="Entry attachment"
-              preview
               image-class="entry-preview-image"
             />
 
@@ -759,7 +753,6 @@ async function submitEntry() {
           v-if="extractPreviewImage(selectedEntry)"
           :src="extractPreviewImage(selectedEntry)"
           alt="Entry attachment"
-          preview
           image-class="entry-detail-image"
         />
         <div
