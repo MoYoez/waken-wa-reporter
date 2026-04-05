@@ -4,7 +4,7 @@
 
 > 此版本 为 Go 编写的 CLI 版本，如果您在寻找 Desktop 界面的版本，请参考 [Tauri-Desktop](https://github.com/MoYoez/waken-wa-reporter/tree/tauri-desktop) 
 
-> 也有适用于 Auto.js 的 **Android** 版本（能力见下表）。
+> 也有适用于 [Auto.js](https://github.com/SuperMonster003/AutoJs6) 的 **Android** 版本（能力见下表）[Android](https://github.com/MoYoez/waken-wa-reporter/blob/main/mobile/android/autojs/waken-wa-activity.js)。
 
 ## 平台兼容
 
