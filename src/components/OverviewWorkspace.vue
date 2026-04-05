@@ -1,0 +1,124 @@
+<script setup lang="ts">
+import { computed } from "vue";
+import Card from "primevue/card";
+import Message from "primevue/message";
+import Tag from "primevue/tag";
+
+import type { ClientConfig, RealtimeReporterSnapshot } from "../types";
+
+const props = defineProps<{
+  config: ClientConfig;
+  readiness: boolean;
+  reporterSnapshot: RealtimeReporterSnapshot;
+}>();
+
+const latestLogs = computed(() => props.reporterSnapshot.logs.slice(0, 4));
+
+function formatTime(value?: string | null) {
+  if (!value) return "暂无";
+  return new Date(value).toLocaleString();
+}
+</script>
+
+<template>
+  <div class="workspace-grid">
+    <header class="hero-panel">
+      <div>
+        <p class="eyebrow">概览</p>
+        <h2>概览</h2>
+        <p class="hero-copy">在这里查看当前连接状态、设备信息和后台同步运行情况。</p>
+      </div>
+      <div class="hero-actions">
+        <Tag :value="reporterSnapshot.running ? '后台同步运行中' : '后台同步未开启'" :severity="reporterSnapshot.running ? 'success' : 'warn'" rounded />
+      </div>
+    </header>
+
+    <Card class="glass-card overview-summary-card">
+      <template #content>
+        <div class="overview-summary">
+          <div class="overview-item">
+            <span>站点地址</span>
+            <strong>{{ config.baseUrl || "未设置" }}</strong>
+          </div>
+          <div class="overview-item">
+            <span>设备名称</span>
+            <strong>{{ config.device || "未命名设备" }}</strong>
+          </div>
+          <div class="overview-item">
+            <span>默认模式</span>
+            <strong>{{ config.pushMode === "active" ? "长期展示" : "实时模式" }}</strong>
+          </div>
+          <div class="overview-item">
+            <span>最近心跳</span>
+            <strong>{{ formatTime(reporterSnapshot.lastHeartbeatAt) }}</strong>
+          </div>
+        </div>
+      </template>
+    </Card>
+
+    <Card class="glass-card">
+      <template #title>
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">当前状态</p>
+            <h3>后台同步</h3>
+          </div>
+        </div>
+      </template>
+      <template #content>
+        <div class="overview-summary">
+          <div class="overview-item">
+            <span>基础配置</span>
+            <strong>{{ readiness ? "已就绪" : "待完善" }}</strong>
+          </div>
+          <div class="overview-item">
+            <span>当前进程</span>
+            <strong>{{ reporterSnapshot.currentActivity?.processName || "暂无" }}</strong>
+          </div>
+          <div class="overview-item">
+            <span>窗口标题</span>
+            <strong>{{ reporterSnapshot.currentActivity?.processTitle || "暂无" }}</strong>
+          </div>
+          <div class="overview-item">
+            <span>轮询间隔</span>
+            <strong>{{ config.pollIntervalMs }} ms</strong>
+          </div>
+        </div>
+
+        <div class="message-stack">
+          <Message v-if="reporterSnapshot.lastError" severity="error" :closable="false">
+            {{ reporterSnapshot.lastError }}
+          </Message>
+          <Message v-else-if="!reporterSnapshot.running" severity="secondary" :closable="false">
+            后台同步当前未开启。你可以在“设置”里手动开启，或启用启动后自动同步。
+          </Message>
+        </div>
+      </template>
+    </Card>
+
+    <Card class="glass-card">
+      <template #title>
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">最近动态</p>
+            <h3>这里展示最近几次后台同步的内容摘要</h3>
+          </div>
+        </div>
+      </template>
+      <template #content>
+        <div v-if="latestLogs.length" class="log-list">
+          <article v-for="log in latestLogs" :key="log.id" class="log-item">
+            <div class="log-header">
+              <strong>{{ log.title }}</strong>
+              <small>{{ formatTime(log.timestamp) }}</small>
+            </div>
+            <p class="log-detail">{{ log.detail }}</p>
+          </article>
+        </div>
+        <Message v-else severity="secondary" :closable="false">
+          开启后台同步后，最近动态会显示在这里。
+        </Message>
+      </template>
+    </Card>
+  </div>
+</template>
