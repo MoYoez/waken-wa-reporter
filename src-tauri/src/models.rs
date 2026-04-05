@@ -119,8 +119,14 @@ pub struct ActivityPayload {
 pub struct InspirationEntryCreateInput {
     pub title: String,
     pub content: String,
+    pub content_lexical: Option<String>,
     pub image_data_url: Option<String>,
     pub generated_hash_key: Option<String>,
+    pub attach_current_status: Option<bool>,
+    pub pre_computed_status_snapshot: Option<String>,
+    pub attach_status_device_hash: Option<String>,
+    pub attach_status_activity_key: Option<String>,
+    pub attach_status_include_device_info: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

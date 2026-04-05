@@ -1,56 +1,187 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from "vue";
+import { computed, onErrorCaptured, onMounted, reactive, ref, watch } from "vue";
 import Button from "primevue/button";
 import Card from "primevue/card";
+import Dialog from "primevue/dialog";
 import Image from "primevue/image";
 import InputText from "primevue/inputtext";
 import Message from "primevue/message";
+import Select from "primevue/select";
 import Tag from "primevue/tag";
 import Textarea from "primevue/textarea";
+import ToggleSwitch from "primevue/toggleswitch";
 import { useToast } from "primevue/usetoast";
 
+import LexicalEditor from "./LexicalEditor.vue";
 import {
   createInspirationEntry,
+  getPublicActivityFeed,
   listInspirationEntries,
   uploadInspirationAsset,
   validateConfig,
 } from "../lib/api";
-import type {
-  ClientConfig,
-  InspirationAssetUploadResult,
-  InspirationEntry,
-} from "../types";
+import {
+  appendParagraphTextToLexical,
+  previewInspirationContent,
+  renderInspirationContentHtml,
+  sanitizeEntryContent as sanitizeRichTextContent,
+} from "../lib/inspirationRichText";
+import { useInspirationDraftStore } from "../stores/inspirationDraft";
+import type { ActivityFeedItem, ClientConfig, InspirationEntry } from "../types";
+
+interface ActivitySelectOption {
+  value: string;
+  label: string;
+  snapshot: string;
+  group: "active" | "recent";
+  item: ActivityFeedItem;
+  deviceName: string;
+}
 
 const props = defineProps<{
   config: ClientConfig;
 }>();
 
 const toast = useToast();
+const draftStore = useInspirationDraftStore();
 
 const compose = reactive({
-  title: "",
-  content: "",
+  title: draftStore.title,
+  content: draftStore.content,
+  contentLexical: draftStore.contentLexical,
 });
 
 const entries = ref<InspirationEntry[]>([]);
+const selectedEntry = ref<InspirationEntry | null>(null);
 const loading = ref(false);
 const submitting = ref(false);
 const uploadPending = ref(false);
+const inlineUploadPending = ref(false);
 const loadError = ref("");
-const uploadedAsset = ref<InspirationAssetUploadResult | null>(null);
-const inlineImageDataUrl = ref("");
+const activityLoadError = ref("");
+const inlineImageDataUrl = ref(draftStore.coverImageDataUrl);
+const bodyImageInput = ref<HTMLInputElement | null>(null);
+const composeTab = ref<"edit" | "preview">(draftStore.composeTab);
+const selectedActivityKey = ref(draftStore.selectedActivityKey);
+const attachCurrentStatus = ref(draftStore.attachCurrentStatus);
+const attachStatusIncludeDeviceInfo = ref(draftStore.attachStatusIncludeDeviceInfo);
+const activityOptions = ref<ActivitySelectOption[]>([]);
+const activityLoading = ref(false);
+const editorFaulted = ref(false);
 
 const configIssues = computed(() => validateConfig(props.config));
+const selectedActivityOption = computed(() =>
+  activityOptions.value.find((item) => item.value === selectedActivityKey.value) ?? null,
+);
+const selectedSnapshotPreview = computed(() => {
+  if (!attachCurrentStatus.value || !selectedActivityOption.value) return "";
+  return selectedActivityOption.value.snapshot;
+});
+const selectedEntryVisible = computed({
+  get: () => Boolean(selectedEntry.value),
+  set: (visible: boolean) => {
+    if (!visible) {
+      selectedEntry.value = null;
+    }
+  },
+});
+
+onErrorCaptured((error, instance, info) => {
+  console.error("[InspirationWorkspace] render error:", error, info, instance);
+  editorFaulted.value = true;
+  return false;
+});
+
+function openEntry(entry: InspirationEntry) {
+  selectedEntry.value = entry;
+}
+
+function contentOf(entry: InspirationEntry | null | undefined) {
+  return typeof entry?.content === "string" ? entry.content : "";
+}
+
+function lexicalOf(entry: InspirationEntry | null | undefined) {
+  return typeof entry?.contentLexical === "string" ? entry.contentLexical : "";
+}
 
 function extractPreviewImage(entry: InspirationEntry) {
-  if (entry.imageDataUrl?.trim()) return entry.imageDataUrl;
+  if (entry.imageDataUrl?.trim()) return resolveAssetUrl(entry.imageDataUrl);
 
-  const match = entry.content.match(/!\[[^\]]*]\(([^)]+)\)/);
-  return match?.[1] ?? "";
+  const match = contentOf(entry).match(/!\[[^\]]*]\(([^)]+)\)/);
+  return resolveAssetUrl(match?.[1] ?? "");
+}
+
+function resolveAssetUrl(rawUrl: string) {
+  const value = rawUrl.trim();
+  if (!value) return "";
+
+  try {
+    return new URL(value).toString();
+  } catch {
+    try {
+      return new URL(value, props.config.baseUrl.trim()).toString();
+    } catch {
+      return value;
+    }
+  }
+}
+
+function toLine(item: ActivityFeedItem) {
+  const statusText = String(item.statusText ?? "").trim();
+  if (statusText) return statusText;
+
+  const processName = String(item.processName ?? "").trim();
+  const processTitle = String(item.processTitle ?? "").trim();
+  if (processTitle && processName) return `${processTitle} | ${processName}`;
+  return processName || processTitle || "未命名活动";
+}
+
+function toBatteryPercent(item: ActivityFeedItem) {
+  const metadata = item.metadata;
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
+  const raw = (metadata as Record<string, unknown>).deviceBatteryPercent;
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return null;
+  return Math.round(raw);
+}
+
+function buildSnapshotText(item: ActivityFeedItem, includeDeviceInfo: boolean) {
+  const base = toLine(item).trim();
+  if (!base) return "";
+  if (!includeDeviceInfo) return base;
+
+  const deviceName = String(item.device ?? "").trim();
+  if (!deviceName) return base;
+
+  const battery = toBatteryPercent(item);
+  const suffix = typeof battery === "number" ? `（${deviceName} · ${battery}%）` : `（${deviceName}）`;
+  return `${base} ${suffix}`.trim();
+}
+
+function toActivityOptions(items: ActivityFeedItem[], group: "active" | "recent") {
+  return items
+    .map((item, index) => {
+      const idPart = String(item.id ?? `${item.processName ?? "item"}-${index}`);
+      const snapshot = buildSnapshotText(item, attachStatusIncludeDeviceInfo.value);
+      const device = String(item.device ?? "").trim();
+      const prefix = group === "active" ? "当前" : "最近";
+      return {
+        value: `${group}:${idPart}`,
+        label: device ? `${prefix} · ${snapshot} · ${device}` : `${prefix} · ${snapshot}`,
+        snapshot,
+        group,
+        item,
+        deviceName: device,
+      } satisfies ActivitySelectOption;
+    })
+    .filter((item) => item.snapshot.trim().length > 0);
 }
 
 function formatTime(value: string) {
-  return new Date(value).toLocaleString();
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value || "-";
+  }
+  return date.toLocaleString();
 }
 
 async function loadEntries() {
@@ -70,8 +201,137 @@ async function loadEntries() {
     return;
   }
 
-  entries.value = result.data ?? [];
+  const normalized = (result.data ?? []).map((entry) => ({
+    ...entry,
+    title: typeof entry.title === "string" ? entry.title : null,
+    content: typeof entry.content === "string" ? entry.content : "",
+    contentLexical: typeof entry.contentLexical === "string" ? entry.contentLexical : null,
+    imageDataUrl: typeof entry.imageDataUrl === "string" ? entry.imageDataUrl : null,
+    statusSnapshot: typeof entry.statusSnapshot === "string" ? entry.statusSnapshot : null,
+    createdAt:
+      typeof entry.createdAt === "string" && entry.createdAt.trim()
+        ? entry.createdAt
+        : new Date().toISOString(),
+  }));
+  entries.value = normalized;
 }
+
+async function loadActivityOptions() {
+  if (!props.config.baseUrl.trim()) {
+    activityOptions.value = [];
+    activityLoadError.value = "";
+    return;
+  }
+
+  activityLoading.value = true;
+  activityLoadError.value = "";
+
+  const result = await getPublicActivityFeed(props.config);
+  activityLoading.value = false;
+
+  if (!result.success || !result.data) {
+    activityLoadError.value = result.error?.message ?? "活动列表加载失败。";
+    activityOptions.value = [];
+    return;
+  }
+
+  const activeStatuses = Array.isArray(result.data.activeStatuses)
+    ? result.data.activeStatuses
+    : [];
+  const recentActivities = Array.isArray(result.data.recentActivities)
+    ? result.data.recentActivities
+    : [];
+
+  const options = [
+    ...toActivityOptions(activeStatuses as ActivityFeedItem[], "active"),
+    ...toActivityOptions((recentActivities as ActivityFeedItem[]).slice(0, 20), "recent"),
+  ];
+
+  const deduped = options.filter(
+    (item, index, all) => index === all.findIndex((candidate) => candidate.value === item.value),
+  );
+
+  activityOptions.value = deduped;
+  if (
+    selectedActivityKey.value &&
+    !activityOptions.value.some((item) => item.value === selectedActivityKey.value)
+  ) {
+    selectedActivityKey.value = "";
+  }
+  pickDefaultActivity();
+}
+
+function pickDefaultActivity() {
+  if (!attachCurrentStatus.value) return;
+  if (selectedActivityKey.value) return;
+  if (!activityOptions.value.length) return;
+
+  const preferred = activityOptions.value.find((item) => item.group === "active") ?? activityOptions.value[0];
+  selectedActivityKey.value = preferred?.value ?? "";
+}
+
+onMounted(() => {
+  if (props.config.baseUrl.trim()) {
+    void loadEntries();
+    void loadActivityOptions();
+  }
+});
+
+watch(
+  () => props.config.baseUrl.trim(),
+  (nextBaseUrl, previousBaseUrl) => {
+    if (!nextBaseUrl) {
+      entries.value = [];
+      loadError.value = "";
+      activityOptions.value = [];
+      activityLoadError.value = "";
+      return;
+    }
+
+    if (nextBaseUrl !== previousBaseUrl) {
+      void loadEntries();
+      void loadActivityOptions();
+    }
+  },
+);
+
+watch(
+  compose,
+  (next) => {
+    draftStore.patchDraft({
+      title: next.title,
+      content: next.content,
+      contentLexical: next.contentLexical,
+    });
+  },
+  { deep: true },
+);
+
+watch(inlineImageDataUrl, (value) => {
+  draftStore.patchDraft({ coverImageDataUrl: value });
+});
+
+watch(composeTab, (value) => {
+  draftStore.patchDraft({ composeTab: value });
+});
+
+watch(selectedActivityKey, (value) => {
+  draftStore.patchDraft({ selectedActivityKey: value });
+});
+
+watch(attachCurrentStatus, (value) => {
+  draftStore.patchDraft({ attachCurrentStatus: value });
+  if (value) {
+    pickDefaultActivity();
+  }
+});
+
+watch(attachStatusIncludeDeviceInfo, (value) => {
+  draftStore.patchDraft({ attachStatusIncludeDeviceInfo: value });
+  if (props.config.baseUrl.trim()) {
+    void loadActivityOptions();
+  }
+});
 
 async function onFileSelected(event: Event) {
   const target = event.target as HTMLInputElement | null;
@@ -88,34 +348,58 @@ async function onFileSelected(event: Event) {
   });
 
   inlineImageDataUrl.value = dataUrl;
-
-  const result = await uploadInspirationAsset(props.config, dataUrl);
   uploadPending.value = false;
   if (target) target.value = "";
 
-  if (!result.success || !result.data) {
-    toast.add({
-      severity: "error",
-      summary: "图片上传失败",
-      detail: result.error?.message ?? "图片上传失败。",
-      life: 4000,
-    });
-    return;
-  }
-
-  uploadedAsset.value = result.data;
-
-  const markdown = `\n\n![inspiration-image](${result.data.url})`;
-  if (!compose.content.includes(result.data.url)) {
-    compose.content += markdown;
-  }
-
   toast.add({
     severity: "success",
-    summary: "图片已上传",
-    detail: "资源地址已自动插入到草稿内容中。",
+    summary: "头图已准备",
+    detail: "这张图片会作为本条灵感的头图一并发布。",
     life: 3000,
   });
+}
+
+async function onBodyImageSelected(event: Event) {
+  const target = event.target as HTMLInputElement | null;
+  const file = target?.files?.[0];
+  if (!file) return;
+
+  inlineUploadPending.value = true;
+
+  try {
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result ?? ""));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+
+    const result = await uploadInspirationAsset(props.config, dataUrl);
+    if (!result.success || !result.data?.url) {
+      toast.add({
+        severity: "error",
+        summary: "附图上传失败",
+        detail: result.error?.message ?? "正文附图上传失败。",
+        life: 4000,
+      });
+      return;
+    }
+
+    compose.contentLexical = appendParagraphTextToLexical(
+      compose.contentLexical,
+      `![](${result.data.url})`,
+    );
+
+    toast.add({
+      severity: "success",
+      summary: "附图已插入",
+      detail: "图片已经作为正文附图插入到当前灵感中。",
+      life: 3000,
+    });
+  } finally {
+    inlineUploadPending.value = false;
+    if (target) target.value = "";
+  }
 }
 
 async function submitEntry() {
@@ -139,11 +423,34 @@ async function submitEntry() {
     return;
   }
 
+  if (attachCurrentStatus.value && !selectedActivityOption.value) {
+    toast.add({
+      severity: "warn",
+      summary: "请选择要附带的活动",
+      detail: "开启附带当前状态后，需要选择一条活动记录。",
+      life: 3000,
+    });
+    return;
+  }
+
+  const contentToSubmit = compose.content.trim();
+  const lexicalToSubmit = compose.contentLexical;
+  const attachPayloadEnabled = attachCurrentStatus.value && Boolean(selectedActivityOption.value);
+
   submitting.value = true;
   const result = await createInspirationEntry(props.config, {
     title: compose.title,
-    content: compose.content,
+    content: contentToSubmit,
+    contentLexical: lexicalToSubmit || undefined,
+    imageDataUrl: inlineImageDataUrl.value || undefined,
     generatedHashKey: props.config.generatedHashKey.trim(),
+    attachCurrentStatus: attachPayloadEnabled || undefined,
+    preComputedStatusSnapshot: attachPayloadEnabled ? selectedSnapshotPreview.value : undefined,
+    attachStatusDeviceHash: attachPayloadEnabled ? props.config.generatedHashKey.trim() : undefined,
+    attachStatusActivityKey: attachPayloadEnabled ? selectedActivityKey.value : undefined,
+    attachStatusIncludeDeviceInfo: attachPayloadEnabled
+      ? attachStatusIncludeDeviceInfo.value
+      : undefined,
   });
   submitting.value = false;
 
@@ -164,10 +471,15 @@ async function submitEntry() {
     life: 3000,
   });
 
-  compose.title = "";
-  compose.content = "";
-  uploadedAsset.value = null;
-  inlineImageDataUrl.value = "";
+  draftStore.resetDraft();
+  compose.title = draftStore.title;
+  compose.content = draftStore.content;
+  compose.contentLexical = draftStore.contentLexical;
+  inlineImageDataUrl.value = draftStore.coverImageDataUrl;
+  composeTab.value = draftStore.composeTab;
+  selectedActivityKey.value = draftStore.selectedActivityKey;
+  attachCurrentStatus.value = draftStore.attachCurrentStatus;
+  attachStatusIncludeDeviceInfo.value = draftStore.attachStatusIncludeDeviceInfo;
 
   void loadEntries();
 }
@@ -194,25 +506,145 @@ async function submitEntry() {
       </template>
       <template #content>
         <div class="panel-grid">
-          <label class="field-block field-span-2">
+          <div class="field-block field-span-2">
             <span class="field-label">标题</span>
             <InputText v-model="compose.title" placeholder="例如：今天突然冒出的一个想法" />
-          </label>
-          <label class="field-block field-span-2">
+          </div>
+
+          <div class="field-block field-span-2">
+            <span class="field-label">关联活动（可选）</span>
+            <div class="activity-toggle-row">
+              <ToggleSwitch v-model="attachCurrentStatus" input-id="attach-current-status" />
+              <label for="attach-current-status">提交时附带当前状态快照</label>
+              <ToggleSwitch
+                v-model="attachStatusIncludeDeviceInfo"
+                input-id="attach-device-info"
+                :disabled="!attachCurrentStatus"
+              />
+              <label for="attach-device-info">快照包含设备与电量</label>
+            </div>
+            <div class="activity-select-row">
+              <Select
+                v-model="selectedActivityKey"
+                :options="activityOptions"
+                option-label="label"
+                option-value="value"
+                show-clear
+                filter
+                :loading="activityLoading"
+                :disabled="!attachCurrentStatus"
+                placeholder="选择一条活动并附带到状态快照"
+              />
+              <Button
+                icon="pi pi-refresh"
+                severity="secondary"
+                text
+                :loading="activityLoading"
+                @click="loadActivityOptions"
+              />
+            </div>
+            <small class="field-help">逻辑与 Web 端一致：可选设备活动，提交时由后端生成状态快照。</small>
+            <div v-if="attachCurrentStatus && selectedSnapshotPreview" class="snapshot-preview">
+              <strong>快照预览：</strong>
+              <span>{{ selectedSnapshotPreview }}</span>
+            </div>
+          </div>
+
+          <div class="field-block field-span-2">
             <span class="field-label">正文</span>
-            <Textarea
-              v-model="compose.content"
-              rows="10"
-              auto-resize
-              placeholder="写下一段随想，或粘贴你想同步到 Waken-Wa 的内容。"
+            <input
+              ref="bodyImageInput"
+              type="file"
+              accept="image/*"
+              class="sr-only"
+              @change="onBodyImageSelected"
             />
-          </label>
+            <div class="editor-mode-tabs">
+              <button
+                type="button"
+                class="editor-mode-tab"
+                :class="{ active: composeTab === 'edit' }"
+                @click="composeTab = 'edit'"
+              >
+                编辑
+              </button>
+              <button
+                type="button"
+                class="editor-mode-tab"
+                :class="{ active: composeTab === 'preview' }"
+                @click="composeTab = 'preview'"
+              >
+                预览
+              </button>
+            </div>
+            <div class="editor-asset-actions">
+              <Button
+                label="插入附图"
+                icon="pi pi-image"
+                text
+                size="small"
+                :loading="inlineUploadPending"
+                @click="bodyImageInput?.click()"
+              />
+              <small>头图用于封面，附图会插入正文内容里。</small>
+            </div>
+            <div v-show="composeTab === 'edit'" class="editor-tab-panel">
+              <LexicalEditor
+                v-if="!editorFaulted"
+                v-model="compose.content"
+                v-model:lexical-value="compose.contentLexical"
+                placeholder="写下一段随想，支持标题、引用、列表、链接和代码。"
+              />
+              <div v-else class="editor-fallback">
+                <Message severity="warn" :closable="false">
+                  编辑器暂时切换到兼容模式，已避免页面卡死。
+                </Message>
+                <Textarea
+                  v-model="compose.content"
+                  rows="12"
+                  auto-resize
+                  placeholder="请输入正文内容"
+                />
+              </div>
+            </div>
+            <div v-show="composeTab === 'preview'" class="compose-live-preview compose-tab-preview">
+              <article class="entry-card compose-preview-card">
+                <div class="entry-header">
+                  <div>
+                    <h4>{{ compose.title.trim() || "未命名条目" }}</h4>
+                    <small>尚未发布</small>
+                  </div>
+                </div>
+
+                <Image
+                  v-if="inlineImageDataUrl.trim()"
+                  :src="inlineImageDataUrl"
+                  alt="Draft cover"
+                  preview
+                  image-class="entry-detail-image"
+                />
+
+                <div
+                  v-if="compose.content.trim() || compose.contentLexical.trim()"
+                  class="entry-content markdown-content"
+                  v-html="renderInspirationContentHtml(compose.content, compose.contentLexical, resolveAssetUrl)"
+                />
+                <Message
+                  v-else
+                  severity="secondary"
+                  :closable="false"
+                >
+                  这里会显示当前正文的最终效果。
+                </Message>
+              </article>
+            </div>
+          </div>
         </div>
 
         <div class="inspiration-upload">
           <label class="upload-label">
             <input type="file" accept="image/*" @change="onFileSelected" />
-            <span><i class="pi pi-image" /> 上传图片</span>
+            <span><i class="pi pi-image" /> 选择头图</span>
           </label>
           <Button
             label="发布内容"
@@ -229,18 +661,20 @@ async function submitEntry() {
           <Message v-if="loadError" severity="error" :closable="false">
             {{ loadError }}
           </Message>
+          <Message v-if="activityLoadError" severity="warn" :closable="false">
+            {{ activityLoadError }}
+          </Message>
         </div>
 
-        <div v-if="uploadedAsset" class="asset-preview">
+        <div v-if="inlineImageDataUrl" class="asset-preview">
           <div>
-            <p class="field-label">最近上传的图片</p>
-            <strong>{{ uploadedAsset.publicKey }}</strong>
-            <small>{{ uploadedAsset.url }}</small>
+            <p class="field-label">当前头图</p>
+            <strong>发布时会作为灵感头图显示</strong>
+            <small>不再把图片地址写进正文内容。</small>
           </div>
           <Image
-            v-if="inlineImageDataUrl"
             :src="inlineImageDataUrl"
-            alt="Uploaded inspiration asset"
+            alt="Inspiration cover"
             preview
             image-class="inline-preview-image"
           />
@@ -260,7 +694,12 @@ async function submitEntry() {
       </template>
       <template #content>
         <div v-if="entries.length" class="entry-list">
-          <article v-for="entry in entries" :key="entry.id" class="entry-card">
+          <article
+            v-for="(entry, index) in entries"
+            :key="`inspiration-${entry.id ?? 'na'}-${entry.createdAt}-${index}`"
+            class="entry-card entry-card-button"
+            @click="openEntry(entry)"
+          >
             <div class="entry-header">
               <div>
                 <h4>{{ entry.title || "未命名条目" }}</h4>
@@ -277,10 +716,19 @@ async function submitEntry() {
               image-class="entry-preview-image"
             />
 
-            <p class="entry-content">{{ entry.content }}</p>
+            <p
+              v-if="previewInspirationContent(contentOf(entry), lexicalOf(entry))"
+              class="entry-content entry-preview-text"
+            >
+              {{ previewInspirationContent(contentOf(entry), lexicalOf(entry)) }}
+            </p>
             <blockquote v-if="entry.statusSnapshot" class="status-snapshot">
               {{ entry.statusSnapshot }}
             </blockquote>
+            <div class="entry-card-footer">
+              <span>点击查看完整内容</span>
+              <i class="pi pi-angle-right" />
+            </div>
           </article>
         </div>
         <Message v-else-if="!loading && !loadError" severity="secondary" :closable="false">
@@ -288,5 +736,41 @@ async function submitEntry() {
         </Message>
       </template>
     </Card>
+
+    <Dialog
+      v-model:visible="selectedEntryVisible"
+      modal
+      dismissable-mask
+      :draggable="false"
+      class="entry-detail-dialog"
+    >
+      <template #header>
+        <div v-if="selectedEntry" class="panel-heading">
+          <div>
+            <p class="eyebrow">灵感详情</p>
+            <h3>{{ selectedEntry.title || "未命名条目" }}</h3>
+          </div>
+          <small>{{ formatTime(selectedEntry.createdAt) }}</small>
+        </div>
+      </template>
+
+      <div v-if="selectedEntry" class="entry-detail-content">
+        <Image
+          v-if="extractPreviewImage(selectedEntry)"
+          :src="extractPreviewImage(selectedEntry)"
+          alt="Entry attachment"
+          preview
+          image-class="entry-detail-image"
+        />
+        <div
+          v-if="sanitizeRichTextContent(contentOf(selectedEntry)) || lexicalOf(selectedEntry)"
+          class="entry-content markdown-content"
+          v-html="renderInspirationContentHtml(contentOf(selectedEntry), lexicalOf(selectedEntry), resolveAssetUrl)"
+        />
+        <blockquote v-if="selectedEntry.statusSnapshot" class="status-snapshot">
+          {{ selectedEntry.statusSnapshot }}
+        </blockquote>
+      </div>
+    </Dialog>
   </div>
 </template>

@@ -108,8 +108,14 @@ pub async fn create_inspiration_entry(
     let body = json!({
         "title": input.title.trim(),
         "content": input.content.trim(),
+        "contentLexical": input.content_lexical,
         "imageDataUrl": input.image_data_url,
         "generatedHashKey": input.generated_hash_key,
+        "attachCurrentStatus": input.attach_current_status,
+        "preComputedStatusSnapshot": input.pre_computed_status_snapshot,
+        "attachStatusDeviceHash": input.attach_status_device_hash,
+        "attachStatusActivityKey": input.attach_status_activity_key,
+        "attachStatusIncludeDeviceInfo": input.attach_status_include_device_info,
     });
 
     Ok(request_json(

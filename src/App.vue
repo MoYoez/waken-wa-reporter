@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import Tag from "primevue/tag";
 import Toast from "primevue/toast";
 import { useToast } from "primevue/usetoast";
 
+import ActivityWorkspace from "./components/ActivityWorkspace.vue";
 import ConnectionPanel from "./components/ConnectionPanel.vue";
+import InspirationWorkspace from "./components/InspirationWorkspace.vue";
 import OverviewWorkspace from "./components/OverviewWorkspace.vue";
+import RealtimeWorkspace from "./components/RealtimeWorkspace.vue";
 import SettingsWorkspace from "./components/SettingsWorkspace.vue";
 import {
   discoverExistingReporterConfig,
@@ -22,14 +25,6 @@ import type {
   RealtimeReporterSnapshot,
   RecentPreset,
 } from "./types";
-
-const ActivityWorkspace = defineAsyncComponent(() => import("./components/ActivityWorkspace.vue"));
-const InspirationWorkspace = defineAsyncComponent(
-  () => import("./components/InspirationWorkspace.vue"),
-);
-const RealtimeWorkspace = defineAsyncComponent(
-  () => import("./components/RealtimeWorkspace.vue"),
-);
 
 type AppSection = "overview" | "settings" | "activity" | "realtime" | "inspiration";
 
@@ -170,11 +165,15 @@ async function completeOnboardingSetup() {
 }
 
 async function refreshReporterSnapshot() {
+  if (activeSection.value === "inspiration") {
+    return;
+  }
+
   const result = await getRealtimeReporterSnapshot();
   if (!result.success || !result.data) {
     return;
   }
-  reporterSnapshot.value = result.data;
+  Object.assign(reporterSnapshot.value, result.data);
 }
 
 function closePendingApprovalDialog() {
@@ -196,7 +195,7 @@ async function handleStartReporter() {
     return;
   }
 
-  reporterSnapshot.value = result.data;
+  Object.assign(reporterSnapshot.value, result.data);
   toast.add({
     severity: "success",
     summary: "后台同步已开启",
@@ -220,7 +219,7 @@ async function handleStopReporter() {
     return;
   }
 
-  reporterSnapshot.value = result.data;
+  Object.assign(reporterSnapshot.value, result.data);
   toast.add({
     severity: "success",
     summary: "后台同步已停止",
@@ -243,6 +242,15 @@ watch(
     pendingApprovalDialogVisible.value = true;
   },
   { immediate: true },
+);
+
+watch(
+  () => activeSection.value,
+  (section) => {
+    if (section !== "inspiration") {
+      void refreshReporterSnapshot();
+    }
+  },
 );
 
 onMounted(async () => {
@@ -279,124 +287,125 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <Toast position="top-right" />
-  <Dialog
-    :visible="shouldShowOnboarding"
-    modal
-    dismissable-mask
-    :draggable="false"
-    :closable="false"
-    class="onboarding-dialog"
-  >
-    <template #container>
-      <div class="onboarding-panel">
-        <template v-if="!onboardingSetupMode">
-          <p class="eyebrow">首次引导</p>
-          <h3>先完成连接设置，再开始使用桌面客户端</h3>
-          <p class="onboarding-copy">
-            首次使用时，你可以直接导入本机已有配置，或手动完成连接设置。准备完成后，就可以开始同步活动状态，并在后台持续更新。
-          </p>
-          <div v-if="existingReporterConfig?.found && !reporterConfigPromptHandled" class="onboarding-step onboarding-highlight">
-            <strong>发现可用的本机配置</strong>
-            <span>已在本机找到 `waken-wa-reporter` 配置文件，可直接导入站点地址、Token、设备标识和同步参数。</span>
-            <small v-if="existingReporterConfig.path">{{ existingReporterConfig.path }}</small>
+  <div class="app-root">
+    <Toast position="top-right" />
+    <Dialog
+      :visible="shouldShowOnboarding"
+      modal
+      dismissable-mask
+      :draggable="false"
+      :closable="false"
+      class="onboarding-dialog"
+    >
+      <template #container>
+        <div class="onboarding-panel">
+          <template v-if="!onboardingSetupMode">
+            <p class="eyebrow">首次引导</p>
+            <h3>先完成连接设置，再开始使用桌面客户端</h3>
+            <p class="onboarding-copy">
+              首次使用时，你可以直接导入本机已有配置，或手动完成连接设置。准备完成后，就可以开始同步活动状态，并在后台持续更新。
+            </p>
+            <div v-if="existingReporterConfig?.found && !reporterConfigPromptHandled" class="onboarding-step onboarding-highlight">
+              <strong>发现可用的本机配置</strong>
+              <span>已在本机找到 `waken-wa-reporter` 配置文件，可直接导入站点地址、Token、设备标识和同步参数。</span>
+              <small v-if="existingReporterConfig.path">{{ existingReporterConfig.path }}</small>
+              <div class="actions-row">
+                <Button
+                  label="使用现有配置"
+                  icon="pi pi-download"
+                  :loading="importingReporterConfig"
+                  @click="useExistingReporterConfig"
+                />
+                <Button
+                  label="暂不导入"
+                  severity="secondary"
+                  text
+                  @click="skipExistingReporterConfig"
+                />
+              </div>
+            </div>
+            <div class="onboarding-steps">
+              <div class="onboarding-step">
+                <strong>1. 完成连接</strong>
+                <span>在引导中完成站点地址、Token 与设备名称设置。</span>
+              </div>
+              <div class="onboarding-step">
+                <strong>2. 检查采集能力</strong>
+                <span>完成配置后，再到设置页检查前台应用、窗口标题和媒体读取能力。</span>
+              </div>
+              <div class="onboarding-step">
+                <strong>3. 开始同步</strong>
+                <span>配置完成后，你可以手动更新状态，也可以开启后台同步持续更新当前状态。</span>
+              </div>
+            </div>
+            <div class="actions-row">
+              <Button label="前往设置" icon="pi pi-arrow-right" @click="startSetup" />
+              <Button label="稍后再说" severity="secondary" text @click="closeOnboarding" />
+            </div>
+          </template>
+
+          <template v-else>
+            <p class="eyebrow">首次引导</p>
+            <h3>在这里完成连接设置</h3>
+            <p class="onboarding-copy">
+              填好接入配置后，就可以开始使用桌面客户端；你也可以先导入现有配置，再按需要微调。
+            </p>
+            <ConnectionPanel
+              :model-value="onboardingDraftConfig"
+              @update:model-value="onboardingDraftConfig = $event"
+              @imported="notifyImport"
+            />
             <div class="actions-row">
               <Button
-                label="使用现有配置"
-                icon="pi pi-download"
-                :loading="importingReporterConfig"
-                @click="useExistingReporterConfig"
+                label="完成并开始使用"
+                icon="pi pi-check"
+                :disabled="!(
+                  onboardingDraftConfig.baseUrl.trim() &&
+                  onboardingDraftConfig.apiToken.trim() &&
+                  onboardingDraftConfig.generatedHashKey.trim()
+                )"
+                @click="completeOnboardingSetup"
               />
               <Button
-                label="暂不导入"
+                label="返回上一步"
                 severity="secondary"
                 text
-                @click="skipExistingReporterConfig"
+                @click="onboardingSetupMode = false"
               />
             </div>
-          </div>
-          <div class="onboarding-steps">
-            <div class="onboarding-step">
-              <strong>1. 完成连接</strong>
-              <span>在引导中完成站点地址、Token 与设备名称设置。</span>
-            </div>
-            <div class="onboarding-step">
-              <strong>2. 检查采集能力</strong>
-              <span>完成配置后，再到设置页检查前台应用、窗口标题和媒体读取能力。</span>
-            </div>
-            <div class="onboarding-step">
-              <strong>3. 开始同步</strong>
-              <span>配置完成后，你可以手动更新状态，也可以开启后台同步持续更新当前状态。</span>
-            </div>
-          </div>
-          <div class="actions-row">
-            <Button label="前往设置" icon="pi pi-arrow-right" @click="startSetup" />
-            <Button label="稍后再说" severity="secondary" text @click="closeOnboarding" />
-          </div>
-        </template>
+          </template>
+        </div>
+      </template>
+    </Dialog>
 
-        <template v-else>
-          <p class="eyebrow">首次引导</p>
-          <h3>在这里完成连接设置</h3>
-          <p class="onboarding-copy">
-            填好接入配置后，就可以开始使用桌面客户端；你也可以先导入现有配置，再按需要微调。
-          </p>
-          <ConnectionPanel
-            :model-value="onboardingDraftConfig"
-            @update:model-value="onboardingDraftConfig = $event"
-            @imported="notifyImport"
-          />
-          <div class="actions-row">
-            <Button
-              label="完成并开始使用"
-              icon="pi pi-check"
-              :disabled="!(
-                onboardingDraftConfig.baseUrl.trim() &&
-                onboardingDraftConfig.apiToken.trim() &&
-                onboardingDraftConfig.generatedHashKey.trim()
-              )"
-              @click="completeOnboardingSetup"
-            />
-            <Button
-              label="返回上一步"
-              severity="secondary"
-              text
-              @click="onboardingSetupMode = false"
-            />
-          </div>
-        </template>
+    <Dialog
+      v-model:visible="pendingApprovalDialogVisible"
+      modal
+      dismissable-mask
+      :draggable="false"
+      header="设备待审核"
+      style="width: min(560px, calc(100vw - 24px))"
+    >
+      <div class="onboarding-steps">
+        <div class="onboarding-step">
+          <strong>{{ reporterSnapshot.lastPendingApprovalMessage || "设备待后台审核后可用" }}</strong>
+          <span>后台同步已经识别到当前设备尚未通过审核，请前往 Waken-Wa 后台的设备管理完成审核。</span>
+        </div>
+        <div
+          v-if="reporterSnapshot.lastPendingApprovalUrl"
+          class="onboarding-step onboarding-highlight"
+        >
+          <strong>审核地址</strong>
+          <span>{{ reporterSnapshot.lastPendingApprovalUrl }}</span>
+        </div>
       </div>
-    </template>
-  </Dialog>
+      <div class="actions-row">
+        <Button label="我知道了" icon="pi pi-check" @click="closePendingApprovalDialog" />
+      </div>
+    </Dialog>
 
-  <Dialog
-    v-model:visible="pendingApprovalDialogVisible"
-    modal
-    dismissable-mask
-    :draggable="false"
-    header="设备待审核"
-    style="width: min(560px, calc(100vw - 24px))"
-  >
-    <div class="onboarding-steps">
-      <div class="onboarding-step">
-        <strong>{{ reporterSnapshot.lastPendingApprovalMessage || "设备待后台审核后可用" }}</strong>
-        <span>后台同步已经识别到当前设备尚未通过审核，请前往 Waken-Wa 后台的设备管理完成审核。</span>
-      </div>
-      <div
-        v-if="reporterSnapshot.lastPendingApprovalUrl"
-        class="onboarding-step onboarding-highlight"
-      >
-        <strong>审核地址</strong>
-        <span>{{ reporterSnapshot.lastPendingApprovalUrl }}</span>
-      </div>
-    </div>
-    <div class="actions-row">
-      <Button label="我知道了" icon="pi pi-check" @click="closePendingApprovalDialog" />
-    </div>
-  </Dialog>
-
-  <div class="app-shell">
-    <aside class="app-sidebar">
+    <div class="app-shell">
+      <aside class="app-sidebar">
       <div class="brand-block">
         <p class="eyebrow">Waken-Wa</p>
         <h1>桌面客户端</h1>
@@ -424,41 +433,45 @@ onBeforeUnmount(() => {
         <Tag :value="reporterSnapshot.running ? '后台同步运行中' : '后台同步未开启'" :severity="reporterSnapshot.running ? 'success' : 'secondary'" rounded />
         <small>关闭主窗口后会最小化到系统托盘，可在后台继续驻留。</small>
       </div>
-    </aside>
+      </aside>
 
-    <main class="app-main">
-      <OverviewWorkspace
-        v-if="activeSection === 'overview'"
-        :config="config"
-        :readiness="readiness"
-        :reporter-snapshot="reporterSnapshot"
-      />
+      <main class="app-main">
+        <OverviewWorkspace
+          v-if="activeSection === 'overview'"
+          :config="config"
+          :readiness="readiness"
+          :reporter-snapshot="reporterSnapshot"
+        />
 
-      <SettingsWorkspace
-        v-else-if="activeSection === 'settings'"
-        :model-value="config"
-        :reporter-snapshot="reporterSnapshot"
-        :reporter-busy="reporterBusy"
-        @update:model-value="config = $event"
-        @imported="notifyImport"
-        @save="handleSaveSettings"
-        @start-reporter="handleStartReporter"
-        @stop-reporter="handleStopReporter"
-      />
+        <SettingsWorkspace
+          v-else-if="activeSection === 'settings'"
+          :model-value="config"
+          :reporter-snapshot="reporterSnapshot"
+          :reporter-busy="reporterBusy"
+          @update:model-value="config = $event"
+          @imported="notifyImport"
+          @save="handleSaveSettings"
+          @start-reporter="handleStartReporter"
+          @stop-reporter="handleStopReporter"
+        />
 
-      <ActivityWorkspace
-        v-else-if="activeSection === 'activity'"
-        :config="config"
-        :recent-presets="recentPresets"
-        @preset-saved="handlePresetSaved"
-      />
+        <ActivityWorkspace
+          v-else-if="activeSection === 'activity'"
+          :config="config"
+          :recent-presets="recentPresets"
+          @preset-saved="handlePresetSaved"
+        />
 
-      <RealtimeWorkspace
-        v-else-if="activeSection === 'realtime'"
-        :snapshot="reporterSnapshot"
-      />
+        <RealtimeWorkspace
+          v-else-if="activeSection === 'realtime'"
+          :snapshot="reporterSnapshot"
+        />
 
-      <InspirationWorkspace v-else :config="config" />
-    </main>
+        <InspirationWorkspace
+          v-else-if="activeSection === 'inspiration'"
+          :config="config"
+        />
+      </main>
+    </div>
   </div>
 </template>

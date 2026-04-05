@@ -60,6 +60,7 @@ export interface InspirationEntry {
   id: number;
   title: string | null;
   content: string;
+  contentLexical?: string | null;
   imageDataUrl?: string | null;
   statusSnapshot?: string | null;
   createdAt: string;
@@ -69,8 +70,14 @@ export interface InspirationEntry {
 export interface InspirationEntryCreateInput {
   title: string;
   content: string;
+  contentLexical?: string;
   imageDataUrl?: string;
   generatedHashKey?: string;
+  attachCurrentStatus?: boolean;
+  preComputedStatusSnapshot?: string;
+  attachStatusDeviceHash?: string;
+  attachStatusActivityKey?: string;
+  attachStatusIncludeDeviceInfo?: boolean;
 }
 
 export interface InspirationAssetUploadResult {
