@@ -1,4 +1,5 @@
 use std::ffi::{c_char, CStr};
+use std::path::Path;
 use std::process::Command;
 
 use super::{build_self_test_result, make_probe, ForegroundSnapshot, MediaInfo};
@@ -21,36 +22,66 @@ fn read_bridge_string(fetch: unsafe extern "C" fn() -> *mut c_char) -> Option<St
 }
 
 fn get_now_playing_via_nowplaying_cli() -> Result<MediaInfo, String> {
-    let output = Command::new("nowplaying-cli")
-        .args(["get", "title", "artist", "album"])
-        .output()
-        .map_err(|error| format!("调用 nowplaying-cli 失败：{error}"))?;
+    let candidates = [
+        "nowplaying-cli",
+        "/usr/local/bin/nowplaying-cli",
+        "/opt/homebrew/bin/nowplaying-cli",
+    ];
+    let mut last_error = None;
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("nowplaying-cli 返回失败：{}", stderr.trim()));
+    for candidate in candidates {
+        if candidate.contains('/') && !Path::new(candidate).exists() {
+            continue;
+        }
+
+        match Command::new(candidate)
+            .args(["get", "title", "artist", "album"])
+            .output()
+        {
+            Ok(output) => {
+                if !output.status.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    return Err(format!(
+                        "nowplaying-cli 返回失败（{}）：{}",
+                        candidate,
+                        stderr.trim()
+                    ));
+                }
+
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                let mut lines = stdout.lines().map(str::trim);
+                let title = lines.next().unwrap_or_default().to_string();
+                let artist = lines.next().unwrap_or_default().to_string();
+                let album = lines.next().unwrap_or_default().to_string();
+
+                let normalize = |value: String| {
+                    if value.eq_ignore_ascii_case("null") {
+                        String::new()
+                    } else {
+                        value
+                    }
+                };
+
+                return Ok(MediaInfo {
+                    title: normalize(title),
+                    artist: normalize(artist),
+                    album: normalize(album),
+                    source_app_id: "nowplaying-cli".into(),
+                });
+            }
+            Err(error) => {
+                last_error = Some(format!("{}: {}", candidate, error));
+            }
+        }
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut lines = stdout.lines().map(str::trim);
-    let title = lines.next().unwrap_or_default().to_string();
-    let artist = lines.next().unwrap_or_default().to_string();
-    let album = lines.next().unwrap_or_default().to_string();
-
-    let normalize = |value: String| {
-        if value.eq_ignore_ascii_case("null") {
-            String::new()
-        } else {
-            value
-        }
-    };
-
-    Ok(MediaInfo {
-        title: normalize(title),
-        artist: normalize(artist),
-        album: normalize(album),
-        source_app_id: "nowplaying-cli".into(),
-    })
+    let current_path = std::env::var("PATH").unwrap_or_default();
+    Err(format!(
+        "调用 nowplaying-cli 失败：未在可用路径中找到可执行文件。已尝试：{}。PATH={}. 最后一次错误：{}",
+        candidates.join(", "),
+        current_path,
+        last_error.unwrap_or_else(|| "未知错误".to_string())
+    ))
 }
 
 pub fn get_foreground_snapshot() -> Result<ForegroundSnapshot, String> {
