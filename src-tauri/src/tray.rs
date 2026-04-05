@@ -16,7 +16,8 @@ pub fn show_main_window(app: &AppHandle) -> Result<(), String> {
 
     #[cfg(target_os = "macos")]
     {
-        let _ = app.set_dock_visibility(false);
+        let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
+        let _ = app.set_dock_visibility(true);
     }
 
     let _ = window.set_skip_taskbar(false);
@@ -32,6 +33,13 @@ pub fn hide_main_window(app: &AppHandle) -> Result<(), String> {
         .ok_or_else(|| "未找到主窗口。".to_string())?;
     let _ = window.hide();
     let _ = window.set_skip_taskbar(true);
+
+    #[cfg(target_os = "macos")]
+    {
+        let _ = app.set_dock_visibility(false);
+        let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+    }
+
     Ok(())
 }
 

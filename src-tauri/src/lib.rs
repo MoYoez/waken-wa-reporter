@@ -18,12 +18,6 @@ pub fn run() {
         .manage(ReporterRuntime::new())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            #[cfg(target_os = "macos")]
-            {
-                let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-                let _ = app.set_dock_visibility(false);
-            }
-
             tray::setup_tray(&app.handle())
                 .map_err(|error| -> Box<dyn std::error::Error> { error.into() })?;
 
