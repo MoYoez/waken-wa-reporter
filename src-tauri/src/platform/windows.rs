@@ -1,6 +1,4 @@
-use std::{path::Path, process::Command};
-
-use serde_json::Value;
+use std::path::Path;
 
 use super::{build_self_test_result, make_probe, ForegroundSnapshot, MediaInfo};
 use crate::models::PlatformSelfTestResult;
@@ -82,67 +80,6 @@ fn exe_base_name_from_pid(pid: u32) -> Result<String, String> {
     Ok(file_name.to_string())
 }
 
-fn get_now_playing_powershell() -> Result<MediaInfo, String> {
-    let script = r#"
-Add-Type -AssemblyName System.Runtime.WindowsRuntime
-$null = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType=WindowsRuntime]
-$async = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()
-$mgr = $async.GetAwaiter().GetResult()
-$session = $mgr.GetCurrentSession()
-if (-not $session) { exit 0 }
-$info = $session.TryGetMediaPropertiesAsync().GetAwaiter().GetResult()
-if (-not $info) { exit 0 }
-@{
-  title = $info.Title
-  artist = $info.Artist
-  album = $info.AlbumTitle
-  sourceAppId = $session.SourceAppUserModelId
-} | ConvertTo-Json -Compress
-"#;
-
-    let output = Command::new("powershell.exe")
-        .args(["-NoProfile", "-NonInteractive", "-Command", script])
-        .output()
-        .map_err(|error| format!("启动 PowerShell 失败：{error}"))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("读取媒体信息失败：{}", stderr.trim()));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let trimmed = stdout.trim();
-    if trimmed.is_empty() {
-        return Ok(MediaInfo::default());
-    }
-
-    let value = serde_json::from_str::<Value>(trimmed)
-        .map_err(|error| format!("解析媒体信息失败：{error}"))?;
-
-    Ok(MediaInfo {
-        title: value
-            .get("title")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .to_string(),
-        artist: value
-            .get("artist")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .to_string(),
-        album: value
-            .get("album")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .to_string(),
-        source_app_id: value
-            .get("sourceAppId")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .to_string(),
-    })
-}
-
 #[cfg(target_os = "windows")]
 fn get_now_playing_native() -> Result<MediaInfo, String> {
     const RPC_E_CHANGED_MODE: HRESULT = HRESULT(0x80010106u32 as i32);
@@ -206,22 +143,7 @@ fn get_now_playing_native() -> Result<MediaInfo, String> {
 }
 
 pub fn get_now_playing() -> Result<MediaInfo, String> {
-    let native_error = match get_now_playing_native() {
-        Ok(info) if !info.is_empty() => return Ok(info),
-        Ok(_) => None,
-        Err(error) => Some(error),
-    };
-
-    match get_now_playing_powershell() {
-        Ok(info) => Ok(info),
-        Err(error) => {
-            if let Some(native_error) = native_error {
-                Err(format!("原生 WinRT：{native_error}；PowerShell：{error}"))
-            } else {
-                Err(error)
-            }
-        }
-    }
+    get_now_playing_native()
 }
 
 pub fn run_self_test() -> PlatformSelfTestResult {
