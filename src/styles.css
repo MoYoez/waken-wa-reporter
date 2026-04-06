@@ -939,7 +939,8 @@ select {
   background: rgba(255, 252, 247, 0.94);
   border: 1px solid rgba(154, 131, 102, 0.12);
   display: grid;
-  gap: 10px;
+  gap: 8px;
+  min-width: 0;
 }
 
 .self-test-head {
@@ -953,12 +954,19 @@ select {
 .self-test-detail {
   margin: 0;
   color: #6a5746;
-  line-height: 1.75;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .self-test-summary {
   color: #3d2d20;
   font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.self-test-detail {
+  font-size: 0.92rem;
 }
 
 .self-test-guidance {

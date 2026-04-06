@@ -47,6 +47,27 @@ function formatTime(value?: string | null) {
   return new Date(value).toLocaleString();
 }
 
+function firstGuidance(items?: string[] | null) {
+  return items?.find((item) => item.trim()) ?? "";
+}
+
+function compactDetail(value?: string | null) {
+  const text = (value ?? "").trim();
+  if (!text) return "暂无结果。";
+
+  const normalized = text.replace(/\s+/g, " ");
+  if (normalized.length <= 88) {
+    return normalized;
+  }
+
+  const firstChunk = normalized.split("；")[0]?.trim() || normalized;
+  if (firstChunk.length <= 88) {
+    return `${firstChunk}。`;
+  }
+
+  return `${firstChunk.slice(0, 84).trimEnd()}...`;
+}
+
 async function handleSelfTest() {
   selfTestLoading.value = true;
   const result = await runPlatformSelfTest();
@@ -190,7 +211,7 @@ async function handleSelfTest() {
         <div class="panel-heading">
           <div>
             <p class="eyebrow">平台能力检查</p>
-            <h3>检查应用识别、窗口标题和媒体读取能力</h3>
+            <h3>前台应用、窗口标题和媒体读取</h3>
           </div>
           <Tag :value="selfTestResult.platform" severity="contrast" rounded />
         </div>
@@ -202,11 +223,10 @@ async function handleSelfTest() {
               <strong>前台应用</strong>
               <Tag :value="selfTestResult.foreground.success ? '可用' : '异常'" :severity="selfTestResult.foreground.success ? 'success' : 'danger'" rounded />
             </div>
-            <p class="self-test-summary">{{ selfTestResult.foreground.summary }}</p>
-            <p class="self-test-detail">{{ selfTestResult.foreground.detail }}</p>
-            <ul v-if="selfTestResult.foreground.guidance?.length" class="self-test-guidance">
-              <li v-for="item in selfTestResult.foreground.guidance" :key="item">{{ item }}</li>
-            </ul>
+            <p class="self-test-detail">{{ compactDetail(selfTestResult.foreground.detail) }}</p>
+            <p v-if="firstGuidance(selfTestResult.foreground.guidance)" class="self-test-summary">
+              {{ firstGuidance(selfTestResult.foreground.guidance) }}
+            </p>
           </article>
 
           <article class="self-test-card">
@@ -214,11 +234,10 @@ async function handleSelfTest() {
               <strong>窗口标题</strong>
               <Tag :value="selfTestResult.windowTitle.success ? '可用' : '异常'" :severity="selfTestResult.windowTitle.success ? 'success' : 'danger'" rounded />
             </div>
-            <p class="self-test-summary">{{ selfTestResult.windowTitle.summary }}</p>
-            <p class="self-test-detail">{{ selfTestResult.windowTitle.detail }}</p>
-            <ul v-if="selfTestResult.windowTitle.guidance?.length" class="self-test-guidance">
-              <li v-for="item in selfTestResult.windowTitle.guidance" :key="item">{{ item }}</li>
-            </ul>
+            <p class="self-test-detail">{{ compactDetail(selfTestResult.windowTitle.detail) }}</p>
+            <p v-if="firstGuidance(selfTestResult.windowTitle.guidance)" class="self-test-summary">
+              {{ firstGuidance(selfTestResult.windowTitle.guidance) }}
+            </p>
           </article>
 
           <article class="self-test-card">
@@ -226,11 +245,10 @@ async function handleSelfTest() {
               <strong>媒体采集</strong>
               <Tag :value="selfTestResult.media.success ? '可用' : '异常'" :severity="selfTestResult.media.success ? 'success' : 'danger'" rounded />
             </div>
-            <p class="self-test-summary">{{ selfTestResult.media.summary }}</p>
-            <p class="self-test-detail">{{ selfTestResult.media.detail }}</p>
-            <ul v-if="selfTestResult.media.guidance?.length" class="self-test-guidance">
-              <li v-for="item in selfTestResult.media.guidance" :key="item">{{ item }}</li>
-            </ul>
+            <p class="self-test-detail">{{ compactDetail(selfTestResult.media.detail) }}</p>
+            <p v-if="firstGuidance(selfTestResult.media.guidance)" class="self-test-summary">
+              {{ firstGuidance(selfTestResult.media.guidance) }}
+            </p>
           </article>
         </div>
 
@@ -247,7 +265,7 @@ async function handleSelfTest() {
             severity="secondary"
             :closable="false"
           >
-            Linux 上前台窗口采集在 X11 会话可直接使用；Wayland 会话需接入前台窗口桥接文件。媒体采集依赖 playerctl（MPRIS）。
+            Linux：X11 使用 xprop；Wayland 支持 GNOME 的 Focused Window D-Bus 和 KDE 的 kdotool；媒体采集依赖 playerctl。
           </Message>
         </div>
       </template>
