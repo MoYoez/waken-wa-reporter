@@ -1,0 +1,10 @@
+{
+  "bundle": {
+    "iOS": {
+      "developmentTeam": "",
+      "codeSignIdentity": null,
+      "provisioningProfile": null,
+      "minimumSystemVersion": "15.0"
+    }
+  }
+}

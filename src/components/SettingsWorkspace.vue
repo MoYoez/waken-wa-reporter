@@ -244,6 +244,13 @@ async function handleSelfTest() {
           >
             macOS 上窗口标题和部分媒体读取能力可能依赖“辅助功能”或“自动化”授权；如果某项异常，请先按上面的提示检查权限。
           </Message>
+          <Message
+            v-if="selfTestResult.platform === 'linux'"
+            severity="secondary"
+            :closable="false"
+          >
+            Linux 上前台窗口采集在 X11 会话可直接使用；Wayland 会话需接入前台窗口桥接文件。媒体采集依赖 playerctl（MPRIS）。
+          </Message>
         </div>
       </template>
     </Card>

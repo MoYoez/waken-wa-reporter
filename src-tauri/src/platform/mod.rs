@@ -1,6 +1,8 @@
+#[cfg(target_os = "linux")]
+mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
 mod stub;
 #[cfg(target_os = "windows")]
 mod windows;
@@ -83,16 +85,20 @@ impl MediaInfo {
     }
 }
 
+#[cfg(target_os = "linux")]
+pub use linux::{get_foreground_snapshot, get_now_playing};
 #[cfg(target_os = "macos")]
 pub use macos::{get_foreground_snapshot, get_now_playing};
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
 pub use stub::{get_foreground_snapshot, get_now_playing};
 #[cfg(target_os = "windows")]
 pub use windows::{get_foreground_snapshot, get_now_playing};
 
+#[cfg(target_os = "linux")]
+pub use linux::run_self_test;
 #[cfg(target_os = "macos")]
 pub use macos::run_self_test;
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
 pub use stub::run_self_test;
 #[cfg(target_os = "windows")]
 pub use windows::run_self_test;
@@ -102,11 +108,15 @@ pub fn platform_name() -> &'static str {
     {
         "windows"
     }
+    #[cfg(target_os = "linux")]
+    {
+        "linux"
+    }
     #[cfg(target_os = "macos")]
     {
         "macos"
     }
-    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
     {
         "unsupported"
     }

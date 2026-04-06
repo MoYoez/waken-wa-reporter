@@ -6,6 +6,7 @@
 - 支持导入 Waken-Wa 后台的一键接入配置，也支持直接复用本机已有的 `waken-wa-reporter` 配置。
 - 当前支持：
   - **桌面端（Windows/macOS）**：支持后台实时同步、托盘驻留与平台能力自检。
+  - **桌面端（Linux）**：支持后台实时同步与平台能力自检（前台窗口在 Wayland 下需桥接，见下文）。
   - **移动端（Android/iOS）**：支持手机/平板自适应布局，默认关闭后台实时上报能力，仅保留手动活动提交与灵感相关能力。
 
 > 🤔 目前为 早期 的 构建，由 AI 编写的 MVP 实现，可能存在不少的bug :(
@@ -35,6 +36,16 @@ macOS 如需读取“正在播放”媒体信息，额外需要安装：
 
 ```bash
 brew install nowplaying-cli
+```
+
+Linux 端建议安装：
+
+```bash
+# 读取前台窗口（X11）
+sudo apt install x11-utils
+
+# 读取媒体信息（MPRIS）
+sudo apt install playerctl
 ```
 
 > MacOS 26 仅 2.0.0 支持
@@ -216,15 +227,23 @@ pnpm build
 |------|------|
 | **Windows** | 支持前台应用、窗口标题、媒体读取与后台同步 |
 | **macOS** | 支持前台应用、媒体读取与后台同步；窗口标题当前暂未实现 |
+| **Linux** | 支持后台同步与平台自检；X11 支持前台窗口采集，Wayland 需桥接文件；媒体采集依赖 `playerctl` |
 | **Android** | 支持手机/平板 UI、手动活动同步、灵感相关能力；不提供后台实时同步 |
 | **iOS** | 支持手机/平板 UI、手动活动同步、灵感相关能力；需在 macOS 上构建 |
-| **Linux / 其它** | 当前默认不支持实时采集能力 |
+| **其它平台** | 当前默认不支持实时采集能力 |
 
 macOS 说明：
 
 - 媒体读取依赖 `nowplaying-cli`
 - 某些能力可能依赖系统“辅助功能”或“自动化”授权
 - 可在“设置”页运行“检查平台能力”查看详细提示
+
+Linux 说明：
+
+- X11 会话通过 `xprop` 读取前台应用和窗口标题
+- Wayland 会话无法直接读取全局前台窗口，需接入桥接文件机制
+- 媒体读取通过 `playerctl`（MPRIS）
+- Wayland 桥接规范见：[`docs/linux-wayland-foreground-bridge.md`](docs/linux-wayland-foreground-bridge.md)
 
 ## 上报说明
 
@@ -250,6 +269,9 @@ macOS 说明：
 
 - Windows bundle
 - macOS bundle
+- Linux bundle（AppImage / deb）
+- Android APK/AAB（debug, no-sign）
+- iOS no-sign 构建产物（基于 `src-tauri/tauri.conf.ci.json`）
 
 产物以 GitHub Actions Artifacts 的形式上传。
 

@@ -1,0 +1,414 @@
+use std::{
+    env, fs,
+    path::{Path, PathBuf},
+    process::Command,
+    time::Duration,
+};
+
+use serde::Deserialize;
+
+use super::{build_self_test_result, make_probe, ForegroundSnapshot, MediaInfo};
+use crate::models::PlatformSelfTestResult;
+
+const WAYLAND_BRIDGE_RELATIVE_PATH: &str = "waken-wa/foreground.json";
+const WAYLAND_BRIDGE_MAX_AGE_SECS: u64 = 15;
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WaylandBridgeSnapshot {
+    process_name: String,
+    #[serde(default)]
+    process_title: String,
+}
+
+pub fn get_foreground_snapshot() -> Result<ForegroundSnapshot, String> {
+    let wayland = has_env("WAYLAND_DISPLAY");
+
+    if wayland {
+        if let Ok(snapshot) = read_wayland_bridge_snapshot() {
+            return Ok(snapshot);
+        }
+
+        if has_env("DISPLAY") {
+            if let Ok(snapshot) = get_foreground_snapshot_x11() {
+                return Ok(snapshot);
+            }
+        }
+
+        return Err(format!(
+            "Wayland 会话无法直接读取全局前台窗口。请接入桥接数据文件：{}",
+            wayland_bridge_path_hint()
+        ));
+    }
+
+    get_foreground_snapshot_x11().or_else(|x11_error| {
+        read_wayland_bridge_snapshot().map_err(|bridge_error| {
+            format!("读取 Linux 前台窗口失败。X11：{x11_error}；桥接：{bridge_error}")
+        })
+    })
+}
+
+pub fn get_now_playing() -> Result<MediaInfo, String> {
+    let output = Command::new("playerctl")
+        .args([
+            "metadata",
+            "--format",
+            "{{title}}\n{{artist}}\n{{album}}\n{{playerName}}",
+        ])
+        .output()
+        .map_err(|error| format!("调用 playerctl 失败：{error}"))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    if !output.status.success() {
+        let combined = format!("{}\n{}", stdout, stderr).to_lowercase();
+        if combined.contains("no players found")
+            || combined.contains("no player could handle this command")
+        {
+            return Ok(MediaInfo::default());
+        }
+        return Err(format!(
+            "读取媒体信息失败：{}",
+            stderr.trim().if_empty("playerctl 返回失败")
+        ));
+    }
+
+    let mut lines = stdout.lines().map(str::trim);
+    let title = lines.next().unwrap_or_default().to_string();
+    let artist = lines.next().unwrap_or_default().to_string();
+    let album = lines.next().unwrap_or_default().to_string();
+    let source_app_id = lines.next().unwrap_or_default().to_string();
+
+    let media = MediaInfo {
+        title,
+        artist,
+        album,
+        source_app_id,
+    };
+
+    if media.is_empty() {
+        return Ok(MediaInfo::default());
+    }
+
+    Ok(media)
+}
+
+fn get_foreground_snapshot_x11() -> Result<ForegroundSnapshot, String> {
+    let active_output = Command::new("xprop")
+        .args(["-root", "_NET_ACTIVE_WINDOW"])
+        .output()
+        .map_err(|error| format!("调用 xprop 失败：{error}"))?;
+
+    if !active_output.status.success() {
+        let stderr = String::from_utf8_lossy(&active_output.stderr);
+        return Err(format!(
+            "读取活动窗口失败：{}",
+            stderr.trim().if_empty("xprop 返回失败")
+        ));
+    }
+
+    let active_stdout = String::from_utf8_lossy(&active_output.stdout);
+    let window_id = parse_active_window_id(&active_stdout)
+        .ok_or_else(|| "无法解析 _NET_ACTIVE_WINDOW。".to_string())?;
+
+    if window_id == "0x0" {
+        return Err("当前没有活动窗口。".into());
+    }
+
+    let detail_output = Command::new("xprop")
+        .args([
+            "-id",
+            &window_id,
+            "WM_CLASS",
+            "_NET_WM_NAME",
+            "WM_NAME",
+            "_NET_WM_PID",
+        ])
+        .output()
+        .map_err(|error| format!("调用 xprop 读取窗口详情失败：{error}"))?;
+
+    if !detail_output.status.success() {
+        let stderr = String::from_utf8_lossy(&detail_output.stderr);
+        return Err(format!(
+            "读取窗口详情失败：{}",
+            stderr.trim().if_empty("xprop 返回失败")
+        ));
+    }
+
+    let detail_stdout = String::from_utf8_lossy(&detail_output.stdout);
+    let process_title = parse_window_title(&detail_stdout).unwrap_or_default();
+    let wm_class = parse_wm_class(&detail_stdout).unwrap_or_default();
+    let process_name = parse_window_pid(&detail_stdout)
+        .and_then(read_process_name_from_pid)
+        .or_else(|| {
+            if wm_class.trim().is_empty() {
+                None
+            } else {
+                Some(wm_class)
+            }
+        })
+        .unwrap_or_else(|| "unknown".to_string());
+
+    Ok(ForegroundSnapshot {
+        process_name,
+        process_title,
+    })
+}
+
+fn read_wayland_bridge_snapshot() -> Result<ForegroundSnapshot, String> {
+    let path = wayland_bridge_path()?;
+    ensure_recent_bridge_file(&path)?;
+
+    let content = fs::read_to_string(&path)
+        .map_err(|error| format!("读取 Wayland 桥接文件失败（{}）：{error}", path.display()))?;
+    let snapshot: WaylandBridgeSnapshot = serde_json::from_str(&content)
+        .map_err(|error| format!("解析 Wayland 桥接文件失败（{}）：{error}", path.display()))?;
+
+    if snapshot.process_name.trim().is_empty() {
+        return Err(format!(
+            "Wayland 桥接文件无效（{}）：processName 为空",
+            path.display()
+        ));
+    }
+
+    Ok(ForegroundSnapshot {
+        process_name: snapshot.process_name.trim().to_string(),
+        process_title: snapshot.process_title.trim().to_string(),
+    })
+}
+
+fn wayland_bridge_path() -> Result<PathBuf, String> {
+    let runtime_dir = env::var("XDG_RUNTIME_DIR")
+        .map_err(|_| "缺少 XDG_RUNTIME_DIR，无法定位 Wayland 桥接文件。".to_string())?;
+    Ok(Path::new(&runtime_dir).join(WAYLAND_BRIDGE_RELATIVE_PATH))
+}
+
+fn wayland_bridge_path_hint() -> String {
+    env::var("XDG_RUNTIME_DIR")
+        .map(|value| {
+            Path::new(&value)
+                .join(WAYLAND_BRIDGE_RELATIVE_PATH)
+                .display()
+                .to_string()
+        })
+        .unwrap_or_else(|_| format!("$XDG_RUNTIME_DIR/{WAYLAND_BRIDGE_RELATIVE_PATH}"))
+}
+
+fn ensure_recent_bridge_file(path: &Path) -> Result<(), String> {
+    let metadata =
+        fs::metadata(path).map_err(|error| format!("读取桥接文件元数据失败：{error}"))?;
+    let modified = metadata
+        .modified()
+        .map_err(|error| format!("读取桥接文件时间戳失败：{error}"))?;
+    let elapsed = modified
+        .elapsed()
+        .map_err(|error| format!("读取桥接文件时间差失败：{error}"))?;
+
+    if elapsed > Duration::from_secs(WAYLAND_BRIDGE_MAX_AGE_SECS) {
+        return Err(format!(
+            "Wayland 桥接文件过期（{}，>{}秒）。",
+            path.display(),
+            WAYLAND_BRIDGE_MAX_AGE_SECS
+        ));
+    }
+
+    Ok(())
+}
+
+fn parse_active_window_id(stdout: &str) -> Option<String> {
+    stdout
+        .split('#')
+        .nth(1)
+        .map(str::trim)
+        .and_then(|value| value.split_whitespace().next())
+        .map(str::to_string)
+}
+
+fn parse_wm_class(stdout: &str) -> Option<String> {
+    for line in stdout.lines() {
+        if !line.starts_with("WM_CLASS") {
+            continue;
+        }
+        let values = extract_quoted_values(line);
+        if values.len() >= 2 {
+            return Some(values[1].clone());
+        }
+        if let Some(value) = values.first() {
+            return Some(value.clone());
+        }
+    }
+    None
+}
+
+fn parse_window_title(stdout: &str) -> Option<String> {
+    for key in ["_NET_WM_NAME", "WM_NAME"] {
+        for line in stdout.lines() {
+            if !line.starts_with(key) {
+                continue;
+            }
+            let values = extract_quoted_values(line);
+            if let Some(value) = values.first() {
+                return Some(value.to_string());
+            }
+        }
+    }
+    None
+}
+
+fn parse_window_pid(stdout: &str) -> Option<u32> {
+    for line in stdout.lines() {
+        if !line.starts_with("_NET_WM_PID") {
+            continue;
+        }
+        let raw = line.split('=').nth(1)?.trim();
+        if let Ok(pid) = raw.parse::<u32>() {
+            return Some(pid);
+        }
+    }
+    None
+}
+
+fn extract_quoted_values(line: &str) -> Vec<String> {
+    let mut values = Vec::new();
+    let mut start = None;
+
+    for (idx, ch) in line.char_indices() {
+        if ch == '"' {
+            match start {
+                Some(begin) => {
+                    values.push(line[begin..idx].to_string());
+                    start = None;
+                }
+                None => start = Some(idx + 1),
+            }
+        }
+    }
+
+    values
+}
+
+fn read_process_name_from_pid(pid: u32) -> Option<String> {
+    let comm_path = Path::new("/proc").join(pid.to_string()).join("comm");
+    let name = fs::read_to_string(comm_path).ok()?;
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
+fn has_env(key: &str) -> bool {
+    env::var(key)
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false)
+}
+
+fn linux_guidance(error: &str, probe: &str) -> Vec<String> {
+    let lower = error.to_lowercase();
+    let mut guidance = Vec::new();
+
+    if probe == "foreground" || lower.contains("wayland") || lower.contains("桥接") {
+        guidance.push("X11 会话可直接通过 xprop 读取前台窗口。".into());
+        guidance.push(format!(
+            "Wayland 会话请由 GNOME 扩展或 KWin 脚本持续写入桥接文件：{}。",
+            wayland_bridge_path_hint()
+        ));
+        guidance.push(
+            "GNOME 建议监听 global.display 的 focus-window 变化并写入 processName/processTitle。"
+                .into(),
+        );
+        guidance.push(
+            "KDE 建议监听 workspace.windowActivated 变化并写入 processName/processTitle。".into(),
+        );
+    }
+
+    if lower.contains("xprop") {
+        guidance.push("请安装 xprop（通常由 xorg-xprop / x11-utils 提供）。".into());
+    }
+
+    if probe == "media" || lower.contains("playerctl") {
+        guidance.push("请安装 playerctl，并确认播放器实现了 MPRIS。".into());
+    }
+
+    if guidance.is_empty() {
+        guidance.push("请先确认当前桌面环境是否允许采集前台窗口/媒体信息。".into());
+    }
+
+    guidance
+}
+
+pub fn run_self_test() -> PlatformSelfTestResult {
+    let foreground = match get_foreground_snapshot() {
+        Ok(snapshot) => make_probe(
+            true,
+            "前台应用采集正常",
+            format!("当前前台应用：{}", snapshot.process_name),
+            Vec::new(),
+        ),
+        Err(error) => make_probe(
+            false,
+            "前台应用采集失败",
+            error.clone(),
+            linux_guidance(&error, "foreground"),
+        ),
+    };
+
+    let window_title = match get_foreground_snapshot() {
+        Ok(snapshot) => make_probe(
+            !snapshot.process_title.trim().is_empty(),
+            if snapshot.process_title.trim().is_empty() {
+                "窗口标题为空"
+            } else {
+                "窗口标题采集正常"
+            },
+            if snapshot.process_title.trim().is_empty() {
+                "当前前台窗口没有可用标题。".into()
+            } else {
+                snapshot.process_title
+            },
+            Vec::new(),
+        ),
+        Err(error) => make_probe(
+            false,
+            "窗口标题采集失败",
+            error.clone(),
+            linux_guidance(&error, "foreground"),
+        ),
+    };
+
+    let media = match get_now_playing() {
+        Ok(info) if !info.is_empty() => {
+            make_probe(true, "媒体采集正常", info.summary(), Vec::new())
+        }
+        Ok(_) => make_probe(
+            true,
+            "当前没有播放中的媒体",
+            "系统当前没有可用的正在播放信息。".to_string(),
+            vec!["如需验证媒体采集，请先播放一段音频/视频后重试。".into()],
+        ),
+        Err(error) => make_probe(
+            false,
+            "媒体采集失败",
+            error.clone(),
+            linux_guidance(&error, "media"),
+        ),
+    };
+
+    build_self_test_result(foreground, window_title, media)
+}
+
+trait EmptyFallback {
+    fn if_empty<'a>(&'a self, fallback: &'a str) -> &'a str;
+}
+
+impl EmptyFallback for str {
+    fn if_empty<'a>(&'a self, fallback: &'a str) -> &'a str {
+        if self.trim().is_empty() {
+            fallback
+        } else {
+            self
+        }
+    }
+}
