@@ -22,3 +22,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+src-tauri/gen/apple/waken-wa-preview-ui.xcodeproj/project.pbxproj
+src-tauri/gen/apple/waken-wa-preview-ui.xcodeproj/xcshareddata/xcschemes/waken-wa-preview-ui_iOS.xcscheme
