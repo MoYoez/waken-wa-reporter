@@ -6,9 +6,8 @@ use crate::{
     import_config::parse_import_payload,
     models::{
         default_client_capabilities, effective_device_name, ActivityPayload, ApiResult,
-        AppStatePayload,
-        ClientCapabilities, ClientConfig, ExistingReporterConfig, ImportedIntegrationConfig,
-        InspirationEntryCreateInput, PlatformSelfTestResult,
+        AppStatePayload, ClientCapabilities, ClientConfig, ExistingReporterConfig,
+        ImportedIntegrationConfig, InspirationEntryCreateInput, PlatformSelfTestResult,
     },
     platform, reporter_config, state_store,
 };

@@ -14,8 +14,8 @@ use serde_json::{json, Map, Value};
 
 use crate::{
     models::{
-        effective_device_name, ActivityPayload, ApiResult, ClientConfig, RealtimeReporterSnapshot, ReporterActivity,
-        ReporterLogEntry,
+        effective_device_name, ActivityPayload, ApiResult, ClientConfig, RealtimeReporterSnapshot,
+        ReporterActivity, ReporterLogEntry,
     },
     platform::{get_foreground_snapshot, get_now_playing, ForegroundSnapshot, MediaInfo},
 };
