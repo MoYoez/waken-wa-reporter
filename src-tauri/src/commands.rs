@@ -5,7 +5,8 @@ use crate::{
     http_client::request_json,
     import_config::parse_import_payload,
     models::{
-        default_client_capabilities, ActivityPayload, ApiResult, AppStatePayload,
+        default_client_capabilities, effective_device_name, ActivityPayload, ApiResult,
+        AppStatePayload,
         ClientCapabilities, ClientConfig, ExistingReporterConfig, ImportedIntegrationConfig,
         InspirationEntryCreateInput, PlatformSelfTestResult,
     },
@@ -58,10 +59,18 @@ pub async fn submit_activity_report(
 
     let process_name = payload.process_name.trim().to_string();
 
+    let resolved_device = payload
+        .device
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .unwrap_or_else(|| effective_device_name(&config.device));
+
     let body = json!({
         "generatedHashKey": generated_hash_key,
         "process_name": process_name,
-        "device": payload.device.map(|value| value.trim().to_string()).filter(|value| !value.is_empty()),
+        "device": resolved_device,
         "process_title": payload.process_title.map(|value| value.trim().to_string()).filter(|value| !value.is_empty()),
         "persist_minutes": payload.persist_minutes,
         "battery_level": payload.battery_level,
@@ -115,7 +124,7 @@ pub async fn probe_connectivity(
 ) -> Result<ApiResult<serde_json::Value>, String> {
     let body = json!({
         "generatedHashKey": config.generated_hash_key.trim(),
-        "device": config.device.trim(),
+        "device": effective_device_name(&config.device),
         "deviceType": config.device_type.trim(),
     });
 

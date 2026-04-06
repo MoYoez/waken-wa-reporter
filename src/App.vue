@@ -144,7 +144,7 @@ function inferMobileDeviceType(): DeviceType {
 }
 
 function normalizeConfigByCapabilities(raw: ClientConfig): ClientConfig {
-  const normalizedDevice = raw.device.trim() || defaultClientConfig().device;
+  const normalizedDevice = raw.device.trim();
 
   if (reporterSupported.value) {
     return { ...raw, device: normalizedDevice, deviceType: "desktop" };

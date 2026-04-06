@@ -35,30 +35,6 @@ const issues = computed(() => validateConfig(props.modelValue, props.capabilitie
 const reporterSupported = computed(() => props.capabilities.realtimeReporter);
 const isOnboarding = computed(() => props.variant === "onboarding");
 const currentGeneratedHashKey = computed(() => props.modelValue.generatedHashKey.trim());
-const verifiedGeneratedHashKey = computed(() => props.verifiedGeneratedHashKey?.trim() ?? "");
-const keyApprovalReminder = computed(() => {
-  if (!currentGeneratedHashKey.value) return null;
-
-  if (verifiedGeneratedHashKey.value === currentGeneratedHashKey.value) {
-    return null;
-  }
-
-  if (!verifiedGeneratedHashKey.value) {
-    return {
-      severity: "info" as const,
-      summary: "当前设备 Key 尚未完成审核确认",
-      detail:
-        "设备首次接入后，后台通常需要先审核这个 Key。若活动同步或灵感发布失败，客户端会提示你前往设备管理完成审核。",
-    };
-  }
-
-  return {
-    severity: "warn" as const,
-    summary: "当前设备 Key 已变更，可能需要重新审核",
-    detail:
-      "这个设备 Key 和上一次已验证通过的 Key 不一致。更换 Key 后，活动同步和灵感发布可能会先被拦截，需在后台设备管理里完成审核。",
-  };
-});
 
 function updateField<K extends keyof ClientConfig>(key: K, value: ClientConfig[K]) {
   emit("update:modelValue", {
@@ -371,15 +347,6 @@ function importConfig() {
       </template>
 
       <div class="message-stack">
-        <Message
-          v-if="keyApprovalReminder"
-          :severity="keyApprovalReminder.severity"
-          :closable="false"
-        >
-          <strong>{{ keyApprovalReminder.summary }}</strong>
-          <br />
-          {{ keyApprovalReminder.detail }}
-        </Message>
         <Message v-if="issues.length === 0" severity="success" :closable="false">
           当前设置已可用，Wink~
         </Message>

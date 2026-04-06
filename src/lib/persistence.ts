@@ -6,7 +6,7 @@ export const defaultClientConfig = (): ClientConfig => ({
   baseUrl: "",
   apiToken: "",
   generatedHashKey: "",
-  device: "Waken-Wa Client",
+  device: "",
   deviceType: "desktop",
   pushMode: "realtime",
   pollIntervalMs: 2000,

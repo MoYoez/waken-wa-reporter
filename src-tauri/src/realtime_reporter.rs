@@ -14,7 +14,7 @@ use serde_json::{json, Map, Value};
 
 use crate::{
     models::{
-        ActivityPayload, ApiResult, ClientConfig, RealtimeReporterSnapshot, ReporterActivity,
+        effective_device_name, ActivityPayload, ApiResult, ClientConfig, RealtimeReporterSnapshot, ReporterActivity,
         ReporterLogEntry,
     },
     platform::{get_foreground_snapshot, get_now_playing, ForegroundSnapshot, MediaInfo},
@@ -463,7 +463,7 @@ fn build_payload(
     ActivityPayload {
         generated_hash_key: config.generated_hash_key.trim().to_string(),
         process_name: snapshot.process_name.clone(),
-        device: Some(config.device.trim().to_string()).filter(|value| !value.is_empty()),
+        device: Some(effective_device_name(&config.device)),
         process_title: Some(snapshot.process_title.clone()).filter(|value| !value.is_empty()),
         persist_minutes: None,
         battery_level: None,

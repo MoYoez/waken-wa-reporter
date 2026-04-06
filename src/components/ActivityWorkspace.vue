@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from "vue";
+import { computed, reactive, ref } from "vue";
 import Button from "primevue/button";
 import Card from "primevue/card";
 import InputNumber from "primevue/inputnumber";
 import InputText from "primevue/inputtext";
 import Message from "primevue/message";
-import Select from "primevue/select";
 import ToggleSwitch from "primevue/toggleswitch";
 import { useToast } from "primevue/usetoast";
 
@@ -26,8 +25,6 @@ import type {
 } from "../types";
 
 interface ActivityFormState {
-  selectedDevice: "current";
-  device: string;
   processName: string;
   processTitle: string;
   batteryLevel: number | null;
@@ -50,10 +47,9 @@ const emit = defineEmits<{
 const toast = useToast();
 const isNativeNotice = computed(() => !props.capabilities.realtimeReporter);
 const { notify } = createNotifier(toast, () => isNativeNotice.value);
+const mobileRuntime = computed(() => !props.capabilities.realtimeReporter);
 
 const form = reactive<ActivityFormState>({
-  selectedDevice: "current",
-  device: props.config.device,
   processName: "",
   processTitle: "",
   batteryLevel: null,
@@ -64,28 +60,6 @@ const form = reactive<ActivityFormState>({
 const submitting = ref(false);
 
 const configIssues = computed(() => validateConfig(props.config, props.capabilities));
-
-const deviceOptions = computed(() => [
-  {
-    label: props.config.device.trim() || "当前设备",
-    value: "current" as const,
-  },
-]);
-
-const requestPayload = computed<ActivityPayload>(() => ({
-  generatedHashKey: props.config.generatedHashKey.trim(),
-  process_name: form.processName.trim(),
-  ...(form.processTitle.trim() ? { process_title: form.processTitle.trim() } : {}),
-  device: form.device.trim() || props.config.device.trim() || undefined,
-  device_type: props.config.deviceType,
-  push_mode: "active",
-  persist_minutes: Math.min(Math.max(Math.round(form.persistMinutes || 30), 1), 1440),
-  ...(typeof form.batteryLevel === "number" ? { battery_level: form.batteryLevel } : {}),
-  ...(typeof form.batteryLevel === "number" ? { is_charging: form.isCharging } : {}),
-  metadata: {
-    source: "waken-wa-client",
-  },
-}));
 
 async function detectBattery() {
   try {
@@ -113,6 +87,35 @@ function applyPreset(preset: RecentPreset) {
   form.processTitle = preset.process_title ?? "";
 }
 
+async function buildRequestPayload(): Promise<ActivityPayload> {
+  let batteryLevel = form.batteryLevel;
+  let isCharging = form.isCharging;
+
+  if (mobileRuntime.value) {
+    try {
+      const battery = await readBatterySnapshot();
+      batteryLevel = battery.levelPercent;
+      isCharging = battery.charging;
+    } catch {
+      batteryLevel = null;
+    }
+  }
+
+  return {
+    generatedHashKey: props.config.generatedHashKey.trim(),
+    process_name: form.processName.trim(),
+    ...(form.processTitle.trim() ? { process_title: form.processTitle.trim() } : {}),
+    device_type: props.config.deviceType,
+    push_mode: "active",
+    persist_minutes: Math.min(Math.max(Math.round(form.persistMinutes || 30), 1), 1440),
+    ...(typeof batteryLevel === "number" ? { battery_level: batteryLevel } : {}),
+    ...(typeof batteryLevel === "number" ? { is_charging: isCharging } : {}),
+    metadata: {
+      source: "waken-wa-client",
+    },
+  };
+}
+
 async function submitReport() {
   if (configIssues.value.length > 0) {
     notify({
@@ -135,7 +138,7 @@ async function submitReport() {
   }
 
   submitting.value = true;
-  const result = await submitActivityReport(props.config, requestPayload.value);
+  const result = await submitActivityReport(props.config, await buildRequestPayload());
   submitting.value = false;
 
   const pendingApproval = extractPendingApprovalInfo(result);
@@ -174,13 +177,6 @@ async function submitReport() {
     life: 3000,
   });
 }
-
-watch(
-  () => props.config.device,
-  (value) => {
-    form.device = value;
-  },
-);
 </script>
 
 <template>
@@ -196,21 +192,7 @@ watch(
       </template>
       <template #content>
         <div class="activity-form-stack">
-          <label class="field-block field-span-2">
-            <span class="field-label">归属设备</span>
-            <Select
-              v-model="form.selectedDevice"
-              :options="deviceOptions"
-              option-label="label"
-              option-value="value"
-            />
-          </label>
-
           <div class="panel-grid">
-            <label class="field-block">
-              <span class="field-label">设备显示名称</span>
-              <InputText v-model="form.device" placeholder="例如：MacBook Pro" />
-            </label>
             <label class="field-block">
               <span class="field-label">进程名称</span>
               <InputText v-model="form.processName" placeholder="例如：VS Code" />
@@ -222,7 +204,7 @@ watch(
             <InputText v-model="form.processTitle" placeholder="例如：编辑 index.tsx" />
           </label>
 
-          <div class="panel-grid">
+          <div v-if="!mobileRuntime" class="panel-grid">
             <label class="field-block">
               <span class="field-label">电量（可选，0-100）</span>
               <InputNumber

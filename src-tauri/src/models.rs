@@ -2,7 +2,21 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 pub fn default_device_name() -> String {
-    "Waken-Wa Client".into()
+    hostname::get()
+        .ok()
+        .and_then(|value| value.into_string().ok())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "Waken-Wa Client".into())
+}
+
+pub fn effective_device_name(value: &str) -> String {
+    let normalized = value.trim();
+    if normalized.is_empty() {
+        default_device_name()
+    } else {
+        normalized.to_string()
+    }
 }
 
 pub fn default_device_type() -> String {
