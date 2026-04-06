@@ -282,7 +282,7 @@ Linux 说明：
 - Repository Secret: `APPLE_API_ISSUER`
 - Repository Secret: `APPLE_API_KEY`
 - Repository Secret: `APPLE_P8_SECRET`
-- Repository Variable: `IOS_DEVELOPMENT_TEAM`
+- Environment Secret: `IOS_DEVELOPMENT_TEAM`
 
 其中 `APPLE_API_KEY_PATH` 不需要手动配置；CI 会在运行时把 `APPLE_P8_SECRET` 动态写入临时 `.p8` 文件，并自动导出 `APPLE_API_KEY_PATH` 给 Tauri / Xcode 使用。
 
