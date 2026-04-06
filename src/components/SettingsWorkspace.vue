@@ -68,6 +68,42 @@ function compactDetail(value?: string | null) {
   return `${firstChunk.slice(0, 84).trimEnd()}...`;
 }
 
+function summarizeProbeDetail(
+  platform: string,
+  probe: "foreground" | "windowTitle" | "media",
+  success: boolean,
+  detail?: string | null,
+) {
+  if (success) {
+    return compactDetail(detail);
+  }
+
+  const lower = (detail ?? "").toLowerCase();
+  if (platform === "linux") {
+    if (probe === "foreground" || probe === "windowTitle") {
+      if (lower.includes("focused window d-bus") || lower.includes("gdbus")) {
+        return "缺少 GNOME 前台窗口支持。";
+      }
+      if (lower.includes("kdotool")) {
+        return "缺少 KDE 前台窗口支持。";
+      }
+      if (lower.includes("xprop")) {
+        return "缺少 xprop。";
+      }
+      return "未读取到前台窗口信息。";
+    }
+
+    if (probe === "media") {
+      if (lower.includes("playerctl")) {
+        return "缺少 playerctl。";
+      }
+      return "未读取到媒体信息。";
+    }
+  }
+
+  return compactDetail(detail);
+}
+
 async function handleSelfTest() {
   selfTestLoading.value = true;
   const result = await runPlatformSelfTest();
@@ -99,7 +135,7 @@ async function handleSelfTest() {
       <div>
         <p class="eyebrow">设置</p>
         <h2>设置</h2>
-        <p class="hero-copy">在这里完成连接、设备身份和客户端功能配置，让这台客户端稳定接入你的 Waken-Wa。</p>
+        <p class="hero-copy">管理连接、设备身份和客户端功能。</p>
       </div>
       <div class="hero-actions">
         <Tag
@@ -122,7 +158,7 @@ async function handleSelfTest() {
         <div class="panel-heading">
           <div>
             <p class="eyebrow">后台同步</p>
-            <h3>管理后台同步状态，持续更新你当前的活动信息</h3>
+            <h3>管理同步状态</h3>
           </div>
         </div>
       </template>
@@ -193,7 +229,7 @@ async function handleSelfTest() {
         <div class="panel-heading">
           <div>
             <p class="eyebrow">移动端模式</p>
-            <h3>后台实时上报已关闭</h3>
+            <h3>后台同步已关闭</h3>
           </div>
         </div>
       </template>
@@ -223,7 +259,9 @@ async function handleSelfTest() {
               <strong>前台应用</strong>
               <Tag :value="selfTestResult.foreground.success ? '可用' : '异常'" :severity="selfTestResult.foreground.success ? 'success' : 'danger'" rounded />
             </div>
-            <p class="self-test-detail">{{ compactDetail(selfTestResult.foreground.detail) }}</p>
+            <p class="self-test-detail">
+              {{ summarizeProbeDetail(selfTestResult.platform, "foreground", selfTestResult.foreground.success, selfTestResult.foreground.detail) }}
+            </p>
             <p v-if="firstGuidance(selfTestResult.foreground.guidance)" class="self-test-summary">
               {{ firstGuidance(selfTestResult.foreground.guidance) }}
             </p>
@@ -234,7 +272,9 @@ async function handleSelfTest() {
               <strong>窗口标题</strong>
               <Tag :value="selfTestResult.windowTitle.success ? '可用' : '异常'" :severity="selfTestResult.windowTitle.success ? 'success' : 'danger'" rounded />
             </div>
-            <p class="self-test-detail">{{ compactDetail(selfTestResult.windowTitle.detail) }}</p>
+            <p class="self-test-detail">
+              {{ summarizeProbeDetail(selfTestResult.platform, "windowTitle", selfTestResult.windowTitle.success, selfTestResult.windowTitle.detail) }}
+            </p>
             <p v-if="firstGuidance(selfTestResult.windowTitle.guidance)" class="self-test-summary">
               {{ firstGuidance(selfTestResult.windowTitle.guidance) }}
             </p>
@@ -245,7 +285,9 @@ async function handleSelfTest() {
               <strong>媒体采集</strong>
               <Tag :value="selfTestResult.media.success ? '可用' : '异常'" :severity="selfTestResult.media.success ? 'success' : 'danger'" rounded />
             </div>
-            <p class="self-test-detail">{{ compactDetail(selfTestResult.media.detail) }}</p>
+            <p class="self-test-detail">
+              {{ summarizeProbeDetail(selfTestResult.platform, "media", selfTestResult.media.success, selfTestResult.media.detail) }}
+            </p>
             <p v-if="firstGuidance(selfTestResult.media.guidance)" class="self-test-summary">
               {{ firstGuidance(selfTestResult.media.guidance) }}
             </p>
