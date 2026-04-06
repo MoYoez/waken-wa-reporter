@@ -179,51 +179,6 @@ jobs:
           path: src-tauri/target/release/bundle/dmg/*.dmg
           if-no-files-found: error
 
-  build-ios-unsigned:
-    name: build-ios-unsigned
-    runs-on: macos-latest
-    needs: quality-code
-
-    steps:
-      - name: checkout-code
-        uses: actions/checkout@v4
-
-      - name: install-pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - name: install-nodejs
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-
-      - name: install-rust-toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-ios
-
-      - name: rust-cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
-
-      - name: install-frontend-dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: build-ios-unsigned
-        run: pnpm ios:build:unsigned
-
-      - name: upload-ios-unsigned-artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: tauri-ios-unsigned
-          path: |
-            src-tauri/gen/apple/output/*.ipa
-            src-tauri/gen/apple/output/Release-iphoneos/*.app
-          if-no-files-found: error
-
   build-linux:
     name: build-linux
     runs-on: ubuntu-latest
