@@ -23,7 +23,7 @@ mkdir -p "$APP_BUILD_DIR" "$PAYLOAD_DIR"
 xcodebuild \
   -project "$PROJECT_PATH" \
   -scheme "$SCHEME" \
-  -configuration Release \
+  -configuration release \
   -sdk iphoneos \
   -derivedDataPath "$DERIVED_DATA_DIR" \
   CONFIGURATION_BUILD_DIR="$APP_BUILD_DIR" \
