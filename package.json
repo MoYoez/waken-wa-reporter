@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "ios:init": "pnpm tauri ios init --ci",
+    "ios:build:unsigned": "pnpm build && pnpm tauri ios init --ci && sh ./scripts/build-ios-unsigned.sh"
   },
   "dependencies": {
     "@lexical/history": "^0.38.1",
