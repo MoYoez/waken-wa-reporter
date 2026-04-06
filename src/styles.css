@@ -167,6 +167,57 @@ select {
   backdrop-filter: blur(10px);
 }
 
+.pending-save-float {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 40;
+  width: min(420px, calc(100vw - 32px));
+  padding: 18px 20px;
+  border-radius: 24px;
+  border: 1px solid rgba(197, 145, 91, 0.26);
+  background: linear-gradient(135deg, rgba(255, 249, 241, 0.98), rgba(244, 234, 220, 0.95));
+  box-shadow: 0 18px 40px rgba(100, 80, 54, 0.16);
+  display: grid;
+  gap: 14px;
+  backdrop-filter: blur(12px);
+}
+
+.pending-save-float-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.pending-save-float-copy strong {
+  color: #3d2d20;
+  font-size: 1.08rem;
+}
+
+.pending-save-float-copy span {
+  color: #6a5746;
+  line-height: 1.7;
+  word-break: break-word;
+}
+
+.pending-save-float-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pending-save-float-enter-active,
+.pending-save-float-leave-active {
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.pending-save-float-enter-from,
+.pending-save-float-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
 .mobile-tab-item {
   border: 0;
   border-radius: 14px;
@@ -1402,5 +1453,62 @@ select {
 
   .reporter-enabled-card {
     align-items: flex-start;
+  }
+
+  .pending-save-float {
+    right: 14px;
+    left: 14px;
+    width: auto;
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+    padding: 16px;
+    border-radius: 22px;
+    gap: 12px;
+  }
+
+  .app-root.has-pending-save .app-main {
+    padding-bottom: 256px;
+  }
+
+  .pending-save-float-copy {
+    gap: 6px;
+  }
+
+  .pending-save-float-copy strong {
+    font-size: 1rem;
+  }
+
+  .pending-save-float-copy span {
+    font-size: 0.94rem;
+    line-height: 1.65;
+  }
+
+  .pending-save-float-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .pending-save-float-actions .p-button {
+    width: 100%;
+    justify-content: center;
+    min-height: 42px;
+  }
+}
+
+@media (max-width: 520px) {
+  .app-root.has-pending-save .app-main {
+    padding-bottom: 292px;
+  }
+
+  .pending-save-float {
+    right: 12px;
+    left: 12px;
+    bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+    padding: 14px;
+    border-radius: 20px;
+  }
+
+  .pending-save-float-actions {
+    grid-template-columns: 1fr;
   }
 }

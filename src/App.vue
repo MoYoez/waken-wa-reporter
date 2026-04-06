@@ -50,6 +50,7 @@ const toast = useToast();
 
 const capabilities = ref<ClientCapabilities>(defaultCapabilities);
 const config = ref<ClientConfig>(defaultClientConfig());
+const persistedConfig = ref<ClientConfig>(defaultClientConfig());
 const onboardingDraftConfig = ref<ClientConfig>(defaultClientConfig());
 const recentPresets = ref<RecentPreset[]>([]);
 const activeSection = ref<AppSection>("overview");
@@ -111,6 +112,11 @@ const readiness = computed(() => {
 const shouldShowOnboarding = computed(
   () => hydrated.value && !onboardingDismissed.value && !readiness.value,
 );
+const hasPendingSettingsChanges = computed(() => {
+  const current = JSON.stringify(normalizeConfigByCapabilities(config.value));
+  const persisted = JSON.stringify(normalizeConfigByCapabilities(persistedConfig.value));
+  return current !== persisted;
+});
 
 function ensureVisibleSection() {
   if (!visibleSections.value.some((section) => section.key === activeSection.value)) {
@@ -209,20 +215,40 @@ async function useExistingReporterConfig() {
 
 async function persistAppState(configOverride?: ClientConfig) {
   await saveAppState(
-    normalizeConfigByCapabilities(configOverride ?? config.value),
+    normalizeConfigByCapabilities(configOverride ?? persistedConfig.value),
     recentPresets.value,
     onboardingDismissed.value,
     reporterConfigPromptHandled.value,
   );
 }
 
-async function handleSaveSettings() {
-  config.value = normalizeConfigByCapabilities(config.value);
-  await persistAppState();
+async function applySettingsChanges() {
+  try {
+    config.value = normalizeConfigByCapabilities({ ...config.value });
+    await persistAppState(config.value);
+    persistedConfig.value = { ...config.value };
+    notify({
+      severity: "success",
+      summary: "设置已保存",
+      detail: "当前配置已写入本地。",
+      life: 2500,
+    });
+  } catch (error) {
+    notify({
+      severity: "error",
+      summary: "保存失败",
+      detail: error instanceof Error ? error.message : "设置写入本地失败。",
+      life: 4000,
+    });
+  }
+}
+
+function revertPendingSettings() {
+  config.value = normalizeConfigByCapabilities({ ...persistedConfig.value });
   notify({
-    severity: "success",
-    summary: "设置已保存",
-    detail: "当前配置已写入本地。",
+    severity: "info",
+    summary: "已撤销更改",
+    detail: "界面已恢复到上一次已保存的配置。",
     life: 2500,
   });
 }
@@ -232,6 +258,7 @@ async function completeOnboardingSetup() {
   onboardingDismissed.value = true;
   onboardingSetupMode.value = false;
   await persistAppState(config.value);
+  persistedConfig.value = { ...config.value };
   notify({
     severity: "success",
     summary: "设置已完成",
@@ -364,6 +391,7 @@ onMounted(async () => {
   const state = await loadAppState();
   const normalized = normalizeConfigByCapabilities(state.config);
   config.value = normalized;
+  persistedConfig.value = { ...normalized };
   onboardingDraftConfig.value = { ...normalized };
   recentPresets.value = state.recentPresets;
   onboardingDismissed.value = state.onboardingDismissed;
@@ -405,7 +433,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="app-root">
+  <div class="app-root" :class="{ 'has-pending-save': hasPendingSettingsChanges }">
     <Toast v-if="!isNativeNotice" position="top-right" />
     <Dialog
       :visible="shouldShowOnboarding"
@@ -528,6 +556,36 @@ onBeforeUnmount(() => {
       </div>
     </Dialog>
 
+    <transition name="pending-save-float">
+      <section
+        v-if="hasPendingSettingsChanges"
+        class="pending-save-float"
+        aria-live="polite"
+      >
+        <div class="pending-save-float-copy">
+          <p class="eyebrow">设置保存</p>
+          <strong>有待保存的更改</strong>
+          <span>当前修改还没有写入本地。你可以现在应用，或者直接撤销恢复到上一次保存状态。</span>
+        </div>
+        <div class="pending-save-float-actions">
+          <Button
+            label="应用"
+            icon="pi pi-check"
+            size="small"
+            @click="applySettingsChanges"
+          />
+          <Button
+            label="撤回"
+            icon="pi pi-undo"
+            severity="secondary"
+            outlined
+            size="small"
+            @click="revertPendingSettings"
+          />
+        </div>
+      </section>
+    </transition>
+
     <div class="app-shell" :class="{ 'phone-nav': isPhone }">
       <aside v-if="!isPhone" class="app-sidebar">
         <div class="brand-block">
@@ -585,7 +643,6 @@ onBeforeUnmount(() => {
           :reporter-busy="reporterBusy"
           @update:model-value="config = normalizeConfigByCapabilities($event)"
           @imported="notifyImport"
-          @save="handleSaveSettings"
           @start-reporter="handleStartReporter"
           @stop-reporter="handleStopReporter"
         />
