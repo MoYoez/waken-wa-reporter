@@ -151,10 +151,7 @@ fn get_foreground_snapshot_wayland() -> Result<ForegroundSnapshot, String> {
         Err(error) => errors.push(format!("KDE kdotool：{error}")),
     }
 
-    Err(format!(
-        "Wayland 前台窗口采集失败。{}",
-        errors.join("；")
-    ))
+    Err(format!("Wayland 前台窗口采集失败。{}", errors.join("；")))
 }
 
 fn get_foreground_snapshot_gnome_focused_window_dbus() -> Result<ForegroundSnapshot, String> {
@@ -217,8 +214,8 @@ fn get_foreground_snapshot_kde_kdotool() -> Result<ForegroundSnapshot, String> {
         return Err("kdotool 未返回窗口类名。".into());
     }
 
-    let process_title = run_command_trimmed("kdotool", ["getwindowname", &window_id])
-        .unwrap_or_default();
+    let process_title =
+        run_command_trimmed("kdotool", ["getwindowname", &window_id]).unwrap_or_default();
 
     Ok(ForegroundSnapshot {
         process_name,
@@ -236,7 +233,11 @@ fn run_command_trimmed<const N: usize>(program: &str, args: [&str; N]) -> Result
     let stderr = String::from_utf8_lossy(&output.stderr);
 
     if !output.status.success() {
-        return Err(stderr.trim().if_empty(stdout.trim()).if_empty("命令返回失败").to_string());
+        return Err(stderr
+            .trim()
+            .if_empty(stdout.trim())
+            .if_empty("命令返回失败")
+            .to_string());
     }
 
     Ok(stdout.lines().next().unwrap_or_default().trim().to_string())
@@ -377,9 +378,8 @@ fn linux_guidance(error: &str, probe: &str) -> Vec<String> {
             "GNOME Wayland 可安装 Focused Window D-Bus 扩展，客户端会直接通过 gdbus 读取前台窗口。"
                 .into(),
         );
-        guidance.push(
-            "KDE Plasma Wayland 可安装 kdotool，客户端会直接读取活动窗口类名和标题。".into(),
-        );
+        guidance
+            .push("KDE Plasma Wayland 可安装 kdotool，客户端会直接读取活动窗口类名和标题。".into());
     }
 
     if lower.contains("xprop") {
