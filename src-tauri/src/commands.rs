@@ -5,14 +5,18 @@ use crate::{
     http_client::request_json,
     import_config::parse_import_payload,
     models::{
-        ActivityPayload, ApiResult, AppStatePayload, ClientConfig, ExistingReporterConfig,
-        ImportedIntegrationConfig, InspirationEntryCreateInput, PlatformSelfTestResult,
-        RealtimeReporterSnapshot,
+        default_client_capabilities, ActivityPayload, ApiResult, AppStatePayload, ClientCapabilities,
+        ClientConfig, ExistingReporterConfig, ImportedIntegrationConfig, InspirationEntryCreateInput,
+        PlatformSelfTestResult,
     },
     platform,
-    realtime_reporter::{snapshot_result, ReporterRuntime},
-    reporter_config, state_store, tray,
+    reporter_config, state_store,
 };
+
+#[cfg(desktop)]
+use crate::realtime_reporter::{snapshot_result, ReporterRuntime};
+#[cfg(desktop)]
+use crate::tray;
 
 #[tauri::command]
 pub fn load_app_state(app: AppHandle) -> Result<AppStatePayload, String> {
@@ -31,6 +35,12 @@ pub fn parse_imported_integration_config(
     parse_import_payload(&input)
 }
 
+#[tauri::command]
+pub fn get_client_capabilities() -> Result<ApiResult<ClientCapabilities>, String> {
+    Ok(ApiResult::success(200, default_client_capabilities()))
+}
+
+#[cfg(desktop)]
 #[tauri::command]
 pub fn hide_to_tray(app: AppHandle) -> Result<(), String> {
     tray::hide_main_window(&app)
@@ -148,26 +158,29 @@ pub async fn upload_inspiration_asset(
     .await)
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 pub fn start_realtime_reporter(
     reporter: State<'_, ReporterRuntime>,
     config: ClientConfig,
-) -> Result<ApiResult<RealtimeReporterSnapshot>, String> {
+) -> Result<ApiResult<crate::models::RealtimeReporterSnapshot>, String> {
     let snapshot = reporter.start(config)?;
     Ok(ApiResult::success(200, snapshot))
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 pub fn stop_realtime_reporter(
     reporter: State<'_, ReporterRuntime>,
-) -> Result<ApiResult<RealtimeReporterSnapshot>, String> {
+) -> Result<ApiResult<crate::models::RealtimeReporterSnapshot>, String> {
     Ok(ApiResult::success(200, reporter.stop()))
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 pub fn get_realtime_reporter_snapshot(
     reporter: State<'_, ReporterRuntime>,
-) -> Result<ApiResult<RealtimeReporterSnapshot>, String> {
+) -> Result<ApiResult<crate::models::RealtimeReporterSnapshot>, String> {
     Ok(snapshot_result(&reporter))
 }
 

@@ -20,14 +20,21 @@ import {
   uploadInspirationAsset,
   validateConfig,
 } from "../lib/api";
+import { readBatterySnapshot } from "../lib/battery";
 import {
   appendParagraphTextToLexical,
   previewInspirationContent,
   renderInspirationContentHtml,
   sanitizeEntryContent as sanitizeRichTextContent,
 } from "../lib/inspirationRichText";
+import { createNotifier } from "../lib/notify";
 import { useInspirationDraftStore } from "../stores/inspirationDraft";
-import type { ActivityFeedItem, ClientConfig, InspirationEntry } from "../types";
+import type {
+  ActivityFeedItem,
+  ClientCapabilities,
+  ClientConfig,
+  InspirationEntry,
+} from "../types";
 
 interface ActivitySelectOption {
   value: string;
@@ -40,9 +47,12 @@ interface ActivitySelectOption {
 
 const props = defineProps<{
   config: ClientConfig;
+  capabilities: ClientCapabilities;
 }>();
 
 const toast = useToast();
+const isNativeNotice = computed(() => !props.capabilities.realtimeReporter);
+const { notify } = createNotifier(toast, () => isNativeNotice.value);
 const draftStore = useInspirationDraftStore();
 
 const compose = reactive({
@@ -62,19 +72,51 @@ const activityLoadError = ref("");
 const inlineImageDataUrl = ref(draftStore.coverImageDataUrl);
 const bodyImageInput = ref<HTMLInputElement | null>(null);
 const composeTab = ref<"edit" | "preview">(draftStore.composeTab);
+const statusSnapshotInput = ref(draftStore.statusSnapshotInput);
+const statusSnapshotDeviceName = ref(draftStore.statusSnapshotDeviceName);
 const selectedActivityKey = ref(draftStore.selectedActivityKey);
 const attachCurrentStatus = ref(draftStore.attachCurrentStatus);
 const attachStatusIncludeDeviceInfo = ref(draftStore.attachStatusIncludeDeviceInfo);
+const statusBatteryPercent = ref<number | null>(null);
+const statusBatteryCharging = ref<boolean | null>(null);
 const activityOptions = ref<ActivitySelectOption[]>([]);
 const activityLoading = ref(false);
 const editorFaulted = ref(false);
 
-const configIssues = computed(() => validateConfig(props.config));
+const mobileRuntime = computed(() => !props.capabilities.realtimeReporter);
+const configIssues = computed(() => validateConfig(props.config, props.capabilities));
 const selectedActivityOption = computed(() =>
   activityOptions.value.find((item) => item.value === selectedActivityKey.value) ?? null,
 );
+function buildManualSnapshot(input: string, includeDeviceInfo: boolean) {
+  const base = input.trim();
+  if (!base) return "";
+  if (!includeDeviceInfo) return base;
+
+  const deviceName = statusSnapshotDeviceName.value.trim() || props.config.device.trim();
+  const batteryPart =
+    typeof statusBatteryPercent.value === "number"
+      ? `${statusBatteryPercent.value}%${statusBatteryCharging.value ? " · 充电中" : ""}`
+      : "";
+
+  if (deviceName && batteryPart) {
+    return `${base}（${deviceName} · ${batteryPart}）`;
+  }
+  if (deviceName) {
+    return `${base}（${deviceName}）`;
+  }
+  if (batteryPart) {
+    return `${base}（${batteryPart}）`;
+  }
+  return base;
+}
+
 const selectedSnapshotPreview = computed(() => {
-  if (!attachCurrentStatus.value || !selectedActivityOption.value) return "";
+  if (!attachCurrentStatus.value) return "";
+  if (mobileRuntime.value) {
+    return buildManualSnapshot(statusSnapshotInput.value, attachStatusIncludeDeviceInfo.value);
+  }
+  if (!selectedActivityOption.value) return "";
   return selectedActivityOption.value.snapshot;
 });
 const selectedEntryVisible = computed({
@@ -270,7 +312,9 @@ function pickDefaultActivity() {
 onMounted(() => {
   if (props.config.baseUrl.trim()) {
     void loadEntries();
-    void loadActivityOptions();
+    if (!mobileRuntime.value) {
+      void loadActivityOptions();
+    }
   }
 });
 
@@ -287,7 +331,9 @@ watch(
 
     if (nextBaseUrl !== previousBaseUrl) {
       void loadEntries();
-      void loadActivityOptions();
+      if (!mobileRuntime.value) {
+        void loadActivityOptions();
+      }
     }
   },
 );
@@ -312,6 +358,14 @@ watch(composeTab, (value) => {
   draftStore.patchDraft({ composeTab: value });
 });
 
+watch(statusSnapshotInput, (value) => {
+  draftStore.patchDraft({ statusSnapshotInput: value });
+});
+
+watch(statusSnapshotDeviceName, (value) => {
+  draftStore.patchDraft({ statusSnapshotDeviceName: value });
+});
+
 watch(selectedActivityKey, (value) => {
   draftStore.patchDraft({ selectedActivityKey: value });
 });
@@ -325,7 +379,7 @@ watch(attachCurrentStatus, (value) => {
 
 watch(attachStatusIncludeDeviceInfo, (value) => {
   draftStore.patchDraft({ attachStatusIncludeDeviceInfo: value });
-  if (props.config.baseUrl.trim()) {
+  if (!mobileRuntime.value && props.config.baseUrl.trim()) {
     void loadActivityOptions();
   }
 });
@@ -348,12 +402,33 @@ async function onFileSelected(event: Event) {
   uploadPending.value = false;
   if (target) target.value = "";
 
-  toast.add({
+  notify({
     severity: "success",
     summary: "头图已准备",
     detail: "这张图片会作为本条灵感的头图一并发布。",
     life: 3000,
   });
+}
+
+async function detectStatusBattery() {
+  try {
+    const battery = await readBatterySnapshot();
+    statusBatteryPercent.value = battery.levelPercent;
+    statusBatteryCharging.value = battery.charging;
+    notify({
+      severity: "success",
+      summary: "电量已读取",
+      detail: `当前电量 ${battery.levelPercent}%${battery.charging ? "（充电中）" : ""}`,
+      life: 2500,
+    });
+  } catch (error) {
+    notify({
+      severity: "warn",
+      summary: "无法获取电量信息",
+      detail: error instanceof Error ? error.message : "当前运行环境不支持读取电量。",
+      life: 3500,
+    });
+  }
 }
 
 async function onBodyImageSelected(event: Event) {
@@ -373,7 +448,7 @@ async function onBodyImageSelected(event: Event) {
 
     const result = await uploadInspirationAsset(props.config, dataUrl);
     if (!result.success || !result.data?.url) {
-      toast.add({
+      notify({
         severity: "error",
         summary: "附图上传失败",
         detail: result.error?.message ?? "正文附图上传失败。",
@@ -387,7 +462,7 @@ async function onBodyImageSelected(event: Event) {
       `![](${result.data.url})`,
     );
 
-    toast.add({
+    notify({
       severity: "success",
       summary: "附图已插入",
       detail: "图片已经作为正文附图插入到当前灵感中。",
@@ -401,7 +476,7 @@ async function onBodyImageSelected(event: Event) {
 
 async function submitEntry() {
   if (configIssues.value.length > 0) {
-    toast.add({
+    notify({
       severity: "warn",
       summary: "请先完成连接设置",
       detail: "发布内容前，需要先填写站点地址和 API Token。",
@@ -411,7 +486,7 @@ async function submitEntry() {
   }
 
   if (!compose.content.trim()) {
-    toast.add({
+    notify({
       severity: "warn",
       summary: "请填写正文内容",
       detail: "发布内容前，正文不能为空。",
@@ -420,19 +495,42 @@ async function submitEntry() {
     return;
   }
 
-  if (attachCurrentStatus.value && !selectedActivityOption.value) {
-    toast.add({
-      severity: "warn",
-      summary: "请选择要附带的活动",
-      detail: "开启附带当前状态后，需要选择一条活动记录。",
-      life: 3000,
-    });
-    return;
+  if (attachCurrentStatus.value) {
+    if (mobileRuntime.value && !statusSnapshotInput.value.trim()) {
+      notify({
+        severity: "warn",
+        summary: "请填写你正在做什么",
+        detail: "开启附带当前状态后，需要填写一段状态描述。",
+        life: 3000,
+      });
+      return;
+    }
+
+    if (!mobileRuntime.value && !selectedActivityOption.value) {
+      notify({
+        severity: "warn",
+        summary: "请选择要附带的活动",
+        detail: "开启附带当前状态后，需要选择一条活动记录。",
+        life: 3000,
+      });
+      return;
+    }
   }
 
   const contentToSubmit = compose.content.trim();
   const lexicalToSubmit = compose.contentLexical;
-  const attachPayloadEnabled = attachCurrentStatus.value && Boolean(selectedActivityOption.value);
+  const attachPayloadEnabled = attachCurrentStatus.value
+    && (mobileRuntime.value ? statusSnapshotInput.value.trim().length > 0 : Boolean(selectedActivityOption.value));
+
+  if (attachPayloadEnabled && mobileRuntime.value && attachStatusIncludeDeviceInfo.value && statusBatteryPercent.value === null) {
+    try {
+      const battery = await readBatterySnapshot();
+      statusBatteryPercent.value = battery.levelPercent;
+      statusBatteryCharging.value = battery.charging;
+    } catch {
+      // ignore battery read failure; snapshot will fallback to device only
+    }
+  }
 
   submitting.value = true;
   const result = await createInspirationEntry(props.config, {
@@ -442,9 +540,13 @@ async function submitEntry() {
     imageDataUrl: inlineImageDataUrl.value || undefined,
     generatedHashKey: props.config.generatedHashKey.trim(),
     attachCurrentStatus: attachPayloadEnabled || undefined,
-    preComputedStatusSnapshot: attachPayloadEnabled ? selectedSnapshotPreview.value : undefined,
+    preComputedStatusSnapshot: attachPayloadEnabled
+      ? (mobileRuntime.value
+          ? buildManualSnapshot(statusSnapshotInput.value, attachStatusIncludeDeviceInfo.value)
+          : selectedSnapshotPreview.value)
+      : undefined,
     attachStatusDeviceHash: attachPayloadEnabled ? props.config.generatedHashKey.trim() : undefined,
-    attachStatusActivityKey: attachPayloadEnabled ? selectedActivityKey.value : undefined,
+    attachStatusActivityKey: attachPayloadEnabled && !mobileRuntime.value ? selectedActivityKey.value : undefined,
     attachStatusIncludeDeviceInfo: attachPayloadEnabled
       ? attachStatusIncludeDeviceInfo.value
       : undefined,
@@ -452,7 +554,7 @@ async function submitEntry() {
   submitting.value = false;
 
   if (!result.success) {
-    toast.add({
+    notify({
       severity: "error",
       summary: `发布失败（${result.status || "网络"}）`,
       detail: result.error?.message ?? "内容保存失败。",
@@ -461,7 +563,7 @@ async function submitEntry() {
     return;
   }
 
-  toast.add({
+  notify({
     severity: "success",
     summary: "内容已发布",
     detail: "新的内容已同步到 Waken-Wa。",
@@ -474,9 +576,13 @@ async function submitEntry() {
   compose.contentLexical = draftStore.contentLexical;
   inlineImageDataUrl.value = draftStore.coverImageDataUrl;
   composeTab.value = draftStore.composeTab;
+  statusSnapshotInput.value = draftStore.statusSnapshotInput;
+  statusSnapshotDeviceName.value = draftStore.statusSnapshotDeviceName;
   selectedActivityKey.value = draftStore.selectedActivityKey;
   attachCurrentStatus.value = draftStore.attachCurrentStatus;
   attachStatusIncludeDeviceInfo.value = draftStore.attachStatusIncludeDeviceInfo;
+  statusBatteryPercent.value = null;
+  statusBatteryCharging.value = null;
 
   void loadEntries();
 }
@@ -489,7 +595,7 @@ async function submitEntry() {
         <div class="panel-heading">
           <div>
             <p class="eyebrow">灵感创作</p>
-            <h3>在桌面端整理想法并发布到 Waken-Wa</h3>
+            <h3>在这里整理想法并发布到 Waken-Wa</h3>
           </div>
           <Button
             label="刷新列表"
@@ -509,18 +615,43 @@ async function submitEntry() {
           </div>
 
           <div class="field-block field-span-2">
-            <span class="field-label">关联活动（可选）</span>
+            <span class="field-label">{{ mobileRuntime ? "你正在做什么（可选）" : "关联活动（可选）" }}</span>
             <div class="activity-toggle-row">
               <ToggleSwitch v-model="attachCurrentStatus" input-id="attach-current-status" />
-              <label for="attach-current-status">提交时附带当前状态快照</label>
+              <label for="attach-current-status">
+                {{ mobileRuntime ? "提交时附带“你正在做什么”快照" : "提交时附带当前状态快照" }}
+              </label>
               <ToggleSwitch
                 v-model="attachStatusIncludeDeviceInfo"
                 input-id="attach-device-info"
                 :disabled="!attachCurrentStatus"
               />
               <label for="attach-device-info">快照包含设备与电量</label>
+              <Button
+                v-if="mobileRuntime"
+                label="读取电量信息"
+                icon="pi pi-bolt"
+                severity="secondary"
+                text
+                size="small"
+                @click="detectStatusBattery"
+              />
             </div>
-            <div class="activity-select-row">
+            <div v-if="mobileRuntime" class="activity-select-row">
+              <InputText
+                v-model="statusSnapshotInput"
+                :disabled="!attachCurrentStatus"
+                placeholder="例如：正在写移动端改造方案"
+              />
+            </div>
+            <div v-if="mobileRuntime" class="activity-select-row">
+              <InputText
+                v-model="statusSnapshotDeviceName"
+                :disabled="!attachCurrentStatus"
+                placeholder="设备名称（可选，留空使用默认设备名）"
+              />
+            </div>
+            <div v-else class="activity-select-row">
               <Select
                 v-model="selectedActivityKey"
                 :options="activityOptions"
@@ -540,7 +671,12 @@ async function submitEntry() {
                 @click="loadActivityOptions"
               />
             </div>
-            <small class="field-help">逻辑与 Web 端一致：可选设备活动，提交时由后端生成状态快照。</small>
+            <small class="field-help">
+              {{ mobileRuntime
+                ? "填写一段你当前在做的事情，可按需附带设备与电量信息。"
+                : "逻辑与 Web 端一致：可选设备活动，提交时由后端生成状态快照。"
+              }}
+            </small>
             <div v-if="attachCurrentStatus && selectedSnapshotPreview" class="snapshot-preview">
               <strong>快照预览：</strong>
               <span>{{ selectedSnapshotPreview }}</span>

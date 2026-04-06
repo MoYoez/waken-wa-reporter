@@ -1,10 +1,12 @@
-## Waken-Wa Desktop
+## Waken-Wa Client
 
-适用于 [Waken-Wa](https://github.com/MoYoez/Waken-Wa) 的桌面端客户端：提供连接配置、活动手动上报、后台实时同步、活动流查看、灵感内容发布，以及系统托盘常驻能力。
+适用于 [Waken-Wa](https://github.com/MoYoez/Waken-Wa) 的客户端：提供连接配置、活动手动上报、活动流查看、灵感内容发布，并在桌面端支持后台实时同步与系统托盘常驻能力。
 
-- 此版本为 `Tauri + Vue + Rust` 的 Desktop 版本。
+- 此版本为 `Tauri + Vue + Rust` 的多端版本（Desktop + Mobile）。
 - 支持导入 Waken-Wa 后台的一键接入配置，也支持直接复用本机已有的 `waken-wa-reporter` 配置。
-- 当前主要面向 **Windows** 与 **macOS**；其它平台可构建界面，但实时采集能力默认不支持。
+- 当前支持：
+  - **桌面端（Windows/macOS）**：支持后台实时同步、托盘驻留与平台能力自检。
+  - **移动端（Android/iOS）**：支持手机/平板自适应布局，默认关闭后台实时上报能力，仅保留手动活动提交与灵感相关能力。
 
 > 🤔 目前为 早期 的 构建，由 AI 编写的 MVP 实现，可能存在不少的bug :(
 
@@ -55,6 +57,36 @@ pnpm tauri dev
 
 ```bash
 pnpm dev
+```
+
+## 移动端开发
+
+### Android
+
+初始化 Android 目标：
+
+```bash
+pnpm tauri android init --ci
+```
+
+如果初始化失败并提示 `Android NDK not found`，请先在 Android Studio 的 SDK Manager 安装 NDK，并设置 `NDK_HOME` 后重试。
+
+启动 Android 开发模式：
+
+```bash
+pnpm tauri android dev
+```
+
+### iOS
+
+iOS 需要在 **macOS + Xcode** 环境中执行。当前 Windows 环境不直接产出 iOS 包。
+
+在 macOS 上可使用：
+
+```bash
+pnpm tauri ios init --ci
+pnpm tauri ios dev
+pnpm tauri ios build
 ```
 
 ## 构建
@@ -184,6 +216,8 @@ pnpm build
 |------|------|
 | **Windows** | 支持前台应用、窗口标题、媒体读取与后台同步 |
 | **macOS** | 支持前台应用、媒体读取与后台同步；窗口标题当前暂未实现 |
+| **Android** | 支持手机/平板 UI、手动活动同步、灵感相关能力；不提供后台实时同步 |
+| **iOS** | 支持手机/平板 UI、手动活动同步、灵感相关能力；需在 macOS 上构建 |
 | **Linux / 其它** | 当前默认不支持实时采集能力 |
 
 macOS 说明：

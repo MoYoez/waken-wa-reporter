@@ -6,12 +6,12 @@ export const defaultClientConfig = (): ClientConfig => ({
   baseUrl: "",
   apiToken: "",
   generatedHashKey: "",
-  device: "Waken-Wa Desktop",
+  device: "Waken-Wa Client",
   deviceType: "desktop",
   pushMode: "realtime",
   pollIntervalMs: 2000,
   heartbeatIntervalMs: 60000,
-  reporterMetadataJson: "{\n  \"source\": \"waken-wa-desktop\"\n}",
+  reporterMetadataJson: "{\n  \"source\": \"waken-wa-client\"\n}",
   reporterEnabled: false,
 });
 

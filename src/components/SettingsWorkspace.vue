@@ -8,7 +8,13 @@ import { useToast } from "primevue/usetoast";
 
 import ConnectionPanel from "./ConnectionPanel.vue";
 import { runPlatformSelfTest } from "../lib/api";
-import type { ClientConfig, PlatformSelfTestResult, RealtimeReporterSnapshot } from "../types";
+import { createNotifier } from "../lib/notify";
+import type {
+  ClientCapabilities,
+  ClientConfig,
+  PlatformSelfTestResult,
+  RealtimeReporterSnapshot,
+} from "../types";
 
 const toast = useToast();
 const selfTestLoading = ref(false);
@@ -16,6 +22,7 @@ const selfTestResult = ref<PlatformSelfTestResult | null>(null);
 
 const props = defineProps<{
   modelValue: ClientConfig;
+  capabilities: ClientCapabilities;
   reporterSnapshot: RealtimeReporterSnapshot;
   reporterBusy: boolean;
 }>();
@@ -23,6 +30,10 @@ const props = defineProps<{
 const configReady = computed(
   () => !!props.modelValue.baseUrl.trim() && !!props.modelValue.apiToken.trim(),
 );
+const reporterSupported = computed(() => props.capabilities.realtimeReporter);
+const selfTestSupported = computed(() => props.capabilities.platformSelfTest);
+const isNativeNotice = computed(() => !props.capabilities.realtimeReporter);
+const { notify } = createNotifier(toast, () => isNativeNotice.value);
 
 defineEmits<{
   "update:modelValue": [value: ClientConfig];
@@ -43,7 +54,7 @@ async function handleSelfTest() {
   selfTestLoading.value = false;
 
   if (!result.success || !result.data) {
-    toast.add({
+    notify({
       severity: "error",
       summary: "检查未完成",
       detail: result.error?.message ?? "平台能力检查执行失败。",
@@ -53,7 +64,7 @@ async function handleSelfTest() {
   }
 
   selfTestResult.value = result.data;
-  toast.add({
+  notify({
     severity: result.data.foreground.success && result.data.media.success ? "success" : "warn",
     summary: "检查已完成",
     detail: `当前平台：${result.data.platform}`,
@@ -68,21 +79,26 @@ async function handleSelfTest() {
       <div>
         <p class="eyebrow">设置</p>
         <h2>设置</h2>
-        <p class="hero-copy">在这里完成连接、设备身份和后台同步设置，让这台客户端稳定接入你的 Waken-Wa。</p>
+        <p class="hero-copy">在这里完成连接、设备身份和客户端功能配置，让这台客户端稳定接入你的 Waken-Wa。</p>
       </div>
       <div class="hero-actions">
         <Button label="保存设置" icon="pi pi-save" severity="secondary" @click="$emit('save')" />
-        <Tag :value="reporterSnapshot.running ? '运行中' : '未启动'" :severity="reporterSnapshot.running ? 'success' : 'warn'" rounded />
+        <Tag
+          :value="reporterSupported ? (reporterSnapshot.running ? '运行中' : '未启动') : '移动端模式'"
+          :severity="reporterSupported ? (reporterSnapshot.running ? 'success' : 'warn') : 'info'"
+          rounded
+        />
       </div>
     </header>
 
     <ConnectionPanel
       :model-value="modelValue"
+      :capabilities="capabilities"
       @update:model-value="$emit('update:modelValue', $event)"
       @imported="$emit('imported', $event)"
     />
 
-    <Card class="glass-card">
+    <Card v-if="reporterSupported" class="glass-card">
       <template #title>
         <div class="panel-heading">
           <div>
@@ -134,6 +150,7 @@ async function handleSelfTest() {
             severity="secondary"
             text
             :loading="selfTestLoading"
+            v-if="selfTestSupported"
             @click="handleSelfTest"
           />
         </div>
@@ -152,7 +169,25 @@ async function handleSelfTest() {
       </template>
     </Card>
 
-    <Card v-if="selfTestResult" class="glass-card">
+    <Card v-else class="glass-card">
+      <template #title>
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">移动端模式</p>
+            <h3>后台实时上报已关闭</h3>
+          </div>
+        </div>
+      </template>
+      <template #content>
+        <div class="message-stack">
+          <Message severity="secondary" :closable="false">
+            当前客户端不提供后台实时同步与系统托盘能力。你仍可手动提交活动并发布灵感内容。
+          </Message>
+        </div>
+      </template>
+    </Card>
+
+    <Card v-if="selfTestSupported && selfTestResult" class="glass-card">
       <template #title>
         <div class="panel-heading">
           <div>

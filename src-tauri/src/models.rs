@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 pub fn default_device_name() -> String {
-    "Waken-Wa Desktop".into()
+    "Waken-Wa Client".into()
 }
 
 pub fn default_device_type() -> String {
@@ -22,7 +22,42 @@ pub fn default_heartbeat_interval_ms() -> u64 {
 }
 
 pub fn default_reporter_metadata_json() -> String {
-    "{\n  \"source\": \"waken-wa-desktop\"\n}".into()
+    "{\n  \"source\": \"waken-wa-client\"\n}".into()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClientCapabilities {
+    pub realtime_reporter: bool,
+    pub tray: bool,
+    pub platform_self_test: bool,
+}
+
+#[cfg(desktop)]
+pub fn default_client_capabilities() -> ClientCapabilities {
+    ClientCapabilities {
+        realtime_reporter: true,
+        tray: true,
+        platform_self_test: true,
+    }
+}
+
+#[cfg(mobile)]
+pub fn default_client_capabilities() -> ClientCapabilities {
+    ClientCapabilities {
+        realtime_reporter: false,
+        tray: false,
+        platform_self_test: false,
+    }
+}
+
+#[cfg(not(any(desktop, mobile)))]
+pub fn default_client_capabilities() -> ClientCapabilities {
+    ClientCapabilities {
+        realtime_reporter: false,
+        tray: false,
+        platform_self_test: false,
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

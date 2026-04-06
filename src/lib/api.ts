@@ -4,6 +4,7 @@ import type {
   ActivityFeedData,
   ActivityPayload,
   ApiResult,
+  ClientCapabilities,
   ClientConfig,
   ExistingReporterConfig,
   ImportedIntegrationConfig,
@@ -26,7 +27,16 @@ function toInvokeError(message: string, details?: unknown): ApiResult<never> {
   };
 }
 
-export function validateConfig(config: ClientConfig) {
+const DEFAULT_CAPABILITIES: ClientCapabilities = {
+  realtimeReporter: true,
+  tray: true,
+  platformSelfTest: true,
+};
+
+export function validateConfig(
+  config: ClientConfig,
+  capabilities: ClientCapabilities = DEFAULT_CAPABILITIES,
+) {
   const issues: string[] = [];
 
   if (!config.baseUrl.trim()) {
@@ -46,12 +56,14 @@ export function validateConfig(config: ClientConfig) {
     issues.push("API Token 为必填项。");
   }
 
-  if (!Number.isFinite(config.pollIntervalMs) || config.pollIntervalMs < 1000) {
-    issues.push("实时上报轮询间隔至少为 1000 毫秒。");
-  }
+  if (capabilities.realtimeReporter) {
+    if (!Number.isFinite(config.pollIntervalMs) || config.pollIntervalMs < 1000) {
+      issues.push("实时上报轮询间隔至少为 1000 毫秒。");
+    }
 
-  if (!Number.isFinite(config.heartbeatIntervalMs) || config.heartbeatIntervalMs < 0) {
-    issues.push("心跳间隔不能小于 0。");
+    if (!Number.isFinite(config.heartbeatIntervalMs) || config.heartbeatIntervalMs < 0) {
+      issues.push("心跳间隔不能小于 0。");
+    }
   }
 
   return issues;
@@ -63,6 +75,10 @@ async function invokeApi<T>(command: string, args?: Record<string, unknown>): Pr
   } catch (error) {
     return toInvokeError(error instanceof Error ? error.message : "Tauri 调用失败", error);
   }
+}
+
+export async function getClientCapabilities(): Promise<ApiResult<ClientCapabilities>> {
+  return invokeApi("get_client_capabilities");
 }
 
 export async function submitActivityReport(

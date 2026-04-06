@@ -447,7 +447,7 @@ fn build_payload(
     mut metadata: Map<String, Value>,
 ) -> ActivityPayload {
     if !metadata.contains_key("source") {
-        metadata.insert("source".into(), Value::String("waken-wa-desktop".into()));
+        metadata.insert("source".into(), Value::String("waken-wa-client".into()));
     }
 
     if let Some(media_map) = media.as_metadata_map() {

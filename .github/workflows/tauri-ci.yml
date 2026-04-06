@@ -1,147 +1,294 @@
-  name: Tauri CI
+name: Tauri CI
 
-  on:
-    push:
-      branches:
-        - tauri-desktop
-    pull_request:
-    workflow_dispatch:
+on:
+  push:
+    branches:
+      - tauri-desktop
+  pull_request:
+  workflow_dispatch:
 
-  permissions:
-    contents: read
+permissions:
+  contents: read
 
-  concurrency:
-    group: tauri-ci-${{ github.workflow }}-${{ github.ref }}
-    cancel-in-progress: true
+concurrency:
+  group: tauri-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
-  env:
-    NODE_VERSION: "20"
-    PNPM_VERSION: "9"
+env:
+  NODE_VERSION: "20"
+  PNPM_VERSION: "9"
 
-  jobs:
-    quality:
-      name: code-quality
-      runs-on: windows-latest
+jobs:
+  quality:
+    name: code-quality
+    runs-on: windows-latest
 
-      steps:
-        - name: checkout-code
-          uses: actions/checkout@v4
+    steps:
+      - name: checkout-code
+        uses: actions/checkout@v4
 
-        - name: install-pnpm
-          uses: pnpm/action-setup@v4
-          with:
-            version: ${{ env.PNPM_VERSION }}
+      - name: install-pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
 
-        - name: install-nodejs
-          uses: actions/setup-node@v4
-          with:
-            node-version: ${{ env.NODE_VERSION }}
-            cache: pnpm
+      - name: install-nodejs
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
 
-        - name: install-rust-toolchain
-          uses: dtolnay/rust-toolchain@stable
-          with:
-            components: rustfmt
+      - name: install-rust-toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
 
-        - name: rust-cache
-          uses: Swatinem/rust-cache@v2
-          with:
-            workspaces: src-tauri -> target
+      - name: rust-cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
 
-        - name: install-frontend-dependencies
-          run: pnpm install --frozen-lockfile
+      - name: install-frontend-dependencies
+        run: pnpm install --frozen-lockfile
 
-        - name: check-rust-format
-          run: cargo fmt --check
-          working-directory: src-tauri
+      - name: check-rust-format
+        run: cargo fmt --check
+        working-directory: src-tauri
 
-        - name: check-rust-compile
-          run: cargo check
-          working-directory: src-tauri
+      - name: check-rust-compile
+        run: cargo check
+        working-directory: src-tauri
 
-        - name: check-frontend-build
-          run: pnpm build
+      - name: check-frontend-build
+        run: pnpm build
 
-    build-windows:
-      name: build-windows
-      runs-on: windows-latest
-      needs: quality
+  build-windows:
+    name: build-windows
+    runs-on: windows-latest
+    needs: quality
 
-      steps:
-        - name: checkout-code
-          uses: actions/checkout@v4
+    steps:
+      - name: checkout-code
+        uses: actions/checkout@v4
 
-        - name: install-pnpm
-          uses: pnpm/action-setup@v4
-          with:
-            version: ${{ env.PNPM_VERSION }}
+      - name: install-pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
 
-        - name: install-nodejs
-          uses: actions/setup-node@v4
-          with:
-            node-version: ${{ env.NODE_VERSION }}
-            cache: pnpm
+      - name: install-nodejs
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
 
-        - name: install-rust-toolchain
-          uses: dtolnay/rust-toolchain@stable
+      - name: install-rust-toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-        - name: rust-cache
-          uses: Swatinem/rust-cache@v2
-          with:
-            workspaces: src-tauri -> target
+      - name: rust-cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
 
-        - name: install-frontend-dependencies
-          run: pnpm install --frozen-lockfile
+      - name: install-frontend-dependencies
+        run: pnpm install --frozen-lockfile
 
-        - name: build-tauri-windows
-          run: pnpm tauri build --bundles msi,nsis
+      - name: build-tauri-windows
+        run: pnpm tauri build --bundles msi,nsis
 
-        - name: upload-windows-installers
-          uses: actions/upload-artifact@v4
-          with:
-            name: tauri-windows-installers
-            path: |
-              src-tauri/target/release/bundle/msi/*.msi
-              src-tauri/target/release/bundle/nsis/*.exe
-            if-no-files-found: error
+      - name: upload-windows-installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-windows-installers
+          path: |
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
 
-    build-macos:
-      name: build-macos
-      runs-on: macos-latest
-      needs: quality
+  build-macos:
+    name: build-macos
+    runs-on: macos-latest
+    needs: quality
 
-      steps:
-        - name: checkout-code
-          uses: actions/checkout@v4
+    steps:
+      - name: checkout-code
+        uses: actions/checkout@v4
 
-        - name: install-pnpm
-          uses: pnpm/action-setup@v4
-          with:
-            version: ${{ env.PNPM_VERSION }}
+      - name: install-pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
 
-        - name: install-nodejs
-          uses: actions/setup-node@v4
-          with:
-            node-version: ${{ env.NODE_VERSION }}
-            cache: pnpm
+      - name: install-nodejs
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
 
-        - name: install-rust-toolchain
-          uses: dtolnay/rust-toolchain@stable
+      - name: install-rust-toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-        - name: rust-cache
-          uses: Swatinem/rust-cache@v2
-          with:
-            workspaces: src-tauri -> target
+      - name: rust-cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
 
-        - name: install-frontend-dependencies
-          run: pnpm install --frozen-lockfile
+      - name: install-frontend-dependencies
+        run: pnpm install --frozen-lockfile
 
-        - name: build-tauri-macos
-          run: pnpm tauri build --bundles dmg
+      - name: build-tauri-macos
+        run: pnpm tauri build --bundles dmg
 
-        - name: upload-macos-dmg
-          uses: actions/upload-artifact@v4
-          with:
-            name: tauri-macos-dmg
-            path: src-tauri/target/release/bundle/dmg/*.dmg
-            if-no-files-found: error
+      - name: upload-macos-dmg
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-macos-dmg
+          path: src-tauri/target/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+
+  build-android:
+    name: build-android
+    runs-on: ubuntu-latest
+    needs: quality
+
+    steps:
+      - name: checkout-code
+        uses: actions/checkout@v4
+
+      - name: install-pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: install-nodejs
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: install-java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: install-rust-toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: add-rust-android-targets
+        run: rustup target add aarch64-linux-android
+
+      - name: setup-android-sdk
+        uses: android-actions/setup-android@v3
+
+      - name: install-android-packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;27.0.12077973"
+
+      - name: export-ndk-home
+        run: |
+          NDK_PATH="$(ls -d "$ANDROID_SDK_ROOT"/ndk/* | sort -V | tail -n 1)"
+          echo "NDK_HOME=$NDK_PATH" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$NDK_PATH" >> "$GITHUB_ENV"
+          echo "Using NDK at: $NDK_PATH"
+
+      - name: install-frontend-dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: init-android-target
+        run: pnpm tauri android init --ci
+
+      - name: normalize-android-sdk-level
+        run: |
+          APP_GRADLE="src-tauri/gen/android/app/build.gradle.kts"
+          sed -i 's/compileSdk = [0-9]\+/compileSdk = 35/' "$APP_GRADLE"
+          sed -i 's/targetSdk = [0-9]\+/targetSdk = 35/' "$APP_GRADLE"
+          grep -nE "compileSdk|targetSdk" "$APP_GRADLE"
+
+      - name: build-android-apk-no-sign
+        run: pnpm tauri android build --ci --debug --apk --target aarch64
+
+      - name: upload-android-artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-android-artifacts
+          path: |
+            src-tauri/gen/android/app/build/outputs/**/*.apk
+            src-tauri/gen/android/app/build/outputs/**/*.aab
+          if-no-files-found: error
+
+  build-ios-nosign:
+    name: build-ios-nosign
+    runs-on: macos-latest
+    needs: quality
+
+    steps:
+      - name: checkout-code
+        uses: actions/checkout@v4
+
+      - name: install-pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: install-nodejs
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: install-rust-toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+
+      - name: install-frontend-dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: init-ios-target
+        run: pnpm tauri ios init --ci
+
+      - name: build-ios-simulator-no-sign
+        run: |
+          IOS_PROJECT="$(find src-tauri/gen/apple -maxdepth 1 -name '*.xcodeproj' | head -n 1)"
+          if [ -z "$IOS_PROJECT" ]; then
+            echo "::error::No iOS project found in src-tauri/gen/apple"
+            exit 1
+          fi
+
+          xcodebuild -list -json -project "$IOS_PROJECT" > /tmp/ios-schemes.json
+
+          IOS_SCHEME="$(python3 - <<'PY'
+          import json
+          with open('/tmp/ios-schemes.json', 'r', encoding='utf-8') as f:
+              data = json.load(f)
+          schemes = data.get('project', {}).get('schemes', [])
+          preferred = [s for s in schemes if s.endswith('_iOS')]
+          print((preferred or schemes)[0] if schemes else "")
+          PY
+          )"
+
+          if [ -z "$IOS_SCHEME" ]; then
+            echo "::error::Unable to resolve iOS scheme"
+            exit 1
+          fi
+
+          echo "Building scheme: $IOS_SCHEME from $IOS_PROJECT"
+          xcodebuild \
+            -project "$IOS_PROJECT" \
+            -scheme "$IOS_SCHEME" \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -derivedDataPath src-tauri/gen/apple/build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: upload-ios-simulator-app
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-ios-simulator-app
+          path: src-tauri/gen/apple/build/DerivedData/Build/Products/Debug-iphonesimulator/*.app
+          if-no-files-found: error

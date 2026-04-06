@@ -4,15 +4,17 @@ import Card from "primevue/card";
 import Message from "primevue/message";
 import Tag from "primevue/tag";
 
-import type { ClientConfig, RealtimeReporterSnapshot } from "../types";
+import type { ClientCapabilities, ClientConfig, RealtimeReporterSnapshot } from "../types";
 
 const props = defineProps<{
   config: ClientConfig;
   readiness: boolean;
+  capabilities: ClientCapabilities;
   reporterSnapshot: RealtimeReporterSnapshot;
 }>();
 
 const latestLogs = computed(() => props.reporterSnapshot.logs.slice(0, 4));
+const reporterSupported = computed(() => props.capabilities.realtimeReporter);
 
 function formatTime(value?: string | null) {
   if (!value) return "暂无";
@@ -26,10 +28,18 @@ function formatTime(value?: string | null) {
       <div>
         <p class="eyebrow">概览</p>
         <h2>概览</h2>
-        <p class="hero-copy">在这里查看当前连接状态、设备信息和后台同步运行情况。</p>
+        <p class="hero-copy">
+          在这里查看当前连接状态、设备信息和同步运行情况。
+        </p>
       </div>
       <div class="hero-actions">
-        <Tag :value="reporterSnapshot.running ? '后台同步运行中' : '后台同步未开启'" :severity="reporterSnapshot.running ? 'success' : 'warn'" rounded />
+        <Tag
+          v-if="reporterSupported"
+          :value="reporterSnapshot.running ? '后台同步运行中' : '后台同步未开启'"
+          :severity="reporterSnapshot.running ? 'success' : 'warn'"
+          rounded
+        />
+        <Tag v-else value="移动端模式" severity="info" rounded />
       </div>
     </header>
 
@@ -49,14 +59,14 @@ function formatTime(value?: string | null) {
             <strong>{{ config.pushMode === "active" ? "长期展示" : "实时模式" }}</strong>
           </div>
           <div class="overview-item">
-            <span>最近心跳</span>
-            <strong>{{ formatTime(reporterSnapshot.lastHeartbeatAt) }}</strong>
+            <span>{{ reporterSupported ? "最近心跳" : "设备类型" }}</span>
+            <strong>{{ reporterSupported ? formatTime(reporterSnapshot.lastHeartbeatAt) : config.deviceType }}</strong>
           </div>
         </div>
       </template>
     </Card>
 
-    <Card class="glass-card">
+    <Card v-if="reporterSupported" class="glass-card">
       <template #title>
         <div class="panel-heading">
           <div>
@@ -96,7 +106,43 @@ function formatTime(value?: string | null) {
       </template>
     </Card>
 
-    <Card class="glass-card">
+    <Card v-else class="glass-card">
+      <template #title>
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">当前状态</p>
+            <h3>移动端能力</h3>
+          </div>
+        </div>
+      </template>
+      <template #content>
+        <div class="overview-summary">
+          <div class="overview-item">
+            <span>基础配置</span>
+            <strong>{{ readiness ? "已就绪" : "待完善" }}</strong>
+          </div>
+          <div class="overview-item">
+            <span>后台实时上报</span>
+            <strong>已禁用</strong>
+          </div>
+          <div class="overview-item">
+            <span>手动活动提交</span>
+            <strong>可用</strong>
+          </div>
+          <div class="overview-item">
+            <span>灵感发布</span>
+            <strong>可用</strong>
+          </div>
+        </div>
+        <div class="message-stack">
+          <Message severity="secondary" :closable="false">
+            当前平台已关闭后台实时同步，适用于移动端前台使用场景。
+          </Message>
+        </div>
+      </template>
+    </Card>
+
+    <Card v-if="reporterSupported" class="glass-card">
       <template #title>
         <div class="panel-heading">
           <div>

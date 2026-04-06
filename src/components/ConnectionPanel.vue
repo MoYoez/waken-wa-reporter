@@ -11,10 +11,12 @@ import Textarea from "primevue/textarea";
 import { useToast } from "primevue/usetoast";
 
 import { parseImportedIntegrationConfig, validateConfig } from "../lib/api";
-import type { ClientConfig } from "../types";
+import { createNotifier } from "../lib/notify";
+import type { ClientCapabilities, ClientConfig, DeviceType } from "../types";
 
 const props = defineProps<{
   modelValue: ClientConfig;
+  capabilities: ClientCapabilities;
 }>();
 
 const emit = defineEmits<{
@@ -24,14 +26,22 @@ const emit = defineEmits<{
 
 const toast = useToast();
 const importPayload = reactive({ text: "" });
+const isNativeNotice = computed(() => !props.capabilities.realtimeReporter);
+const { notify } = createNotifier(toast, () => isNativeNotice.value);
 
-const issues = computed(() => validateConfig(props.modelValue));
+const issues = computed(() => validateConfig(props.modelValue, props.capabilities));
+const reporterSupported = computed(() => props.capabilities.realtimeReporter);
 
 function updateField<K extends keyof ClientConfig>(key: K, value: ClientConfig[K]) {
   emit("update:modelValue", {
     ...props.modelValue,
     [key]: value,
   });
+}
+
+function inferMobileDeviceType(): DeviceType {
+  if (typeof window === "undefined") return "mobile";
+  return window.matchMedia("(max-width: 899px)").matches ? "mobile" : "tablet";
 }
 
 function toBaseUrl(reportEndpoint?: string) {
@@ -46,10 +56,10 @@ function importConfig() {
         ...props.modelValue,
         baseUrl: toBaseUrl(parsed.reportEndpoint) ?? props.modelValue.baseUrl,
         apiToken: parsed.token ?? props.modelValue.apiToken,
-        deviceType: "desktop",
+        deviceType: reporterSupported.value ? "desktop" : inferMobileDeviceType(),
       });
       emit("imported", parsed.tokenName ? `已导入 Token：${parsed.tokenName}` : "已导入接入配置。");
-      toast.add({
+      notify({
         severity: "success",
         summary: "配置导入成功",
         detail: toBaseUrl(parsed.reportEndpoint) ?? "已自动填入地址与 Token。",
@@ -58,7 +68,7 @@ function importConfig() {
       importPayload.text = "";
     })
     .catch((error) => {
-      toast.add({
+      notify({
         severity: "error",
         summary: "导入失败",
         detail: error instanceof Error ? error.message : "配置内容无效。",
@@ -109,17 +119,17 @@ function importConfig() {
           </label>
 
           <label class="field-block">
-            <span class="field-label">设备名称</span>
+            <span class="field-label">设备名称（可选）</span>
             <InputText
               :model-value="modelValue.device"
-              placeholder="例如：办公室主力机"
+              placeholder="留空则使用默认设备名"
               @update:model-value="updateField('device', $event ?? '')"
             />
           </label>
         </div>
       </div>
 
-      <div class="settings-section">
+      <div v-if="reporterSupported" class="settings-section">
         <div class="settings-section-head">
           <strong>后台同步</strong>
           <span>控制后台同步的轮询节奏、心跳频率，以及默认附带的扩展信息。</span>
@@ -163,10 +173,16 @@ function importConfig() {
               :model-value="modelValue.reporterMetadataJson"
               rows="4"
               auto-resize
-              placeholder="{&quot;source&quot;:&quot;waken-wa-desktop&quot;}"
+              placeholder="{&quot;source&quot;:&quot;waken-wa-client&quot;}"
               @update:model-value="updateField('reporterMetadataJson', $event ?? '')"
             />
           </label>
+        </div>
+      </div>
+      <div v-else class="settings-section">
+        <div class="settings-section-head">
+          <strong>移动端说明</strong>
+          <span>当前运行在移动端模式：后台实时同步相关参数已停用，仅保留手动活动提交与内容发布。</span>
         </div>
       </div>
 

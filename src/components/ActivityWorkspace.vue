@@ -10,7 +10,14 @@ import ToggleSwitch from "primevue/toggleswitch";
 import { useToast } from "primevue/usetoast";
 
 import { submitActivityReport, validateConfig } from "../lib/api";
-import type { ActivityPayload, ClientConfig, RecentPreset } from "../types";
+import { readBatterySnapshot } from "../lib/battery";
+import { createNotifier } from "../lib/notify";
+import type {
+  ActivityPayload,
+  ClientCapabilities,
+  ClientConfig,
+  RecentPreset,
+} from "../types";
 
 interface ActivityFormState {
   selectedDevice: "current";
@@ -24,6 +31,7 @@ interface ActivityFormState {
 
 const props = defineProps<{
   config: ClientConfig;
+  capabilities: ClientCapabilities;
   recentPresets: RecentPreset[];
 }>();
 
@@ -32,6 +40,8 @@ const emit = defineEmits<{
 }>();
 
 const toast = useToast();
+const isNativeNotice = computed(() => !props.capabilities.realtimeReporter);
+const { notify } = createNotifier(toast, () => isNativeNotice.value);
 
 const form = reactive<ActivityFormState>({
   selectedDevice: "current",
@@ -45,11 +55,11 @@ const form = reactive<ActivityFormState>({
 
 const submitting = ref(false);
 
-const configIssues = computed(() => validateConfig(props.config));
+const configIssues = computed(() => validateConfig(props.config, props.capabilities));
 
 const deviceOptions = computed(() => [
   {
-    label: props.config.device.trim() || "当前桌面客户端设备",
+    label: props.config.device.trim() || "当前设备",
     value: "current" as const,
   },
 ]);
@@ -65,33 +75,34 @@ const requestPayload = computed<ActivityPayload>(() => ({
   ...(typeof form.batteryLevel === "number" ? { battery_level: form.batteryLevel } : {}),
   ...(typeof form.batteryLevel === "number" ? { is_charging: form.isCharging } : {}),
   metadata: {
-    source: "desktop-client",
+    source: "waken-wa-client",
   },
 }));
 
 async function detectBattery() {
-  const batteryApi = (navigator as Navigator & {
-    getBattery?: () => Promise<{ level: number; charging: boolean }>;
-  }).getBattery;
-
-  if (!batteryApi) {
-    toast.add({
+  try {
+    const battery = await readBatterySnapshot();
+    form.batteryLevel = battery.levelPercent;
+    form.isCharging = battery.charging;
+    notify({
+      severity: "success",
+      summary: "电量已读取",
+      detail: `当前电量 ${battery.levelPercent}%${battery.charging ? "（充电中）" : ""}`,
+      life: 2500,
+    });
+  } catch (error) {
+    notify({
       severity: "warn",
       summary: "无法获取电池信息",
-      detail: "当前运行环境没有暴露 navigator.getBattery()。",
-      life: 3000,
+      detail: error instanceof Error ? error.message : "当前运行环境不支持读取电量。",
+      life: 3500,
     });
-    return;
   }
-
-  const battery = await batteryApi();
-  form.batteryLevel = Math.round(battery.level * 100);
-  form.isCharging = battery.charging;
 }
 
 function openDeviceManager() {
   if (!props.config.baseUrl.trim()) {
-    toast.add({
+    notify({
       severity: "warn",
       summary: "请先完成连接设置",
       detail: "填写站点地址后，才可以跳转到设备管理。",
@@ -111,7 +122,7 @@ function applyPreset(preset: RecentPreset) {
 
 async function submitReport() {
   if (configIssues.value.length > 0) {
-    toast.add({
+    notify({
       severity: "warn",
       summary: "请先完成连接设置",
       detail: "请先填写站点地址和 API Token。",
@@ -121,7 +132,7 @@ async function submitReport() {
   }
 
   if (!form.processName.trim()) {
-    toast.add({
+    notify({
       severity: "warn",
       summary: "请填写进程名称",
       detail: "添加活动前，需要提供进程名称。",
@@ -144,7 +155,7 @@ async function submitReport() {
   if (pendingApproval) {
     const details = result.error?.details as Record<string, unknown>;
     const approvalUrl = typeof details.approvalUrl === "string" ? details.approvalUrl : "";
-    toast.add({
+    notify({
       severity: "warn",
       summary: "设备待审核",
       detail: approvalUrl
@@ -156,7 +167,7 @@ async function submitReport() {
   }
 
   if (!result.success) {
-    toast.add({
+    notify({
       severity: "error",
       summary: `添加失败（${result.status || "网络"}）`,
       detail: result.error?.message ?? "请求未成功完成。",
@@ -171,7 +182,7 @@ async function submitReport() {
     lastUsedAt: new Date().toISOString(),
   });
 
-  toast.add({
+  notify({
     severity: "success",
     summary: "活动已添加",
     detail: "Waken-Wa 已成功接收这条活动记录。",

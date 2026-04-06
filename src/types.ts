@@ -2,6 +2,12 @@ export type DeviceType = "desktop" | "tablet" | "mobile";
 
 export type PushMode = "realtime" | "active";
 
+export interface ClientCapabilities {
+  realtimeReporter: boolean;
+  tray: boolean;
+  platformSelfTest: boolean;
+}
+
 export interface ClientConfig {
   baseUrl: string;
   apiToken: string;
