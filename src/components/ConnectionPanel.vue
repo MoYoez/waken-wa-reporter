@@ -5,9 +5,9 @@ import Card from "primevue/card";
 import InputText from "primevue/inputtext";
 import Message from "primevue/message";
 import Password from "primevue/password";
-import Select from "primevue/select";
 import Tag from "primevue/tag";
 import Textarea from "primevue/textarea";
+import ToggleSwitch from "primevue/toggleswitch";
 import { useToast } from "primevue/usetoast";
 
 import { parseImportedIntegrationConfig, validateConfig } from "../lib/api";
@@ -17,6 +17,7 @@ import type { ClientCapabilities, ClientConfig, DeviceType } from "../types";
 const props = defineProps<{
   modelValue: ClientConfig;
   capabilities: ClientCapabilities;
+  variant?: "default" | "onboarding";
 }>();
 
 const emit = defineEmits<{
@@ -31,6 +32,7 @@ const { notify } = createNotifier(toast, () => isNativeNotice.value);
 
 const issues = computed(() => validateConfig(props.modelValue, props.capabilities));
 const reporterSupported = computed(() => props.capabilities.realtimeReporter);
+const isOnboarding = computed(() => props.variant === "onboarding");
 
 function updateField<K extends keyof ClientConfig>(key: K, value: ClientConfig[K]) {
   emit("update:modelValue", {
@@ -56,6 +58,7 @@ function importConfig() {
         ...props.modelValue,
         baseUrl: toBaseUrl(parsed.reportEndpoint) ?? props.modelValue.baseUrl,
         apiToken: parsed.token ?? props.modelValue.apiToken,
+        device: parsed.deviceName?.trim() || props.modelValue.device,
         deviceType: reporterSupported.value ? "desktop" : inferMobileDeviceType(),
       });
       emit("imported", parsed.tokenName ? `已导入 Token：${parsed.tokenName}` : "已导入接入配置。");
@@ -91,122 +94,235 @@ function importConfig() {
     </template>
 
     <template #content>
-      <div class="settings-section">
-        <div class="settings-section-head">
-          <strong>连接信息</strong>
-          <span>用于建立与站点的连接，也是内容发布和状态同步共用的核心凭证。设备标识会由客户端自动生成并长期保持稳定。</span>
+      <template v-if="isOnboarding">
+        <div class="settings-section">
+          <div class="settings-section-head">
+            <strong>Base64 快速导入</strong>
+            <span>首次引导里优先推荐这种方式。把后台复制的一键接入配置贴进来，会自动填好站点地址和 Token。</span>
+          </div>
+          <div class="panel-grid">
+            <label class="field-block field-span-2">
+              <span class="field-label">Base64 接入配置</span>
+              <Textarea
+                v-model="importPayload.text"
+                rows="4"
+                auto-resize
+                placeholder="粘贴从 Waken-Wa 后台复制的一键接入配置。"
+              />
+            </label>
+          </div>
+          <div class="actions-row">
+            <Button label="导入接入配置" icon="pi pi-upload" @click="importConfig" />
+          </div>
         </div>
-        <div class="panel-grid">
-          <label class="field-block field-span-2">
-            <span class="field-label">站点地址</span>
-            <InputText
-              :model-value="modelValue.baseUrl"
-              placeholder="https://waken-wa.example.com"
-              @update:model-value="updateField('baseUrl', $event ?? '')"
-            />
-          </label>
 
-          <label class="field-block field-span-2">
-            <span class="field-label">API Token</span>
-            <Password
-              :model-value="modelValue.apiToken"
-              placeholder="粘贴后台生成的完整 Token，无需手动添加 Bearer"
-              fluid
-              toggle-mask
-              :feedback="false"
-              @update:model-value="updateField('apiToken', $event)"
-            />
-          </label>
+        <div class="settings-section">
+          <details class="settings-disclosure">
+            <summary class="settings-disclosure-summary">
+              <div>
+                <strong>附加配置</strong>
+                <span>需要手动填写或微调时，再展开设置站点地址、Token 和同步参数。</span>
+              </div>
+              <i class="pi pi-angle-down" aria-hidden="true" />
+            </summary>
+            <div class="settings-disclosure-body">
+              <div class="panel-grid">
+                <label class="field-block field-span-2">
+                  <span class="field-label">站点地址</span>
+                  <InputText
+                    :model-value="modelValue.baseUrl"
+                    placeholder="https://waken-wa.example.com"
+                    @update:model-value="updateField('baseUrl', $event ?? '')"
+                  />
+                </label>
 
-          <label class="field-block">
-            <span class="field-label">设备名称（可选）</span>
-            <InputText
-              :model-value="modelValue.device"
-              placeholder="留空则使用默认设备名"
-              @update:model-value="updateField('device', $event ?? '')"
-            />
-          </label>
+                <label class="field-block field-span-2">
+                  <span class="field-label">API Token</span>
+                  <Password
+                    :model-value="modelValue.apiToken"
+                    placeholder="粘贴后台生成的完整 Token，无需手动添加 Bearer"
+                    fluid
+                    toggle-mask
+                    :feedback="false"
+                    @update:model-value="updateField('apiToken', $event)"
+                  />
+                </label>
+              </div>
+
+              <template v-if="reporterSupported">
+                <div class="settings-section-head settings-disclosure-subhead">
+                  <strong>后台同步附加配置</strong>
+                  <span>控制后台同步的轮询节奏、心跳频率，以及是否在启动后自动开启同步。</span>
+                </div>
+                <div class="panel-grid">
+                  <label class="field-block">
+                    <span class="field-label">轮询间隔</span>
+                    <InputText
+                      :model-value="String(modelValue.pollIntervalMs)"
+                      placeholder="2000"
+                      @update:model-value="updateField('pollIntervalMs', Number($event ?? 0))"
+                    />
+                  </label>
+
+                  <label class="field-block">
+                    <span class="field-label">心跳间隔</span>
+                    <InputText
+                      :model-value="String(modelValue.heartbeatIntervalMs)"
+                      placeholder="60000"
+                      @update:model-value="updateField('heartbeatIntervalMs', Number($event ?? 0))"
+                    />
+                  </label>
+
+                  <div class="reporter-enabled-card field-span-2">
+                    <div class="reporter-enabled-copy">
+                      <span class="field-label">启动后自动开启后台同步</span>
+                      <strong>{{ modelValue.reporterEnabled ? "已开启" : "未开启" }}</strong>
+                      <span>
+                        开启后，这台客户端下次启动时会在连接配置就绪后自动开始后台同步。
+                      </span>
+                    </div>
+                    <ToggleSwitch
+                      :model-value="modelValue.reporterEnabled"
+                      input-id="onboarding-reporter-enabled"
+                      @update:model-value="updateField('reporterEnabled', Boolean($event))"
+                    />
+                  </div>
+                </div>
+              </template>
+              <div v-else class="settings-section-head settings-disclosure-subhead">
+                <strong>移动端说明</strong>
+                <span>当前运行在移动端模式：后台实时同步相关参数已停用，仅保留手动活动提交与内容发布。</span>
+              </div>
+            </div>
+          </details>
         </div>
-      </div>
 
-      <div v-if="reporterSupported" class="settings-section">
-        <div class="settings-section-head">
-          <strong>后台同步</strong>
-          <span>控制后台同步的轮询节奏、心跳频率，以及默认附带的扩展信息。</span>
+        <div class="settings-section">
+          <div class="settings-section-head">
+            <strong>设备名称（可选）</strong>
+            <span>如果你想让这台设备在后台里更容易辨认，可以在这里补充一个名字；留空也能正常使用。</span>
+          </div>
+          <div class="panel-grid">
+            <label class="field-block field-span-2">
+              <span class="field-label">设备名称（可选）</span>
+              <InputText
+                :model-value="modelValue.device"
+                placeholder="留空则使用默认设备名"
+                @update:model-value="updateField('device', $event ?? '')"
+              />
+            </label>
+          </div>
         </div>
-        <div class="panel-grid">
-          <label class="field-block">
-            <span class="field-label">轮询间隔</span>
-            <InputText
-              :model-value="String(modelValue.pollIntervalMs)"
-              placeholder="2000"
-              @update:model-value="updateField('pollIntervalMs', Number($event ?? 0))"
-            />
-          </label>
+      </template>
 
-          <label class="field-block">
-            <span class="field-label">心跳间隔</span>
-            <InputText
-              :model-value="String(modelValue.heartbeatIntervalMs)"
-              placeholder="60000"
+      <template v-else>
+        <div class="settings-section">
+          <div class="settings-section-head">
+            <strong>连接信息</strong>
+            <span>用于建立与站点的连接，也是内容发布和状态同步共用的核心凭证。设备标识会由客户端自动生成并长期保持稳定。</span>
+          </div>
+          <div class="panel-grid">
+            <label class="field-block field-span-2">
+              <span class="field-label">站点地址</span>
+              <InputText
+                :model-value="modelValue.baseUrl"
+                placeholder="https://waken-wa.example.com"
+                @update:model-value="updateField('baseUrl', $event ?? '')"
+              />
+            </label>
+
+            <label class="field-block field-span-2">
+              <span class="field-label">API Token</span>
+              <Password
+                :model-value="modelValue.apiToken"
+                placeholder="粘贴后台生成的完整 Token，无需手动添加 Bearer"
+                fluid
+                toggle-mask
+                :feedback="false"
+                @update:model-value="updateField('apiToken', $event)"
+              />
+            </label>
+
+            <label class="field-block">
+              <span class="field-label">设备名称（可选）</span>
+              <InputText
+                :model-value="modelValue.device"
+                placeholder="留空则使用默认设备名"
+                @update:model-value="updateField('device', $event ?? '')"
+              />
+            </label>
+          </div>
+        </div>
+
+        <div v-if="reporterSupported" class="settings-section">
+          <div class="settings-section-head">
+            <strong>后台同步</strong>
+            <span>控制后台同步的轮询节奏、心跳频率，以及是否在启动后自动开启同步。</span>
+          </div>
+          <div class="panel-grid">
+            <label class="field-block">
+              <span class="field-label">轮询间隔</span>
+              <InputText
+                :model-value="String(modelValue.pollIntervalMs)"
+                placeholder="2000"
+                @update:model-value="updateField('pollIntervalMs', Number($event ?? 0))"
+              />
+            </label>
+
+            <label class="field-block">
+              <span class="field-label">心跳间隔</span>
+              <InputText
+                :model-value="String(modelValue.heartbeatIntervalMs)"
+                placeholder="60000"
               @update:model-value="updateField('heartbeatIntervalMs', Number($event ?? 0))"
             />
           </label>
 
-          <label class="field-block field-span-2">
-            <span class="field-label">启动后自动开启后台同步</span>
-            <Select
-              :model-value="modelValue.reporterEnabled"
-              :options="[
-                { label: '关闭', value: false },
-                { label: '开启', value: true },
-              ]"
-              option-label="label"
-              option-value="value"
-              @update:model-value="updateField('reporterEnabled', Boolean($event))"
-            />
-          </label>
+            <div class="reporter-enabled-card field-span-2">
+              <div class="reporter-enabled-copy">
+                <span class="field-label">启动后自动开启后台同步</span>
+                <strong>{{ modelValue.reporterEnabled ? "已开启" : "未开启" }}</strong>
+                <span>
+                  开启后，这台客户端在下次启动时会自动开始后台同步，适合长期常驻使用。
+                </span>
+              </div>
+              <ToggleSwitch
+                :model-value="modelValue.reporterEnabled"
+                input-id="settings-reporter-enabled"
+                @update:model-value="updateField('reporterEnabled', Boolean($event))"
+              />
+            </div>
+          </div>
+        </div>
+        <div v-else class="settings-section">
+          <div class="settings-section-head">
+            <strong>移动端说明</strong>
+            <span>当前运行在移动端模式：后台实时同步相关参数已停用，仅保留手动活动提交与内容发布。</span>
+          </div>
+        </div>
 
-          <label class="field-block field-span-2">
-            <span class="field-label">后台同步附加信息 JSON</span>
-            <Textarea
-              :model-value="modelValue.reporterMetadataJson"
-              rows="4"
-              auto-resize
-              placeholder="{&quot;source&quot;:&quot;waken-wa-client&quot;}"
-              @update:model-value="updateField('reporterMetadataJson', $event ?? '')"
-            />
-          </label>
+        <div class="settings-section">
+          <div class="settings-section-head">
+            <strong>快速导入</strong>
+            <span>如果你已经从后台复制过接入配置，可以直接粘贴到这里，一次性填写地址和 Token。</span>
+          </div>
+          <div class="panel-grid">
+            <label class="field-block field-span-2">
+              <span class="field-label">粘贴接入配置</span>
+              <Textarea
+                v-model="importPayload.text"
+                rows="4"
+                auto-resize
+                placeholder="粘贴从 Waken-Wa 后台复制的一键接入配置。"
+              />
+            </label>
+          </div>
         </div>
-      </div>
-      <div v-else class="settings-section">
-        <div class="settings-section-head">
-          <strong>移动端说明</strong>
-          <span>当前运行在移动端模式：后台实时同步相关参数已停用，仅保留手动活动提交与内容发布。</span>
-        </div>
-      </div>
 
-      <div class="settings-section">
-        <div class="settings-section-head">
-          <strong>快速导入</strong>
-          <span>如果你已经从后台复制过接入配置，可以直接粘贴到这里，一次性填写地址和 Token。</span>
+        <div class="actions-row">
+          <Button label="导入接入配置" icon="pi pi-upload" @click="importConfig" />
         </div>
-        <div class="panel-grid">
-          <label class="field-block field-span-2">
-            <span class="field-label">粘贴接入配置</span>
-            <Textarea
-              v-model="importPayload.text"
-              rows="4"
-              auto-resize
-              placeholder="粘贴从 Waken-Wa 后台复制的一键接入配置。"
-            />
-          </label>
-        </div>
-      </div>
-
-      <div class="actions-row">
-        <Button label="导入接入配置" icon="pi pi-upload" @click="importConfig" />
-      </div>
+      </template>
 
       <div class="message-stack">
         <Message v-if="issues.length === 0" severity="success" :closable="false">

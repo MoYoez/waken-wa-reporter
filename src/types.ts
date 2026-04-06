@@ -116,6 +116,7 @@ export interface ImportedIntegrationConfig {
   reportEndpoint?: string;
   token?: string;
   tokenName?: string;
+  deviceName?: string;
   raw: Record<string, unknown>;
 }
 

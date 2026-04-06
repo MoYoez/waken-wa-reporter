@@ -448,7 +448,7 @@ onBeforeUnmount(() => {
             <div class="onboarding-steps">
               <div class="onboarding-step">
                 <strong>1. 完成连接</strong>
-                <span>在引导中完成站点地址、Token 与设备名称设置。</span>
+                <span>优先粘贴 Base64 接入配置；需要时再展开附加配置微调连接参数，并可选填写设备名称。</span>
               </div>
               <div class="onboarding-step">
                 <strong>2. 活动同步</strong>
@@ -474,6 +474,7 @@ onBeforeUnmount(() => {
             <ConnectionPanel
               :model-value="onboardingDraftConfig"
               :capabilities="capabilities"
+              variant="onboarding"
               @update:model-value="onboardingDraftConfig = $event"
               @imported="notifyImport"
             />
@@ -571,6 +572,9 @@ onBeforeUnmount(() => {
           :readiness="readiness"
           :capabilities="capabilities"
           :reporter-snapshot="reporterSnapshot"
+          :reporter-busy="reporterBusy"
+          @start-reporter="handleStartReporter"
+          @stop-reporter="handleStopReporter"
         />
 
         <SettingsWorkspace

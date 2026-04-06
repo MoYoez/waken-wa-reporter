@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import Button from "primevue/button";
 import Card from "primevue/card";
 import Message from "primevue/message";
 import Tag from "primevue/tag";
@@ -11,6 +12,12 @@ const props = defineProps<{
   readiness: boolean;
   capabilities: ClientCapabilities;
   reporterSnapshot: RealtimeReporterSnapshot;
+  reporterBusy: boolean;
+}>();
+
+defineEmits<{
+  startReporter: [];
+  stopReporter: [];
 }>();
 
 const latestLogs = computed(() => props.reporterSnapshot.logs.slice(0, 4));
@@ -93,11 +100,45 @@ function formatTime(value?: string | null) {
             <span>轮询间隔</span>
             <strong>{{ config.pollIntervalMs }} ms</strong>
           </div>
+          <div class="overview-item">
+            <span>开机后自动同步</span>
+            <strong>{{ config.reporterEnabled ? "已开启" : "未开启" }}</strong>
+          </div>
+          <div class="overview-item">
+            <span>心跳间隔</span>
+            <strong>{{ config.heartbeatIntervalMs }} ms</strong>
+          </div>
+        </div>
+
+        <div class="actions-row">
+          <Button
+            label="开启后台同步"
+            icon="pi pi-play"
+            :loading="reporterBusy"
+            :disabled="reporterSnapshot.running || !readiness"
+            @click="$emit('startReporter')"
+          />
+          <Button
+            label="停止后台同步"
+            icon="pi pi-stop"
+            severity="secondary"
+            outlined
+            :loading="reporterBusy"
+            :disabled="!reporterSnapshot.running"
+            @click="$emit('stopReporter')"
+          />
         </div>
 
         <div class="message-stack">
           <Message v-if="reporterSnapshot.lastError" severity="error" :closable="false">
             {{ reporterSnapshot.lastError }}
+          </Message>
+          <Message
+            v-else-if="config.reporterEnabled"
+            severity="success"
+            :closable="false"
+          >
+            已启用启动后自动同步，客户端下次打开时会自动尝试开始后台同步。
           </Message>
           <Message v-else-if="!reporterSnapshot.running" severity="secondary" :closable="false">
             后台同步当前未开启。你可以在“设置”里手动开启，或启用启动后自动同步。

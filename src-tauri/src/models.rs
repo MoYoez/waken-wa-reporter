@@ -170,6 +170,7 @@ pub struct ImportedIntegrationConfig {
     pub report_endpoint: Option<String>,
     pub token: Option<String>,
     pub token_name: Option<String>,
+    pub device_name: Option<String>,
     pub raw: Map<String, Value>,
 }
 

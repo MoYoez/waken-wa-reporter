@@ -100,21 +100,6 @@ async function detectBattery() {
   }
 }
 
-function openDeviceManager() {
-  if (!props.config.baseUrl.trim()) {
-    notify({
-      severity: "warn",
-      summary: "请先完成连接设置",
-      detail: "填写站点地址后，才可以跳转到设备管理。",
-      life: 3500,
-    });
-    return;
-  }
-
-  const targetUrl = `${props.config.baseUrl.trim().replace(/\/$/, "")}/admin/devices`;
-  window.open(targetUrl, "_blank", "noopener,noreferrer");
-}
-
 function applyPreset(preset: RecentPreset) {
   form.processName = preset.process_name;
   form.processTitle = preset.process_title ?? "";
@@ -207,14 +192,6 @@ watch(
             <p class="eyebrow">活动同步</p>
             <h3>快速添加活动</h3>
           </div>
-          <Button
-            label="打开设备管理"
-            icon="pi pi-desktop"
-            severity="secondary"
-            outlined
-            size="small"
-            @click="openDeviceManager"
-          />
         </div>
       </template>
       <template #content>

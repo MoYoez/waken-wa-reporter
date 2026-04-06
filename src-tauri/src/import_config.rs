@@ -25,6 +25,18 @@ fn decode_base64_json(input: &str) -> Option<Map<String, Value>> {
     })
 }
 
+fn read_string(map: &Map<String, Value>, key: &str) -> Option<String> {
+    map.get(key)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
+fn first_string(map: &Map<String, Value>, keys: &[&str]) -> Option<String> {
+    keys.iter().find_map(|key| read_string(map, key))
+}
+
 pub fn parse_import_payload(input: &str) -> Result<ImportedIntegrationConfig, String> {
     let trimmed = input.trim();
     if trimmed.is_empty() {
@@ -60,12 +72,16 @@ pub fn parse_import_payload(input: &str) -> Result<ImportedIntegrationConfig, St
         .get("tokenName")
         .and_then(Value::as_str)
         .map(str::to_string);
+    let legacy_device_name = first_string(&raw, &["device_name", "deviceName", "device"]);
 
     let report_endpoint = token_block
         .and_then(|token| token.get("reportEndpoint"))
         .and_then(Value::as_str)
         .map(str::to_string)
         .or(legacy_endpoint);
+    let device_name = token_block
+        .and_then(|token| first_string(token, &["deviceName", "device_name", "device"]))
+        .or(legacy_device_name);
 
     Ok(ImportedIntegrationConfig {
         report_endpoint,
@@ -78,6 +94,7 @@ pub fn parse_import_payload(input: &str) -> Result<ImportedIntegrationConfig, St
             .and_then(Value::as_str)
             .map(str::to_string)
             .or(legacy_token_name),
+        device_name,
         raw,
     }
     .with_legacy_token(legacy_api_key))
