@@ -349,10 +349,10 @@ jobs:
       - name: init-ios-target
         run: pnpm tauri ios init --ci
 
-      - name: build-ios-no-sign
+      - name: build-ios-simulator-no-sign
         run: |
           export TAURI_APPLE_DEVELOPMENT_TEAM="ad-hoc"
-          pnpm tauri ios build --ci --config src-tauri/tauri.conf.ci.json
+          pnpm tauri ios build --ci --target aarch64-sim x86_64 --config src-tauri/tauri.conf.ci.json
 
       - name: upload-ios-no-sign-artifacts
         uses: actions/upload-artifact@v4

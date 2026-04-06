@@ -271,7 +271,7 @@ Linux 说明：
 - macOS bundle
 - Linux bundle（AppImage / deb）
 - Android APK/AAB（debug, no-sign）
-- iOS no-sign 构建产物（基于 `src-tauri/tauri.conf.ci.json`，使用占位 Team ID 规避空值校验）
+- iOS Simulator no-sign 构建产物（`aarch64-sim` / `x86_64`，基于 `src-tauri/tauri.conf.ci.json`）
 
 产物以 GitHub Actions Artifacts 的形式上传。
 
