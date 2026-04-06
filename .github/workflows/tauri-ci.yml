@@ -278,7 +278,7 @@ jobs:
           xcodebuild \
             -project "$IOS_PROJECT" \
             -scheme "$IOS_SCHEME" \
-            -configuration Debug \
+            -configuration Release \
             -sdk iphonesimulator \
             -derivedDataPath src-tauri/gen/apple/build/DerivedData \
             CODE_SIGNING_ALLOWED=NO \
@@ -290,5 +290,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tauri-ios-simulator-app
-          path: src-tauri/gen/apple/build/DerivedData/Build/Products/Debug-iphonesimulator/*.app
+          path: src-tauri/gen/apple/build/DerivedData/Build/Products/Release-iphonesimulator/*.app
           if-no-files-found: error
