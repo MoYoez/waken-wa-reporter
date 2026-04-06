@@ -271,9 +271,20 @@ Linux 说明：
 - macOS bundle
 - Linux bundle（AppImage / deb）
 - Android APK/AAB（debug, no-sign）
-- iOS Simulator no-sign 构建产物（`aarch64-sim` / `x86_64`，基于 `src-tauri/tauri.conf.ci.json`）
+- iOS 签名构建产物（独立 workflow，输出 `.ipa` / `.xcarchive`，基于 `src-tauri/tauri.conf.ci.json`）
 
 产物以 GitHub Actions Artifacts 的形式上传。
+
+### iOS CI Secrets
+
+独立的 [`.github/workflows/ios-ci.yml`](.github/workflows/ios-ci.yml) 需要以下 GitHub 配置：
+
+- Repository Secret: `APPLE_API_ISSUER`
+- Repository Secret: `APPLE_API_KEY`
+- Repository Secret: `APPLE_P8_SECRET`
+- Repository Variable: `IOS_DEVELOPMENT_TEAM`
+
+其中 `APPLE_API_KEY_PATH` 不需要手动配置；CI 会在运行时把 `APPLE_P8_SECRET` 动态写入临时 `.p8` 文件，并自动导出 `APPLE_API_KEY_PATH` 给 Tauri / Xcode 使用。
 
 ## License
 
