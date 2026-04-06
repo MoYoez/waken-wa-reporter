@@ -24,6 +24,7 @@ export async function loadAppState(): Promise<AppStatePayload> {
       recentPresets: [],
       onboardingDismissed: false,
       reporterConfigPromptHandled: false,
+      verifiedGeneratedHashKey: "",
     };
   }
 }
@@ -33,6 +34,7 @@ export async function saveAppState(
   recentPresets: RecentPreset[],
   onboardingDismissed: boolean,
   reporterConfigPromptHandled: boolean,
+  verifiedGeneratedHashKey: string,
 ) {
   await invoke("save_app_state", {
     payload: {
@@ -40,6 +42,7 @@ export async function saveAppState(
       recentPresets,
       onboardingDismissed,
       reporterConfigPromptHandled,
+      verifiedGeneratedHashKey,
     },
   });
 }

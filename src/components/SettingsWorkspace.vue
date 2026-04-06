@@ -25,6 +25,7 @@ const props = defineProps<{
   capabilities: ClientCapabilities;
   reporterSnapshot: RealtimeReporterSnapshot;
   reporterBusy: boolean;
+  verifiedGeneratedHashKey: string;
 }>();
 
 const configReady = computed(
@@ -149,6 +150,7 @@ async function handleSelfTest() {
     <ConnectionPanel
       :model-value="modelValue"
       :capabilities="capabilities"
+      :verified-generated-hash-key="verifiedGeneratedHashKey"
       @update:model-value="$emit('update:modelValue', $event)"
       @imported="$emit('imported', $event)"
     />

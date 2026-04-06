@@ -1171,6 +1171,14 @@ select {
   font-size: 0.9rem;
 }
 
+.entry-card-footer span {
+  flex: 1;
+}
+
+.entry-card-footer i {
+  flex-shrink: 0;
+}
+
 .markdown-content > *:first-child {
   margin-top: 0;
 }
@@ -1399,6 +1407,11 @@ select {
     min-height: 100%;
   }
 
+  .app-main {
+    padding-top: calc(24px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
+  }
+
   #app::-webkit-scrollbar {
     display: none;
   }
@@ -1419,6 +1432,10 @@ select {
     align-items: flex-start;
   }
 
+  .glass-card .p-card-body {
+    padding: 20px;
+  }
+
   .overview-summary,
   .module-switcher,
   .self-test-grid,
@@ -1432,12 +1449,38 @@ select {
 @media (max-width: 760px) {
   .app-main,
   .app-sidebar {
-    padding: 18px;
+    padding: 16px;
   }
 
   .app-main {
     overflow: visible;
-    padding-bottom: 96px;
+    padding-top: calc(20px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .workspace-grid {
+    gap: 18px;
+  }
+
+  .hero-panel {
+    padding: 20px 18px;
+    border-radius: 24px;
+    gap: 14px;
+  }
+
+  .hero-actions,
+  .panel-heading {
+    width: 100%;
+  }
+
+  .panel-heading {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .glass-card .p-card-body {
+    padding: 18px;
+    gap: 16px;
   }
 
   .panel-grid,
@@ -1447,6 +1490,19 @@ select {
 
   .activity-select-row {
     grid-template-columns: 1fr;
+  }
+
+  .activity-toggle-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 10px 12px;
+  }
+
+  .activity-toggle-row .p-button {
+    grid-column: 1 / -1;
+    width: 100%;
+    justify-content: center;
   }
 
   .field-span-2 {
@@ -1461,6 +1517,65 @@ select {
 
   .reporter-enabled-card {
     align-items: flex-start;
+  }
+
+  .editor-mode-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .editor-mode-tab {
+    width: 100%;
+  }
+
+  .editor-asset-actions,
+  .inspiration-upload,
+  .log-header,
+  .log-title-row,
+  .log-dialog-meta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .actions-row {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .actions-row .p-button,
+  .editor-asset-actions .p-button,
+  .inspiration-upload .p-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .upload-label {
+    width: 100%;
+  }
+
+  .upload-label span {
+    justify-content: center;
+  }
+
+  .asset-preview {
+    padding: 14px;
+    align-items: flex-start;
+  }
+
+  .inline-preview-image,
+  .entry-preview-image {
+    width: 100%;
+    max-width: 100%;
+    max-height: 220px;
+  }
+
+  .entry-detail-image {
+    max-height: 240px;
+  }
+
+  .status-snapshot {
+    padding: 10px 12px;
   }
 
   .pending-save-float {
@@ -1504,6 +1619,46 @@ select {
 }
 
 @media (max-width: 520px) {
+  .app-main,
+  .app-sidebar {
+    padding: 14px;
+  }
+
+  .app-main {
+    padding-top: calc(18px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(128px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .hero-panel {
+    padding: 18px 16px;
+  }
+
+  .glass-card .p-card-body {
+    padding: 16px;
+  }
+
+  .entry-card,
+  .log-item,
+  .self-test-card,
+  .preset-card,
+  .feed-item {
+    padding: 14px;
+  }
+
+  .mobile-tabbar {
+    gap: 6px;
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .mobile-tab-item {
+    min-height: 52px;
+    padding: 6px 2px;
+  }
+
+  .mobile-tab-item span {
+    font-size: 0.72rem;
+  }
+
   .app-root.has-pending-save .app-main {
     padding-bottom: 292px;
   }

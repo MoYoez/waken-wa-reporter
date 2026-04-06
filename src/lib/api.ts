@@ -11,6 +11,7 @@ import type {
   InspirationAssetUploadResult,
   InspirationEntry,
   InspirationEntryCreateInput,
+  PendingApprovalInfo,
   PlatformSelfTestResult,
   RealtimeReporterSnapshot,
 } from "../types";
@@ -69,6 +70,57 @@ export function validateConfig(
   return issues;
 }
 
+function pendingApprovalPayload(
+  candidate: unknown,
+): { pending: boolean; message: string; approvalUrl: string } | null {
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+    return null;
+  }
+
+  const payload = candidate as Record<string, unknown>;
+  if (payload.pending !== true) {
+    return null;
+  }
+
+  return {
+    pending: true,
+    message:
+      typeof payload.error === "string"
+        ? payload.error
+        : typeof payload.message === "string"
+          ? payload.message
+          : "",
+    approvalUrl: typeof payload.approvalUrl === "string" ? payload.approvalUrl : "",
+  };
+}
+
+export function extractPendingApprovalInfo(
+  result: ApiResult<unknown>,
+): PendingApprovalInfo | null {
+  if (result.status !== 202) {
+    return null;
+  }
+
+  const payload =
+    pendingApprovalPayload(result.error?.details)
+    ?? pendingApprovalPayload(result.data);
+
+  if (!payload) {
+    return null;
+  }
+
+  return {
+    message: payload.message || result.error?.message || "设备待后台审核后可用",
+    approvalUrl: payload.approvalUrl || null,
+  };
+}
+
+export function formatPendingApprovalDetail(info: PendingApprovalInfo) {
+  return info.approvalUrl
+    ? `设备待后台审核后可用，请前往设备管理完成审核：${info.approvalUrl}`
+    : "设备待后台审核后可用，请前往 Waken-Wa 后台的设备管理完成审核。";
+}
+
 async function invokeApi<T>(command: string, args?: Record<string, unknown>): Promise<ApiResult<T>> {
   try {
     return await invoke<ApiResult<T>>(command, args);
@@ -98,6 +150,12 @@ export async function listInspirationEntries(
   config: ClientConfig,
 ): Promise<ApiResult<InspirationEntry[]>> {
   return invokeApi("list_inspiration_entries", { config });
+}
+
+export async function probeConnectivity(
+  config: ClientConfig,
+): Promise<ApiResult<Record<string, unknown>>> {
+  return invokeApi("probe_connectivity", { config });
 }
 
 export async function createInspirationEntry(

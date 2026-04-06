@@ -123,6 +123,8 @@ pub struct AppStatePayload {
     pub onboarding_dismissed: bool,
     #[serde(default)]
     pub reporter_config_prompt_handled: bool,
+    #[serde(default)]
+    pub verified_generated_hash_key: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -9,13 +9,19 @@ import Select from "primevue/select";
 import ToggleSwitch from "primevue/toggleswitch";
 import { useToast } from "primevue/usetoast";
 
-import { submitActivityReport, validateConfig } from "../lib/api";
+import {
+  extractPendingApprovalInfo,
+  formatPendingApprovalDetail,
+  submitActivityReport,
+  validateConfig,
+} from "../lib/api";
 import { readBatterySnapshot } from "../lib/battery";
 import { createNotifier } from "../lib/notify";
 import type {
   ActivityPayload,
   ClientCapabilities,
   ClientConfig,
+  PendingApprovalInfo,
   RecentPreset,
 } from "../types";
 
@@ -37,6 +43,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   presetSaved: [preset: RecentPreset];
+  pendingApproval: [info: PendingApprovalInfo];
+  keyVerified: [generatedHashKey: string];
 }>();
 
 const toast = useToast();
@@ -130,24 +138,15 @@ async function submitReport() {
   const result = await submitActivityReport(props.config, requestPayload.value);
   submitting.value = false;
 
-  const pendingApproval =
-    result.status === 202 &&
-    result.error?.details &&
-    typeof result.error.details === "object" &&
-    !Array.isArray(result.error.details) &&
-    (result.error.details as Record<string, unknown>).pending === true;
-
+  const pendingApproval = extractPendingApprovalInfo(result);
   if (pendingApproval) {
-    const details = result.error?.details as Record<string, unknown>;
-    const approvalUrl = typeof details.approvalUrl === "string" ? details.approvalUrl : "";
     notify({
       severity: "warn",
       summary: "设备待审核",
-      detail: approvalUrl
-        ? `设备待后台审核后可用，请前往设备管理完成审核：${approvalUrl}`
-        : "设备待后台审核后可用，请前往 Waken-Wa 后台的设备管理完成审核。",
+      detail: formatPendingApprovalDetail(pendingApproval),
       life: 6000,
     });
+    emit("pendingApproval", pendingApproval);
     return;
   }
 
@@ -166,6 +165,7 @@ async function submitReport() {
     process_title: form.processTitle.trim() || undefined,
     lastUsedAt: new Date().toISOString(),
   });
+  emit("keyVerified", props.config.generatedHashKey.trim());
 
   notify({
     severity: "success",

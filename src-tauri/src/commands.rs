@@ -110,6 +110,26 @@ pub async fn list_inspiration_entries(
 }
 
 #[tauri::command]
+pub async fn probe_connectivity(
+    config: ClientConfig,
+) -> Result<ApiResult<serde_json::Value>, String> {
+    let body = json!({
+        "generatedHashKey": config.generated_hash_key.trim(),
+        "device": config.device.trim(),
+        "deviceType": config.device_type.trim(),
+    });
+
+    Ok(request_json(
+        &config.base_url,
+        "/api/activity/verify",
+        Some(&config.api_token),
+        reqwest::Method::POST,
+        Some(body),
+    )
+    .await)
+}
+
+#[tauri::command]
 pub async fn create_inspiration_entry(
     config: ClientConfig,
     input: InspirationEntryCreateInput,

@@ -104,6 +104,11 @@ export interface ApiResult<T> {
   error?: ApiError;
 }
 
+export interface PendingApprovalInfo {
+  message: string;
+  approvalUrl?: string | null;
+}
+
 export interface RecentPreset {
   process_name: string;
   process_title?: string;
@@ -125,6 +130,7 @@ export interface AppStatePayload {
   recentPresets: RecentPreset[];
   onboardingDismissed: boolean;
   reporterConfigPromptHandled?: boolean;
+  verifiedGeneratedHashKey?: string;
 }
 
 export type ReporterLogLevel = "info" | "success" | "warn" | "error";
@@ -166,4 +172,13 @@ export interface ExistingReporterConfig {
   found: boolean;
   path?: string;
   config?: ClientConfig;
+}
+
+export interface MobileConnectivityState {
+  checking: boolean;
+  checked: boolean;
+  ok: boolean | null;
+  summary: string;
+  detail: string;
+  checkedAt?: string | null;
 }

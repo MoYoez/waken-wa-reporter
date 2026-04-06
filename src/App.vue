@@ -14,8 +14,11 @@ import RealtimeWorkspace from "./components/RealtimeWorkspace.vue";
 import SettingsWorkspace from "./components/SettingsWorkspace.vue";
 import {
   discoverExistingReporterConfig,
+  extractPendingApprovalInfo,
+  formatPendingApprovalDetail,
   getClientCapabilities,
   getRealtimeReporterSnapshot,
+  probeConnectivity,
   startRealtimeReporter,
   stopRealtimeReporter,
 } from "./lib/api";
@@ -26,6 +29,8 @@ import type {
   ClientConfig,
   DeviceType,
   ExistingReporterConfig,
+  MobileConnectivityState,
+  PendingApprovalInfo,
   RealtimeReporterSnapshot,
   RecentPreset,
 } from "./types";
@@ -60,6 +65,15 @@ const reporterConfigPromptHandled = ref(false);
 const reporterBusy = ref(false);
 const importingReporterConfig = ref(false);
 const existingReporterConfig = ref<ExistingReporterConfig | null>(null);
+const verifiedGeneratedHashKey = ref("");
+const mobileConnectivity = ref<MobileConnectivityState>({
+  checking: false,
+  checked: false,
+  ok: null,
+  summary: "待检测",
+  detail: "",
+  checkedAt: null,
+});
 const reporterSnapshot = ref<RealtimeReporterSnapshot>({
   running: false,
   logs: [],
@@ -71,6 +85,7 @@ const reporterSnapshot = ref<RealtimeReporterSnapshot>({
 });
 const pendingApprovalDialogVisible = ref(false);
 const lastPendingApprovalSeen = ref("");
+const lastMobileConnectivitySignature = ref("");
 const onboardingSetupMode = ref(false);
 const viewportWidth = ref<number>(1200);
 
@@ -139,6 +154,7 @@ function normalizeConfigByCapabilities(raw: ClientConfig): ClientConfig {
     ...raw,
     device: normalizedDevice,
     deviceType: inferMobileDeviceType(),
+    pushMode: "active",
     reporterEnabled: false,
   };
 }
@@ -177,6 +193,125 @@ function notifyImport(message: string) {
     detail: message,
     life: 3000,
   });
+}
+
+function rememberVerifiedGeneratedHashKey(nextKey: string) {
+  const normalized = nextKey.trim();
+  if (!normalized || verifiedGeneratedHashKey.value === normalized) {
+    return;
+  }
+
+  verifiedGeneratedHashKey.value = normalized;
+  void persistAppState();
+}
+
+function handlePendingApproval(info: PendingApprovalInfo) {
+  reporterSnapshot.value.lastPendingApprovalMessage = info.message;
+  reporterSnapshot.value.lastPendingApprovalUrl = info.approvalUrl ?? null;
+  pendingApprovalDialogVisible.value = true;
+}
+
+function resetMobileConnectivity(summary = "待检测", detail = "") {
+  mobileConnectivity.value = {
+    checking: false,
+    checked: false,
+    ok: null,
+    summary,
+    detail,
+    checkedAt: null,
+  };
+}
+
+async function runMobileConnectivityProbe(force = false) {
+  if (reporterSupported.value) {
+    resetMobileConnectivity();
+    return;
+  }
+
+  if (!readiness.value) {
+    lastMobileConnectivitySignature.value = "";
+    resetMobileConnectivity(
+      "等待配置",
+      "填写站点地址、API Token 和设备 Key 后，移动端会自动检测 token 是否可用以及设备是否已经审核。",
+    );
+    return;
+  }
+
+  const signature = [
+    config.value.baseUrl.trim(),
+    config.value.apiToken.trim(),
+    config.value.generatedHashKey.trim(),
+  ].join("|");
+
+  if (!force && mobileConnectivity.value.checked && lastMobileConnectivitySignature.value === signature) {
+    return;
+  }
+
+  lastMobileConnectivitySignature.value = signature;
+  mobileConnectivity.value = {
+    checking: true,
+    checked: false,
+    ok: null,
+    summary: "检测中",
+    detail: "正在校验当前 API Token 是否可用，以及这台设备是否已经通过审核。",
+    checkedAt: null,
+  };
+
+  const result = await probeConnectivity(config.value);
+  const checkedAt = new Date().toISOString();
+  const pendingApproval = extractPendingApprovalInfo(result);
+
+  if (pendingApproval) {
+    mobileConnectivity.value = {
+      checking: false,
+      checked: true,
+      ok: false,
+      summary: "设备待审核",
+      detail: formatPendingApprovalDetail(pendingApproval),
+      checkedAt,
+    };
+    handlePendingApproval(pendingApproval);
+    return;
+  }
+
+  if (result.success) {
+    rememberVerifiedGeneratedHashKey(config.value.generatedHashKey.trim());
+    mobileConnectivity.value = {
+      checking: false,
+      checked: true,
+      ok: true,
+      summary: "检测通过",
+      detail: "已确认当前 API Token 可用，并且这台设备已经通过审核。这个检查不会写入活动或灵感内容。",
+      checkedAt,
+    };
+    return;
+  }
+
+  let summary = "检测失败";
+  let detail = result.error?.message ?? "暂时无法确认当前移动端配置是否可用。";
+
+  if (result.status === 401) {
+    summary = "Token 不可用";
+    detail = "当前 API Token 无效或已停用，请回到设置页检查并重新导入。";
+  } else if (result.status === 403) {
+    summary = "设备不可用";
+    detail = result.error?.message ?? "当前设备已被停用，或没有权限继续使用这个 Key。";
+  } else if (result.status === 400) {
+    summary = "配置不完整";
+    detail = result.error?.message ?? "缺少必要配置，暂时无法校验当前设备。";
+  } else if (result.status === 0) {
+    summary = "无法连接站点";
+    detail = result.error?.message ?? "请检查站点地址、网络连通性和服务是否已启动。";
+  }
+
+  mobileConnectivity.value = {
+    checking: false,
+    checked: true,
+    ok: false,
+    summary,
+    detail,
+    checkedAt,
+  };
 }
 
 function closeOnboarding() {
@@ -219,6 +354,7 @@ async function persistAppState(configOverride?: ClientConfig) {
     recentPresets.value,
     onboardingDismissed.value,
     reporterConfigPromptHandled.value,
+    verifiedGeneratedHashKey.value,
   );
 }
 
@@ -289,7 +425,11 @@ async function handleStartReporter() {
   }
 
   reporterBusy.value = true;
-  const result = await startRealtimeReporter(config.value);
+  const reporterConfig = {
+    ...config.value,
+    pushMode: "realtime" as const,
+  };
+  const result = await startRealtimeReporter(reporterConfig);
   reporterBusy.value = false;
 
   if (!result.success || !result.data) {
@@ -379,6 +519,24 @@ watch(
   { deep: true },
 );
 
+watch(
+  () => [
+    hydrated.value,
+    reporterSupported.value,
+    readiness.value,
+    config.value.baseUrl.trim(),
+    config.value.apiToken.trim(),
+    config.value.generatedHashKey.trim(),
+  ].join("|"),
+  () => {
+    if (!hydrated.value) {
+      return;
+    }
+    void runMobileConnectivityProbe();
+  },
+  { immediate: true },
+);
+
 onMounted(async () => {
   viewportWidth.value = window.innerWidth;
   window.addEventListener("resize", onViewportResize);
@@ -395,6 +553,7 @@ onMounted(async () => {
   onboardingDraftConfig.value = { ...normalized };
   recentPresets.value = state.recentPresets;
   onboardingDismissed.value = state.onboardingDismissed;
+  verifiedGeneratedHashKey.value = state.verifiedGeneratedHashKey?.trim() ?? "";
   reporterConfigPromptHandled.value = reporterSupported.value
     ? (state.reporterConfigPromptHandled ?? false)
     : true;
@@ -502,6 +661,7 @@ onBeforeUnmount(() => {
             <ConnectionPanel
               :model-value="onboardingDraftConfig"
               :capabilities="capabilities"
+              :verified-generated-hash-key="verifiedGeneratedHashKey"
               variant="onboarding"
               @update:model-value="onboardingDraftConfig = $event"
               @imported="notifyImport"
@@ -530,7 +690,6 @@ onBeforeUnmount(() => {
     </Dialog>
 
     <Dialog
-      v-if="reporterSupported"
       v-model:visible="pendingApprovalDialogVisible"
       modal
       dismissable-mask
@@ -541,7 +700,7 @@ onBeforeUnmount(() => {
       <div class="onboarding-steps">
         <div class="onboarding-step">
           <strong>{{ reporterSnapshot.lastPendingApprovalMessage || "设备待后台审核后可用" }}</strong>
-          <span>后台同步已经识别到当前设备尚未通过审核，请前往 Waken-Wa 后台的设备管理完成审核。</span>
+          <span>客户端已经识别到当前设备尚未通过审核，请前往 Waken-Wa 后台的设备管理完成审核。</span>
         </div>
         <div
           v-if="reporterSnapshot.lastPendingApprovalUrl"
@@ -629,10 +788,12 @@ onBeforeUnmount(() => {
           :config="config"
           :readiness="readiness"
           :capabilities="capabilities"
+          :mobile-connectivity="mobileConnectivity"
           :reporter-snapshot="reporterSnapshot"
           :reporter-busy="reporterBusy"
           @start-reporter="handleStartReporter"
           @stop-reporter="handleStopReporter"
+          @retry-mobile-connectivity="runMobileConnectivityProbe(true)"
         />
 
         <SettingsWorkspace
@@ -641,6 +802,7 @@ onBeforeUnmount(() => {
           :capabilities="capabilities"
           :reporter-snapshot="reporterSnapshot"
           :reporter-busy="reporterBusy"
+          :verified-generated-hash-key="verifiedGeneratedHashKey"
           @update:model-value="config = normalizeConfigByCapabilities($event)"
           @imported="notifyImport"
           @start-reporter="handleStartReporter"
@@ -653,6 +815,8 @@ onBeforeUnmount(() => {
           :capabilities="capabilities"
           :recent-presets="recentPresets"
           @preset-saved="handlePresetSaved"
+          @pending-approval="handlePendingApproval"
+          @key-verified="rememberVerifiedGeneratedHashKey"
         />
 
         <RealtimeWorkspace
@@ -664,6 +828,8 @@ onBeforeUnmount(() => {
           v-else-if="activeSection === 'inspiration'"
           :config="config"
           :capabilities="capabilities"
+          @pending-approval="handlePendingApproval"
+          @key-verified="rememberVerifiedGeneratedHashKey"
         />
       </main>
     </div>

@@ -15,6 +15,8 @@ import { useToast } from "primevue/usetoast";
 import LexicalEditor from "./LexicalEditor.vue";
 import {
   createInspirationEntry,
+  extractPendingApprovalInfo,
+  formatPendingApprovalDetail,
   getPublicActivityFeed,
   listInspirationEntries,
   uploadInspirationAsset,
@@ -34,6 +36,7 @@ import type {
   ClientCapabilities,
   ClientConfig,
   InspirationEntry,
+  PendingApprovalInfo,
 } from "../types";
 
 interface ActivitySelectOption {
@@ -48,6 +51,11 @@ interface ActivitySelectOption {
 const props = defineProps<{
   config: ClientConfig;
   capabilities: ClientCapabilities;
+}>();
+
+const emit = defineEmits<{
+  pendingApproval: [info: PendingApprovalInfo];
+  keyVerified: [generatedHashKey: string];
 }>();
 
 const toast = useToast();
@@ -447,6 +455,18 @@ async function onBodyImageSelected(event: Event) {
     });
 
     const result = await uploadInspirationAsset(props.config, dataUrl);
+    const pendingApproval = extractPendingApprovalInfo(result);
+    if (pendingApproval) {
+      notify({
+        severity: "warn",
+        summary: "设备待审核",
+        detail: formatPendingApprovalDetail(pendingApproval),
+        life: 6000,
+      });
+      emit("pendingApproval", pendingApproval);
+      return;
+    }
+
     if (!result.success || !result.data?.url) {
       notify({
         severity: "error",
@@ -461,6 +481,7 @@ async function onBodyImageSelected(event: Event) {
       compose.contentLexical,
       `![](${result.data.url})`,
     );
+    emit("keyVerified", props.config.generatedHashKey.trim());
 
     notify({
       severity: "success",
@@ -553,6 +574,18 @@ async function submitEntry() {
   });
   submitting.value = false;
 
+  const pendingApproval = extractPendingApprovalInfo(result);
+  if (pendingApproval) {
+    notify({
+      severity: "warn",
+      summary: "设备待审核",
+      detail: formatPendingApprovalDetail(pendingApproval),
+      life: 6000,
+    });
+    emit("pendingApproval", pendingApproval);
+    return;
+  }
+
   if (!result.success) {
     notify({
       severity: "error",
@@ -562,6 +595,8 @@ async function submitEntry() {
     });
     return;
   }
+
+  emit("keyVerified", props.config.generatedHashKey.trim());
 
   notify({
     severity: "success",

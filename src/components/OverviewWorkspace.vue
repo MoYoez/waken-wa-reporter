@@ -5,12 +5,18 @@ import Card from "primevue/card";
 import Message from "primevue/message";
 import Tag from "primevue/tag";
 
-import type { ClientCapabilities, ClientConfig, RealtimeReporterSnapshot } from "../types";
+import type {
+  ClientCapabilities,
+  ClientConfig,
+  MobileConnectivityState,
+  RealtimeReporterSnapshot,
+} from "../types";
 
 const props = defineProps<{
   config: ClientConfig;
   readiness: boolean;
   capabilities: ClientCapabilities;
+  mobileConnectivity: MobileConnectivityState;
   reporterSnapshot: RealtimeReporterSnapshot;
   reporterBusy: boolean;
 }>();
@@ -18,10 +24,18 @@ const props = defineProps<{
 defineEmits<{
   startReporter: [];
   stopReporter: [];
+  retryMobileConnectivity: [];
 }>();
 
 const latestLogs = computed(() => props.reporterSnapshot.logs.slice(0, 4));
 const reporterSupported = computed(() => props.capabilities.realtimeReporter);
+const effectiveModeLabel = computed(() => {
+  if (!reporterSupported.value) {
+    return "活动模式";
+  }
+
+  return props.reporterSnapshot.running ? "实时模式" : "活动模式";
+});
 
 function formatTime(value?: string | null) {
   if (!value) return "暂无";
@@ -62,8 +76,8 @@ function formatTime(value?: string | null) {
             <strong>{{ config.device || "未命名设备" }}</strong>
           </div>
           <div class="overview-item">
-            <span>默认模式</span>
-            <strong>{{ config.pushMode === "active" ? "长期展示" : "实时模式" }}</strong>
+            <span>当前模式</span>
+            <strong>{{ effectiveModeLabel }}</strong>
           </div>
           <div class="overview-item">
             <span>{{ reporterSupported ? "最近心跳" : "设备类型" }}</span>
@@ -174,9 +188,48 @@ function formatTime(value?: string | null) {
             <span>灵感发布</span>
             <strong>可用</strong>
           </div>
+          <div class="overview-item">
+            <span>连通性检查</span>
+            <strong>
+              {{
+                mobileConnectivity.checking
+                  ? "检测中"
+                  : mobileConnectivity.ok === true
+                    ? "已通过"
+                    : mobileConnectivity.checked
+                      ? "异常"
+                      : "待检测"
+              }}
+            </strong>
+          </div>
+        </div>
+        <div class="actions-row">
+          <Button
+            label="重新测试连接"
+            icon="pi pi-refresh"
+            severity="secondary"
+            outlined
+            :loading="mobileConnectivity.checking"
+            :disabled="!readiness"
+            @click="$emit('retryMobileConnectivity')"
+          />
         </div>
         <div class="message-stack">
-          <Message severity="secondary" :closable="false">
+          <Message
+            :severity="
+              mobileConnectivity.ok === true
+                ? 'success'
+                : mobileConnectivity.checked
+                  ? 'warn'
+                  : 'secondary'
+            "
+            :closable="false"
+          >
+            <strong>{{ mobileConnectivity.summary || "移动端模式" }}</strong>
+            <br v-if="mobileConnectivity.detail" />
+            {{ mobileConnectivity.detail || "当前平台已关闭后台实时同步，适用于移动端前台使用场景。" }}
+          </Message>
+          <Message v-if="!readiness" severity="secondary" :closable="false">
             当前平台已关闭后台实时同步，适用于移动端前台使用场景。
           </Message>
         </div>
