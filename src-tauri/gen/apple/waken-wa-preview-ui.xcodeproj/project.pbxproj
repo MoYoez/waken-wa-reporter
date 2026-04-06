@@ -1,0 +1,498 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		076D00356D6F4238506CBEF6 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E4FAB17637395C4E40B0FF9A /* QuartzCore.framework */; };
+		11B6E39CF13040C26F1C1891 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 75908514258AD6188B1ECBA0 /* UIKit.framework */; };
+		2B0F4D61E6D7E2D07DFB7C2F /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C53CFD8ECC63445A9C3FA667 /* Security.framework */; };
+		388DE3F3007B768D4432C127 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 113EB02CA83F17F5B76D5C78 /* WebKit.framework */; };
+		4167A17706220B62F3021B50 /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 207923B90E2989FABE286074 /* libapp.a */; };
+		55F76684F7CD006B938B5063 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = A4E4E3DB2A9C35158CAE2096 /* main.mm */; };
+		583D4B19498F001D2AC06E72 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D82B48D4CAC404FD9B93A8C /* Metal.framework */; };
+		841CDEA5CEF0C6066D1A9DE9 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 57B1E17516ADDAAF4D376169 /* LaunchScreen.storyboard */; };
+		AC0A1AAA69E847013BE4D671 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B34049A368762B0A96F577E /* MetalKit.framework */; };
+		B22053B26FF69156F458D3AD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 78037072800217A75CFC7491 /* Assets.xcassets */; };
+		E12ECEA2C9CF3A9D5B2FE461 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 27FFA86C08EF4710E9A146B6 /* assets */; };
+		E44035B89F3AE3D9C7797B59 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 12AE5DEC8B6EC378D54BDE1A /* CoreGraphics.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		113EB02CA83F17F5B76D5C78 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		12AE5DEC8B6EC378D54BDE1A /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		17C0B11F44E14BE30AA45A24 /* macos.rs */ = {isa = PBXFileReference; path = macos.rs; sourceTree = "<group>"; };
+		1923854B63E6F85DE4FED11E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		1B34049A368762B0A96F577E /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
+		207923B90E2989FABE286074 /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
+		26F10AD3BDCA7DED69B68CA2 /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
+		27FFA86C08EF4710E9A146B6 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
+		30957FD9E3E0E53DAF23CE7F /* models.rs */ = {isa = PBXFileReference; path = models.rs; sourceTree = "<group>"; };
+		399D72B4E492E3D417312AE9 /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
+		552DC03FD2AF1AA13A8412AE /* reporter_config.rs */ = {isa = PBXFileReference; path = reporter_config.rs; sourceTree = "<group>"; };
+		57B1E17516ADDAAF4D376169 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		70C18904223D49056ED47027 /* stub.rs */ = {isa = PBXFileReference; path = stub.rs; sourceTree = "<group>"; };
+		75908514258AD6188B1ECBA0 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
+		78037072800217A75CFC7491 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		7C552F0B404465A4FB12F359 /* waken-wa-preview-ui_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "waken-wa-preview-ui_iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		81CF7F96EAFAA637B8BB2199 /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
+		8A4810BEF6B49DB045D680B0 /* linux.rs */ = {isa = PBXFileReference; path = linux.rs; sourceTree = "<group>"; };
+		8D82B48D4CAC404FD9B93A8C /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		8F5A8BACFBDCA0233DBABA6B /* tray.rs */ = {isa = PBXFileReference; path = tray.rs; sourceTree = "<group>"; };
+		A4E4E3DB2A9C35158CAE2096 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
+		B27D2DE1E9B100C21A5BF61F /* commands.rs */ = {isa = PBXFileReference; path = commands.rs; sourceTree = "<group>"; };
+		B333BF3091DDDF1636F21976 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
+		BBD9828F43DE051DE268C470 /* import_config.rs */ = {isa = PBXFileReference; path = import_config.rs; sourceTree = "<group>"; };
+		BED271A51FF1B2B8545C2337 /* realtime_reporter.rs */ = {isa = PBXFileReference; path = realtime_reporter.rs; sourceTree = "<group>"; };
+		C53CFD8ECC63445A9C3FA667 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		DBC2A0182CFBE90007C8A436 /* state_store.rs */ = {isa = PBXFileReference; path = state_store.rs; sourceTree = "<group>"; };
+		E2CAE8E9E0A8917ED2EA9DD7 /* http_client.rs */ = {isa = PBXFileReference; path = http_client.rs; sourceTree = "<group>"; };
+		E4F5947699108CF333057A03 /* macos_bridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = macos_bridge.m; sourceTree = "<group>"; };
+		E4FAB17637395C4E40B0FF9A /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		FA441BF6E2F6BA4321377C2D /* windows.rs */ = {isa = PBXFileReference; path = windows.rs; sourceTree = "<group>"; };
+		FC4719A5D0CDEF082AE9D3C1 /* waken-wa-preview-ui_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "waken-wa-preview-ui_iOS.entitlements"; sourceTree = "<group>"; };
+		FD8CA7CFAEFF5BE9D0236C0F /* macos_bridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = macos_bridge.h; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		4375E53706EFD59864D25E4A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4167A17706220B62F3021B50 /* libapp.a in Frameworks */,
+				E44035B89F3AE3D9C7797B59 /* CoreGraphics.framework in Frameworks */,
+				583D4B19498F001D2AC06E72 /* Metal.framework in Frameworks */,
+				AC0A1AAA69E847013BE4D671 /* MetalKit.framework in Frameworks */,
+				076D00356D6F4238506CBEF6 /* QuartzCore.framework in Frameworks */,
+				2B0F4D61E6D7E2D07DFB7C2F /* Security.framework in Frameworks */,
+				11B6E39CF13040C26F1C1891 /* UIKit.framework in Frameworks */,
+				388DE3F3007B768D4432C127 /* WebKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		4E0CFBF49359E2B795944F07 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				866AA31327C7698D0381CB8A /* waken-wa-preview-ui */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		588B9AE05288101B6B8E2073 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				12AE5DEC8B6EC378D54BDE1A /* CoreGraphics.framework */,
+				207923B90E2989FABE286074 /* libapp.a */,
+				8D82B48D4CAC404FD9B93A8C /* Metal.framework */,
+				1B34049A368762B0A96F577E /* MetalKit.framework */,
+				E4FAB17637395C4E40B0FF9A /* QuartzCore.framework */,
+				C53CFD8ECC63445A9C3FA667 /* Security.framework */,
+				75908514258AD6188B1ECBA0 /* UIKit.framework */,
+				113EB02CA83F17F5B76D5C78 /* WebKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		6A8EF17FF8F2914A5EA76C83 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				7C552F0B404465A4FB12F359 /* waken-wa-preview-ui_iOS.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		7348FCF5E1E47208FC53214D /* Externals */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Externals;
+			sourceTree = "<group>";
+		};
+		866AA31327C7698D0381CB8A /* waken-wa-preview-ui */ = {
+			isa = PBXGroup;
+			children = (
+				A4E4E3DB2A9C35158CAE2096 /* main.mm */,
+				9FB11DD7AF24887A57D0D70E /* bindings */,
+			);
+			path = "waken-wa-preview-ui";
+			sourceTree = "<group>";
+		};
+		88096E4CC9DC8069099C0EE9 = {
+			isa = PBXGroup;
+			children = (
+				27FFA86C08EF4710E9A146B6 /* assets */,
+				78037072800217A75CFC7491 /* Assets.xcassets */,
+				57B1E17516ADDAAF4D376169 /* LaunchScreen.storyboard */,
+				7348FCF5E1E47208FC53214D /* Externals */,
+				4E0CFBF49359E2B795944F07 /* Sources */,
+				BFB2E7593D629BE10FDFB9DF /* src */,
+				CAFA0B2651147892E6398E3E /* waken-wa-preview-ui_iOS */,
+				588B9AE05288101B6B8E2073 /* Frameworks */,
+				6A8EF17FF8F2914A5EA76C83 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		88BD0153DA6729ECB90AAAB3 /* platform */ = {
+			isa = PBXGroup;
+			children = (
+				8A4810BEF6B49DB045D680B0 /* linux.rs */,
+				FD8CA7CFAEFF5BE9D0236C0F /* macos_bridge.h */,
+				E4F5947699108CF333057A03 /* macos_bridge.m */,
+				17C0B11F44E14BE30AA45A24 /* macos.rs */,
+				B333BF3091DDDF1636F21976 /* mod.rs */,
+				70C18904223D49056ED47027 /* stub.rs */,
+				FA441BF6E2F6BA4321377C2D /* windows.rs */,
+			);
+			path = platform;
+			sourceTree = "<group>";
+		};
+		9FB11DD7AF24887A57D0D70E /* bindings */ = {
+			isa = PBXGroup;
+			children = (
+				81CF7F96EAFAA637B8BB2199 /* bindings.h */,
+			);
+			path = bindings;
+			sourceTree = "<group>";
+		};
+		BFB2E7593D629BE10FDFB9DF /* src */ = {
+			isa = PBXGroup;
+			children = (
+				B27D2DE1E9B100C21A5BF61F /* commands.rs */,
+				E2CAE8E9E0A8917ED2EA9DD7 /* http_client.rs */,
+				BBD9828F43DE051DE268C470 /* import_config.rs */,
+				399D72B4E492E3D417312AE9 /* lib.rs */,
+				26F10AD3BDCA7DED69B68CA2 /* main.rs */,
+				30957FD9E3E0E53DAF23CE7F /* models.rs */,
+				BED271A51FF1B2B8545C2337 /* realtime_reporter.rs */,
+				552DC03FD2AF1AA13A8412AE /* reporter_config.rs */,
+				DBC2A0182CFBE90007C8A436 /* state_store.rs */,
+				8F5A8BACFBDCA0233DBABA6B /* tray.rs */,
+				88BD0153DA6729ECB90AAAB3 /* platform */,
+			);
+			name = src;
+			path = ../../src;
+			sourceTree = "<group>";
+		};
+		CAFA0B2651147892E6398E3E /* waken-wa-preview-ui_iOS */ = {
+			isa = PBXGroup;
+			children = (
+				1923854B63E6F85DE4FED11E /* Info.plist */,
+				FC4719A5D0CDEF082AE9D3C1 /* waken-wa-preview-ui_iOS.entitlements */,
+			);
+			path = "waken-wa-preview-ui_iOS";
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		CF940CB03A1110AEB903AE38 /* waken-wa-preview-ui_iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1918DA13DDE2DECC2760EC9D /* Build configuration list for PBXNativeTarget "waken-wa-preview-ui_iOS" */;
+			buildPhases = (
+				3E67CA856C0C4150C70F2B80 /* Build Rust Code */,
+				0F87AF0CE75EA15CAAB3CD82 /* Sources */,
+				9FD27B7631802853B2CD7FDD /* Resources */,
+				4375E53706EFD59864D25E4A /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "waken-wa-preview-ui_iOS";
+			packageProductDependencies = (
+			);
+			productName = "waken-wa-preview-ui_iOS";
+			productReference = 7C552F0B404465A4FB12F359 /* waken-wa-preview-ui_iOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		BC4742349AEB6508E17B6163 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = DC065665F68C5DE506B11C16 /* Build configuration list for PBXProject "waken-wa-preview-ui" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 88096E4CC9DC8069099C0EE9;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 6A8EF17FF8F2914A5EA76C83 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				CF940CB03A1110AEB903AE38 /* waken-wa-preview-ui_iOS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		9FD27B7631802853B2CD7FDD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B22053B26FF69156F458D3AD /* Assets.xcassets in Resources */,
+				841CDEA5CEF0C6066D1A9DE9 /* LaunchScreen.storyboard in Resources */,
+				E12ECEA2C9CF3A9D5B2FE461 /* assets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		3E67CA856C0C4150C70F2B80 /* Build Rust Code */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build Rust Code";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Externals/x86_64/${CONFIGURATION}/libapp.a",
+				"$(SRCROOT)/Externals/arm64/${CONFIGURATION}/libapp.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "pnpm tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths \"${FRAMEWORK_SEARCH_PATHS:?}\" --header-search-paths \"${HEADER_SEARCH_PATHS:?}\" --gcc-preprocessor-definitions \"${GCC_PREPROCESSOR_DEFINITIONS:-}\" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		0F87AF0CE75EA15CAAB3CD82 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				55F76684F7CD006B938B5063 /* main.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		2BC5F617ABD6C7278D5B9225 /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = debug;
+		};
+		56D20DDBBB4238E02F183511 /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = release;
+		};
+		CB8001A8D03FAA920BCFE9D1 /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "waken-wa-preview-ui_iOS/waken-wa-preview-ui_iOS.entitlements";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = "waken-wa-preview-ui_iOS/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.waken-wa-reporter-rustc.app";
+				PRODUCT_NAME = "Waken-Wa-Reporter Client";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = debug;
+		};
+		E54816308FC89884893E2ABF /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "waken-wa-preview-ui_iOS/waken-wa-preview-ui_iOS.entitlements";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = "waken-wa-preview-ui_iOS/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.waken-wa-reporter-rustc.app";
+				PRODUCT_NAME = "Waken-Wa-Reporter Client";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1918DA13DDE2DECC2760EC9D /* Build configuration list for PBXNativeTarget "waken-wa-preview-ui_iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CB8001A8D03FAA920BCFE9D1 /* debug */,
+				E54816308FC89884893E2ABF /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+		DC065665F68C5DE506B11C16 /* Build configuration list for PBXProject "waken-wa-preview-ui" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2BC5F617ABD6C7278D5B9225 /* debug */,
+				56D20DDBBB4238E02F183511 /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = BC4742349AEB6508E17B6163 /* Project object */;
+}
