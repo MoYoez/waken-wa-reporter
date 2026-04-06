@@ -113,7 +113,7 @@ jobs:
         run: pnpm tauri ios init --ci --config src-tauri/tauri.conf.ci.json
 
       - name: build-ios-app
-        run: pnpm tauri ios build --config src-tauri/tauri.conf.ci.json --method app-store-connect
+        run: pnpm tauri ios build --ci --config src-tauri/tauri.conf.ci.json --export-method app-store-connect
 
       - name: upload-ios-artifacts
         uses: actions/upload-artifact@v4
