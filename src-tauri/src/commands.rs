@@ -5,12 +5,11 @@ use crate::{
     http_client::request_json,
     import_config::parse_import_payload,
     models::{
-        default_client_capabilities, ActivityPayload, ApiResult, AppStatePayload, ClientCapabilities,
-        ClientConfig, ExistingReporterConfig, ImportedIntegrationConfig, InspirationEntryCreateInput,
-        PlatformSelfTestResult,
+        default_client_capabilities, ActivityPayload, ApiResult, AppStatePayload,
+        ClientCapabilities, ClientConfig, ExistingReporterConfig, ImportedIntegrationConfig,
+        InspirationEntryCreateInput, PlatformSelfTestResult,
     },
-    platform,
-    reporter_config, state_store,
+    platform, reporter_config, state_store,
 };
 
 #[cfg(desktop)]
