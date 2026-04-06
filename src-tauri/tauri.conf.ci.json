@@ -1,7 +1,7 @@
 {
   "bundle": {
     "iOS": {
-      "developmentTeam": "",
+      "developmentTeam": "ad-hoc",
       "codeSignIdentity": null,
       "provisioningProfile": null,
       "minimumSystemVersion": "15.0"
