@@ -241,7 +241,7 @@ macOS 说明：
 Linux 说明：
 
 - X11 会话通过 `xprop` 读取前台应用和窗口标题
-- Wayland 会话无法直接读取全局前台窗口，需接入桥接文件机制
+- Wayland 会话直接适配 GNOME 的 `Focused Window D-Bus` 和 KDE Plasma 的 `kdotool`
 - 媒体读取通过 `playerctl`（MPRIS）
 - Wayland 桥接规范见：[`docs/linux-wayland-foreground-bridge.md`](docs/linux-wayland-foreground-bridge.md)
 
