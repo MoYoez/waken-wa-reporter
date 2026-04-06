@@ -21,7 +21,7 @@ jobs:
   build-ios:
     name: build-ios
     runs-on: macos-latest
-    environment: ios
+    environment: APPLE_API_ISSUER
     env:
       APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
       APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
