@@ -3,8 +3,8 @@ use std::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex,
     },
-    thread,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    thread::{self, JoinHandle},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use chrono::Utc;
@@ -23,6 +23,8 @@ use crate::{
 
 const MAX_LOGS: usize = 120;
 const MAX_ERROR_BACKOFF_MS: u64 = 30_000;
+const WORKER_JOIN_WAIT_TIMEOUT: Duration = Duration::from_secs(2);
+const WORKER_JOIN_POLL_STEP: Duration = Duration::from_millis(50);
 
 enum PostActivityResult {
     Success,
@@ -32,7 +34,6 @@ enum PostActivityResult {
     },
 }
 
-#[derive(Default)]
 struct ReporterInner {
     running: bool,
     active_run_id: Option<u64>,
@@ -43,6 +44,24 @@ struct ReporterInner {
     last_pending_approval_message: Option<String>,
     last_pending_approval_url: Option<String>,
     stop_flag: Option<Arc<AtomicBool>>,
+    worker: Option<JoinHandle<()>>,
+}
+
+impl Default for ReporterInner {
+    fn default() -> Self {
+        Self {
+            running: false,
+            active_run_id: None,
+            logs: Vec::new(),
+            current_activity: None,
+            last_heartbeat_at: None,
+            last_error: None,
+            last_pending_approval_message: None,
+            last_pending_approval_url: None,
+            stop_flag: None,
+            worker: None,
+        }
+    }
 }
 
 pub struct ReporterRuntime {
@@ -68,8 +87,7 @@ impl ReporterRuntime {
 
         let stop_flag = Arc::new(AtomicBool::new(false));
         let run_id = self.sequence.fetch_add(1, Ordering::SeqCst);
-
-        {
+        let previous_worker = {
             let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
             if inner.running {
                 return Ok(snapshot_from_inner(&inner));
@@ -79,6 +97,19 @@ impl ReporterRuntime {
                 old_flag.store(true, Ordering::SeqCst);
             }
 
+            inner.worker.take()
+        };
+
+        if let Some(handle) = previous_worker {
+            if let Err(handle) = wait_for_worker_exit(handle) {
+                let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+                inner.worker = Some(handle);
+                return Err("上一次实时上报线程仍在退出，请稍后重试。".into());
+            }
+        }
+
+        {
+            let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
             inner.running = true;
             inner.active_run_id = Some(run_id);
             inner.stop_flag = Some(stop_flag.clone());
@@ -92,23 +123,47 @@ impl ReporterRuntime {
         let state = self.inner.clone();
         let sequence_seed = self.sequence.fetch_add(1, Ordering::SeqCst);
 
-        thread::spawn(move || {
+        let worker = thread::spawn(move || {
             run_reporter_loop(state, config, stop_flag, sequence_seed, run_id);
         });
+
+        {
+            let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+            inner.worker = Some(worker);
+        }
 
         Ok(self.snapshot())
     }
 
     pub fn stop(&self) -> RealtimeReporterSnapshot {
-        {
+        let worker = {
             let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
             if let Some(flag) = inner.stop_flag.take() {
                 flag.store(true, Ordering::SeqCst);
             }
             inner.running = false;
             inner.active_run_id = None;
+            inner.worker.take()
+        };
+
+        let detail = if let Some(handle) = worker {
+            if let Err(handle) = wait_for_worker_exit(handle) {
+                let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+                inner.worker = Some(handle);
+                "停止信号已发送，后台线程会在当前操作完成后退出。"
+            } else {
+                "后台轮询任务已停止。"
+            }
+        } else {
+            "后台轮询任务已停止。"
+        };
+
+        if matches!(detail, "后台轮询任务已停止。") {
+            let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+            inner.worker = None;
         }
-        self.push_log("warn", "实时上报已停止", "后台轮询任务已停止。", None);
+
+        self.push_log("warn", "实时上报已停止", detail, None);
         self.snapshot()
     }
 
@@ -131,6 +186,12 @@ impl ReporterRuntime {
         if inner.logs.len() > MAX_LOGS {
             inner.logs.truncate(MAX_LOGS);
         }
+    }
+}
+
+impl Drop for ReporterRuntime {
+    fn drop(&mut self) {
+        let _ = self.stop();
     }
 }
 
@@ -587,6 +648,26 @@ fn sleep_with_stop(duration: Duration, stop_flag: &Arc<AtomicBool>) {
         let step = remaining.min(200);
         thread::sleep(Duration::from_millis(step));
         remaining = remaining.saturating_sub(step);
+    }
+}
+
+fn wait_for_worker_exit(handle: JoinHandle<()>) -> Result<(), JoinHandle<()>> {
+    let deadline = Instant::now() + WORKER_JOIN_WAIT_TIMEOUT;
+    let handle = handle;
+
+    while Instant::now() < deadline {
+        if handle.is_finished() {
+            let _ = handle.join();
+            return Ok(());
+        }
+        thread::sleep(WORKER_JOIN_POLL_STEP);
+    }
+
+    if handle.is_finished() {
+        let _ = handle.join();
+        Ok(())
+    } else {
+        Err(handle)
     }
 }
 

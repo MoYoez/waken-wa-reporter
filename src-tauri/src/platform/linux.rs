@@ -12,6 +12,7 @@ use super::{build_self_test_result, make_probe, ForegroundSnapshot, MediaInfo};
 use crate::models::PlatformSelfTestResult;
 
 const COMMAND_TIMEOUT: Duration = Duration::from_millis(1500);
+const COMMAND_POLL_STEP: Duration = Duration::from_millis(100);
 
 pub fn get_foreground_snapshot() -> Result<ForegroundSnapshot, String> {
     let wayland = has_env("WAYLAND_DISPLAY");
@@ -270,7 +271,7 @@ fn command_output_with_timeout(program: &str, args: &[&str]) -> Result<Output, S
                     COMMAND_TIMEOUT.as_millis()
                 ));
             }
-            Ok(None) => thread::sleep(Duration::from_millis(25)),
+            Ok(None) => thread::sleep(COMMAND_POLL_STEP),
             Err(error) => {
                 let _ = child.kill();
                 let _ = child.wait();
