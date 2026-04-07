@@ -42,10 +42,7 @@ pub fn load_app_state(app: &AppHandle) -> Result<AppStatePayload, String> {
             Err(error) => {
                 let backup = path.with_extension("json.corrupt");
                 let _ = fs::copy(&path, &backup);
-                eprintln!(
-                    "客户端状态文件损坏，已备份到 {}：{error}",
-                    backup.display()
-                );
+                eprintln!("客户端状态文件损坏，已备份到 {}：{error}", backup.display());
                 AppStatePayload::default()
             }
         },
