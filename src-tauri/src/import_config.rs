@@ -37,10 +37,19 @@ fn first_string(map: &Map<String, Value>, keys: &[&str]) -> Option<String> {
     keys.iter().find_map(|key| read_string(map, key))
 }
 
+const MAX_IMPORT_INPUT_BYTES: usize = 512 * 1024;
+
 pub fn parse_import_payload(input: &str) -> Result<ImportedIntegrationConfig, String> {
     let trimmed = input.trim();
     if trimmed.is_empty() {
         return Err("请先粘贴 Base64 或 JSON 配置。".into());
+    }
+    if trimmed.len() > MAX_IMPORT_INPUT_BYTES {
+        return Err(format!(
+            "输入内容过大（{} 字节），最大允许 {} 字节。",
+            trimmed.len(),
+            MAX_IMPORT_INPUT_BYTES
+        ));
     }
 
     let raw = parse_json_object(trimmed)
