@@ -71,8 +71,8 @@ pub fn save_app_state(app: &AppHandle, payload: &AppStatePayload) -> Result<(), 
 
 fn atomic_write(path: &Path, content: &str) -> Result<(), String> {
     let tmp_path = path.with_extension(format!("{}.tmp", Uuid::new_v4()));
-    let mut file = fs::File::create(&tmp_path)
-        .map_err(|error| format!("创建临时状态文件失败：{error}"))?;
+    let mut file =
+        fs::File::create(&tmp_path).map_err(|error| format!("创建临时状态文件失败：{error}"))?;
     file.write_all(content.as_bytes())
         .map_err(|error| format!("写入临时状态文件失败：{error}"))?;
     file.sync_all()
