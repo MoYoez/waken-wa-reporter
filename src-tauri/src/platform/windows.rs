@@ -100,17 +100,21 @@ impl Drop for ComInitGuard {
 fn init_com_for_media() -> Result<ComInitGuard, String> {
     const RPC_E_CHANGED_MODE: HRESULT = HRESULT(0x80010106u32 as i32);
 
-    unsafe {
-        match CoInitializeEx(None, COINIT_MULTITHREADED) {
-            Ok(_) => Ok(ComInitGuard {
-                should_uninitialize: true,
-            }),
-            Err(error) if error.code() == RPC_E_CHANGED_MODE => Ok(ComInitGuard {
-                should_uninitialize: false,
-            }),
-            Err(error) => Err(format!("初始化 WinRT 失败：{error}")),
-        }
+    let result = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
+
+    if result.is_ok() {
+        return Ok(ComInitGuard {
+            should_uninitialize: true,
+        });
     }
+
+    if result == RPC_E_CHANGED_MODE {
+        return Ok(ComInitGuard {
+            should_uninitialize: false,
+        });
+    }
+
+    Err(format!("初始化 WinRT 失败：{result:?}"))
 }
 
 #[cfg(target_os = "windows")]
