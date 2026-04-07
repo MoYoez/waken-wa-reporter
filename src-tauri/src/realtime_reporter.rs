@@ -256,6 +256,7 @@ fn run_reporter_loop(
     let mut last_signature: Option<String> = None;
     let mut last_report_at: Option<SystemTime> = None;
     let mut consecutive_errors: u32 = 0;
+    let mut last_media_error: Option<String> = None;
 
     while !stop_flag.load(Ordering::SeqCst) {
         let mut iteration_had_error = false;
@@ -263,16 +264,26 @@ fn run_reporter_loop(
         match get_foreground_snapshot() {
             Ok(snapshot) => {
                 let media = match get_now_playing() {
-                    Ok(media) => media,
+                    Ok(media) => {
+                        last_media_error = None;
+                        media
+                    }
                     Err(error) => {
-                        push_background_log(
-                            &state,
-                            &mut sequence_seed,
-                            "warn",
-                            "媒体信息读取失败",
-                            &error,
-                            None,
-                        );
+                        let should_log = last_media_error
+                            .as_ref()
+                            .map(|last| last != &error)
+                            .unwrap_or(true);
+                        last_media_error = Some(error.clone());
+                        if should_log {
+                            push_background_log(
+                                &state,
+                                &mut sequence_seed,
+                                "warn",
+                                "媒体信息读取失败",
+                                &error,
+                                None,
+                            );
+                        }
                         MediaInfo::default()
                     }
                 };

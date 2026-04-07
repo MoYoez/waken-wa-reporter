@@ -1,5 +1,4 @@
 use std::ffi::{c_char, CStr};
-use std::path::Path;
 use std::process::{Command, Output, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -9,6 +8,7 @@ use crate::models::PlatformSelfTestResult;
 
 const COMMAND_TIMEOUT: Duration = Duration::from_millis(1500);
 const COMMAND_POLL_STEP: Duration = Duration::from_millis(100);
+const NOWPLAYING_CLI: &str = "nowplaying-cli";
 
 unsafe extern "C" {
     fn waken_frontmost_app_name() -> *mut c_char;
@@ -26,91 +26,114 @@ fn read_bridge_string(fetch: unsafe extern "C" fn() -> *mut c_char) -> Option<St
     Some(value)
 }
 
-fn get_now_playing_via_nowplaying_cli() -> Result<MediaInfo, String> {
-    let candidates = [
-        "nowplaying-cli",
-        "/usr/local/bin/nowplaying-cli",
-        "/opt/homebrew/bin/nowplaying-cli",
-    ];
-    let mut last_error = None;
-
-    for candidate in candidates {
-        if candidate.contains('/') && !Path::new(candidate).exists() {
-            continue;
-        }
-
-        match command_output_with_timeout(candidate, &["get", "title", "artist", "album"]) {
-            Ok(output) => {
-                if !output.status.success() {
-                    let stderr = String::from_utf8_lossy(&output.stderr);
-                    return Err(format!(
-                        "nowplaying-cli 返回失败（{}）：{}",
-                        candidate,
-                        stderr.trim()
-                    ));
-                }
-
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                let mut lines = stdout.lines().map(str::trim);
-                let title = lines.next().unwrap_or_default().to_string();
-                let artist = lines.next().unwrap_or_default().to_string();
-                let album = lines.next().unwrap_or_default().to_string();
-
-                let normalize = |value: String| {
-                    if value.eq_ignore_ascii_case("null") {
-                        String::new()
-                    } else {
-                        value
-                    }
-                };
-
-                return Ok(MediaInfo {
-                    title: normalize(title),
-                    artist: normalize(artist),
-                    album: normalize(album),
-                    source_app_id: "nowplaying-cli".into(),
-                });
-            }
-            Err(error) => {
-                last_error = Some(format!("{}: {}", candidate, error));
-            }
-        }
-    }
-
-    let current_path = std::env::var("PATH").unwrap_or_default();
-    Err(format!(
-        "调用 nowplaying-cli 失败：未在可用路径中找到可执行文件。已尝试：{}。PATH={}. 最后一次错误：{}",
-        candidates.join(", "),
-        current_path,
-        last_error.unwrap_or_else(|| "未知错误".to_string())
-    ))
+enum NowPlayingCliError {
+    NotFound { path: String },
+    TimedOut,
+    Failed(String),
 }
 
-fn command_output_with_timeout(program: &str, args: &[&str]) -> Result<Output, String> {
+impl NowPlayingCliError {
+    fn into_user_message(self) -> String {
+        match self {
+            Self::NotFound { path } => {
+                format!("调用 nowplaying-cli 失败：未在全局环境中找到可执行文件。PATH={path}")
+            }
+            Self::TimedOut => "调用 nowplaying-cli 超时（>1500ms）。".into(),
+            Self::Failed(detail) => format!("nowplaying-cli 返回失败：{detail}"),
+        }
+    }
+}
+
+fn get_now_playing_via_nowplaying_cli() -> Result<MediaInfo, NowPlayingCliError> {
+    let output = command_output_with_timeout(NOWPLAYING_CLI, &["get", "title", "artist", "album"])
+        .map_err(|error| match error {
+            CommandError::NotFound => NowPlayingCliError::NotFound {
+                path: std::env::var("PATH").unwrap_or_default(),
+            },
+            CommandError::TimedOut => NowPlayingCliError::TimedOut,
+            CommandError::Other(detail) => NowPlayingCliError::Failed(detail),
+        })?;
+
+    if !output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let combined = format!("{}\n{}", stdout, stderr).to_lowercase();
+        if combined.contains("no media")
+            || combined.contains("no now playing")
+            || combined.contains("nothing is playing")
+            || combined.contains("not playing")
+            || combined.contains("no player")
+            || combined.contains("null")
+        {
+            return Ok(MediaInfo::default());
+        }
+
+        let detail = stderr
+            .lines()
+            .map(str::trim)
+            .find(|line| !line.is_empty())
+            .or_else(|| stdout.lines().map(str::trim).find(|line| !line.is_empty()))
+            .unwrap_or("未知错误");
+        return Err(NowPlayingCliError::Failed(detail.to_string()));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut lines = stdout.lines().map(str::trim);
+    let title = lines.next().unwrap_or_default().to_string();
+    let artist = lines.next().unwrap_or_default().to_string();
+    let album = lines.next().unwrap_or_default().to_string();
+
+    let normalize = |value: String| {
+        if value.eq_ignore_ascii_case("null") {
+            String::new()
+        } else {
+            value
+        }
+    };
+
+    Ok(MediaInfo {
+        title: normalize(title),
+        artist: normalize(artist),
+        album: normalize(album),
+        source_app_id: NOWPLAYING_CLI.into(),
+    })
+}
+
+enum CommandError {
+    NotFound,
+    TimedOut,
+    Other(String),
+}
+
+fn command_output_with_timeout(program: &str, args: &[&str]) -> Result<Output, CommandError> {
     let mut child = Command::new(program)
         .args(args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| match error.kind() {
+            std::io::ErrorKind::NotFound => CommandError::NotFound,
+            _ => CommandError::Other(error.to_string()),
+        })?;
 
     let start = Instant::now();
     loop {
         match child.try_wait() {
-            Ok(Some(_)) => return child.wait_with_output().map_err(|error| error.to_string()),
+            Ok(Some(_)) => {
+                return child
+                    .wait_with_output()
+                    .map_err(|error| CommandError::Other(error.to_string()))
+            }
             Ok(None) if start.elapsed() >= COMMAND_TIMEOUT => {
                 let _ = child.kill();
                 let _ = child.wait();
-                return Err(format!(
-                    "命令执行超时（>{}ms）",
-                    COMMAND_TIMEOUT.as_millis()
-                ));
+                return Err(CommandError::TimedOut);
             }
             Ok(None) => thread::sleep(COMMAND_POLL_STEP),
             Err(error) => {
                 let _ = child.kill();
                 let _ = child.wait();
-                return Err(error.to_string());
+                return Err(CommandError::Other(error.to_string()));
             }
         }
     }
@@ -128,7 +151,11 @@ pub fn get_foreground_snapshot() -> Result<ForegroundSnapshot, String> {
 }
 
 pub fn get_now_playing() -> Result<MediaInfo, String> {
-    let media = get_now_playing_via_nowplaying_cli()?;
+    let media = match get_now_playing_via_nowplaying_cli() {
+        Ok(media) => media,
+        Err(NowPlayingCliError::TimedOut) => return Ok(MediaInfo::default()),
+        Err(error) => return Err(error.into_user_message()),
+    };
     if media.is_empty() {
         return Ok(MediaInfo::default());
     }
@@ -150,7 +177,8 @@ fn macos_guidance(error: &str, probe: &str) -> Vec<String> {
 
     if probe == "media" || lower.contains("nowplaying-cli") {
         guidance.push("请先安装 nowplaying-cli：`brew install nowplaying-cli`。".into());
-        guidance.push("确认当前 macOS 上确实有正在播放的媒体内容。".into());
+        guidance
+            .push("如果当前没有正在播放的媒体，客户端现在会直接返回空结果，不再记为失败。".into());
     }
 
     if guidance.is_empty() {
