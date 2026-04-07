@@ -250,6 +250,11 @@ jobs:
     name: build-android
     runs-on: ubuntu-latest
     needs: quality-code
+    env:
+      ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
     steps:
       - name: checkout-code
@@ -299,6 +304,28 @@ jobs:
       - name: init-android-target
         run: pnpm tauri android init --ci
 
+      - name: prepare-android-signing
+        run: |
+          test -n "$ANDROID_KEYSTORE"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+
+          echo "$ANDROID_KEYSTORE" | base64 --decode > src-tauri/gen/android/release.jks
+          cat > src-tauri/gen/android/keystore.properties <<EOF
+          storeFile=release.jks
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
+          EOF
+
+      - name: inject-android-release-signing
+        run: |
+          APP_GRADLE="src-tauri/gen/android/app/build.gradle.kts"
+          grep -q 'val keystoreProperties = Properties().apply' "$APP_GRADLE" || perl -0pi -e 's/val tauriProperties = Properties\(\)\.apply \{\n    val propFile = file\("tauri\.properties"\)\n    if \(propFile\.exists\(\)\) \{\n        propFile\.inputStream\(\)\.use \{ load\(it\) \}\n    \}\n\}\n/val tauriProperties = Properties().apply {\n    val propFile = file("tauri.properties")\n    if (propFile.exists()) {\n        propFile.inputStream().use { load(it) }\n    }\n}\n\nval keystoreProperties = Properties().apply {\n    val propFile = rootProject.file("keystore.properties")\n    if (propFile.exists()) {\n        propFile.inputStream().use { load(it) }\n    }\n}\n/' "$APP_GRADLE"
+          grep -q 'signingConfigs' "$APP_GRADLE" || perl -0pi -e 's/android \{\n/android {\n    signingConfigs {\n        create("release") {\n            storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))\n            storePassword = keystoreProperties.getProperty("storePassword")\n            keyAlias = keystoreProperties.getProperty("keyAlias")\n            keyPassword = keystoreProperties.getProperty("keyPassword")\n        }\n    }\n/' "$APP_GRADLE"
+          perl -0pi -e 's/getByName\("release"\) \{\n            isMinifyEnabled = true/getByName("release") {\n            signingConfig = signingConfigs.getByName("release")\n            isMinifyEnabled = true/' "$APP_GRADLE"
+
       - name: normalize-android-sdk-level
         run: |
           APP_GRADLE="src-tauri/gen/android/app/build.gradle.kts"
@@ -306,7 +333,7 @@ jobs:
           sed -i 's/targetSdk = [0-9]\+/targetSdk = 35/' "$APP_GRADLE"
           grep -nE "compileSdk|targetSdk" "$APP_GRADLE"
 
-      - name: build-android-apk-release-no-sign
+      - name: build-android-apk-release
         run: pnpm tauri android build --ci --apk --target aarch64
 
       - name: upload-android-artifacts
