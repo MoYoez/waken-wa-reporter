@@ -19,7 +19,8 @@ export const defaultClientConfig = (): ClientConfig => ({
 export async function loadAppState(): Promise<AppStatePayload> {
   try {
     return await invoke<AppStatePayload>("load_app_state");
-  } catch {
+  } catch (error) {
+    console.error("[persistence] failed to load app state, fallback to defaults", error);
     return {
       config: defaultClientConfig(),
       recentPresets: [],

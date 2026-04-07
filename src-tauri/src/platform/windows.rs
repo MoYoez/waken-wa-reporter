@@ -10,7 +10,7 @@ use windows::{
     Win32::{
         Foundation::{CloseHandle, MAX_PATH},
         System::{
-            Com::{CoInitializeEx, COINIT_MULTITHREADED},
+            Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED},
             Threading::{
                 OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_FORMAT,
                 PROCESS_QUERY_LIMITED_INFORMATION,
@@ -81,15 +81,41 @@ fn exe_base_name_from_pid(pid: u32) -> Result<String, String> {
 }
 
 #[cfg(target_os = "windows")]
-fn get_now_playing_native() -> Result<MediaInfo, String> {
+struct ComInitGuard {
+    should_uninitialize: bool,
+}
+
+#[cfg(target_os = "windows")]
+impl Drop for ComInitGuard {
+    fn drop(&mut self) {
+        if self.should_uninitialize {
+            unsafe {
+                CoUninitialize();
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn init_com_for_media() -> Result<ComInitGuard, String> {
     const RPC_E_CHANGED_MODE: HRESULT = HRESULT(0x80010106u32 as i32);
 
     unsafe {
-        let result = CoInitializeEx(None, COINIT_MULTITHREADED);
-        if result.is_err() && result != RPC_E_CHANGED_MODE {
-            return Err(format!("初始化 WinRT 失败：{result:?}"));
+        match CoInitializeEx(None, COINIT_MULTITHREADED) {
+            Ok(_) => Ok(ComInitGuard {
+                should_uninitialize: true,
+            }),
+            Err(error) if error.code() == RPC_E_CHANGED_MODE => Ok(ComInitGuard {
+                should_uninitialize: false,
+            }),
+            Err(error) => Err(format!("初始化 WinRT 失败：{error}")),
         }
     }
+}
+
+#[cfg(target_os = "windows")]
+fn get_now_playing_native() -> Result<MediaInfo, String> {
+    let _com_guard = init_com_for_media()?;
 
     let manager = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
         .map_err(|error| format!("请求媒体会话管理器失败：{error}"))?

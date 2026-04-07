@@ -1,8 +1,14 @@
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 use serde_json::{json, Value};
-use std::time::Duration;
+use std::{
+    sync::Mutex,
+    time::Duration,
+};
 
 use crate::models::ApiResult;
+
+static ASYNC_CLIENT_SYSTEM_PROXY: Mutex<Option<reqwest::Client>> = Mutex::new(None);
+static ASYNC_CLIENT_DIRECT: Mutex<Option<reqwest::Client>> = Mutex::new(None);
 
 fn normalize_base_url(base_url: &str) -> String {
     base_url.trim_end_matches('/').trim().to_string()
@@ -29,7 +35,7 @@ pub async fn request_json(
     method: reqwest::Method,
     body: Option<Value>,
 ) -> ApiResult<Value> {
-    let client = match build_async_client(
+    let client = match get_or_create_async_client(
         "waken-wa-tauri-client/0.1.0",
         Some(Duration::from_secs(15)),
         use_system_proxy,
@@ -83,6 +89,27 @@ pub async fn request_json(
 
     let data = payload.get("data").cloned().unwrap_or(payload);
     ApiResult::success(status, data)
+}
+
+fn get_or_create_async_client(
+    user_agent: &str,
+    timeout: Option<Duration>,
+    use_system_proxy: bool,
+) -> Result<reqwest::Client, String> {
+    let cache = if use_system_proxy {
+        &ASYNC_CLIENT_SYSTEM_PROXY
+    } else {
+        &ASYNC_CLIENT_DIRECT
+    };
+
+    let mut guard = cache.lock().unwrap_or_else(|error| error.into_inner());
+    if let Some(client) = guard.as_ref() {
+        return Ok(client.clone());
+    }
+
+    let client = build_async_client(user_agent, timeout, use_system_proxy)?;
+    *guard = Some(client.clone());
+    Ok(client)
 }
 
 pub fn build_async_client(
