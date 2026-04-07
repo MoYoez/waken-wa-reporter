@@ -1,9 +1,6 @@
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 use serde_json::{json, Value};
-use std::{
-    sync::Mutex,
-    time::Duration,
-};
+use std::{sync::Mutex, time::Duration};
 
 use crate::models::ApiResult;
 
