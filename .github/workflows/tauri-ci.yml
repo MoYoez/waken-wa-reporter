@@ -306,8 +306,8 @@ jobs:
           sed -i 's/targetSdk = [0-9]\+/targetSdk = 35/' "$APP_GRADLE"
           grep -nE "compileSdk|targetSdk" "$APP_GRADLE"
 
-      - name: build-android-apk-no-sign
-        run: pnpm tauri android build --ci --debug --apk --target aarch64
+      - name: build-android-apk-release-no-sign
+        run: pnpm tauri android build --ci --apk --target aarch64
 
       - name: upload-android-artifacts
         uses: actions/upload-artifact@v4
