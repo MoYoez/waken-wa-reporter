@@ -67,10 +67,9 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
-      - name: enable-corepack
+      - name: install-pnpm
         run: |
-          corepack enable
-          corepack prepare pnpm@${{ env.PNPM_VERSION }} --activate
+          npm install --global pnpm@${{ env.PNPM_VERSION }}
 
       - name: install-rust-toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -149,10 +148,9 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
-      - name: enable-corepack
+      - name: install-pnpm
         run: |
-          corepack enable
-          corepack prepare pnpm@${{ env.PNPM_VERSION }} --activate
+          npm install --global pnpm@${{ env.PNPM_VERSION }}
 
       - name: install-rust-toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -200,10 +198,9 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
-      - name: enable-corepack
+      - name: install-pnpm
         run: |
-          corepack enable
-          corepack prepare pnpm@${{ env.PNPM_VERSION }} --activate
+          npm install --global pnpm@${{ env.PNPM_VERSION }}
 
       - name: install-java
         uses: actions/setup-java@v5
