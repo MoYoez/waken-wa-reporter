@@ -105,12 +105,20 @@ jobs:
           - os: windows-latest
             name: windows
             tauri_args: --bundles msi,nsis
+            artifact_path: |
+              src-tauri/target/release/bundle/msi/*.msi
+              src-tauri/target/release/bundle/nsis/*.exe
           - os: macos-latest
             name: macos
             tauri_args: --bundles dmg
+            artifact_path: |
+              src-tauri/target/release/bundle/dmg/*.dmg
           - os: ubuntu-latest
             name: linux
             tauri_args: --bundles appimage,deb
+            artifact_path: |
+              src-tauri/target/release/bundle/deb/*.deb
+              src-tauri/target/release/bundle/appimage/*.AppImage
 
     steps:
       - name: checkout-code
@@ -173,7 +181,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: tauri-desktop-${{ matrix.name }}
-          path: ${{ join(fromJSON(steps.build_tauri_desktop.outputs.artifactPaths), '\n') }}
+          path: ${{ matrix.artifact_path }}
           if-no-files-found: error
 
   build-android:
