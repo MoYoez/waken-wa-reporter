@@ -2,7 +2,7 @@ name: waken-wa-preview-ui
 options:
   bundleIdPrefix: com.waken-wa-reporter-rustc.app
   deploymentTarget:
-    iOS: 14.0
+    iOS: 15.0
 fileGroups: [../../src]
 configs:
   debug: debug
