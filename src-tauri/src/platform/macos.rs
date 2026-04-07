@@ -100,7 +100,10 @@ fn command_output_with_timeout(program: &str, args: &[&str]) -> Result<Output, S
             Ok(None) if start.elapsed() >= COMMAND_TIMEOUT => {
                 let _ = child.kill();
                 let _ = child.wait();
-                return Err(format!("命令执行超时（>{}ms）", COMMAND_TIMEOUT.as_millis()));
+                return Err(format!(
+                    "命令执行超时（>{}ms）",
+                    COMMAND_TIMEOUT.as_millis()
+                ));
             }
             Ok(None) => thread::sleep(Duration::from_millis(25)),
             Err(error) => {
