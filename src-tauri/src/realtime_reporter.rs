@@ -13,6 +13,7 @@ use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 use serde_json::{json, Map, Value};
 
 use crate::{
+    http_client::build_blocking_client,
     models::{
         effective_device_name, ActivityPayload, ApiResult, ClientConfig, RealtimeReporterSnapshot,
         ReporterActivity, ReporterLogEntry,
@@ -147,7 +148,7 @@ fn run_reporter_loop(
     stop_flag: Arc<AtomicBool>,
     mut sequence_seed: u64,
 ) {
-    let client = match build_http_client() {
+    let client = match build_http_client(config.use_system_proxy) {
         Ok(client) => client,
         Err(error) => {
             push_background_log(
@@ -446,12 +447,12 @@ fn push_background_log(
     }
 }
 
-fn build_http_client() -> Result<Client, String> {
-    Client::builder()
-        .user_agent("waken-wa-tauri-reporter/0.1.0")
-        .timeout(Duration::from_secs(15))
-        .build()
-        .map_err(|error| format!("创建 HTTP 客户端失败：{error}"))
+fn build_http_client(use_system_proxy: bool) -> Result<Client, String> {
+    build_blocking_client(
+        "waken-wa-tauri-reporter/0.1.0",
+        Some(Duration::from_secs(15)),
+        use_system_proxy,
+    )
 }
 
 fn parse_reporter_metadata(input: &str) -> Result<Map<String, Value>, String> {

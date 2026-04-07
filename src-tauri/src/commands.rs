@@ -83,6 +83,7 @@ pub async fn submit_activity_report(
         &config.base_url,
         "/api/activity",
         Some(&config.api_token),
+        config.use_system_proxy,
         reqwest::Method::POST,
         Some(body),
     )
@@ -97,6 +98,7 @@ pub async fn get_public_activity_feed(
         &config.base_url,
         "/api/activity?public=1",
         None,
+        config.use_system_proxy,
         reqwest::Method::GET,
         None,
     )
@@ -111,6 +113,7 @@ pub async fn list_inspiration_entries(
         &config.base_url,
         "/api/inspiration/entries",
         None,
+        config.use_system_proxy,
         reqwest::Method::GET,
         None,
     )
@@ -131,6 +134,7 @@ pub async fn probe_connectivity(
         &config.base_url,
         "/api/activity/verify",
         Some(&config.api_token),
+        config.use_system_proxy,
         reqwest::Method::POST,
         Some(body),
     )
@@ -159,6 +163,7 @@ pub async fn create_inspiration_entry(
         &config.base_url,
         "/api/inspiration/entries",
         Some(&config.api_token),
+        config.use_system_proxy,
         reqwest::Method::POST,
         Some(body),
     )
@@ -179,6 +184,7 @@ pub async fn upload_inspiration_asset(
         &config.base_url,
         "/api/inspiration/assets",
         Some(&config.api_token),
+        config.use_system_proxy,
         reqwest::Method::POST,
         Some(body),
     )

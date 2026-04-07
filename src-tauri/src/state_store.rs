@@ -1,5 +1,6 @@
 use std::{
     fs,
+    io::Write,
     path::{Path, PathBuf},
 };
 
@@ -64,6 +65,39 @@ pub fn save_app_state(app: &AppHandle, payload: &AppStatePayload) -> Result<(), 
     let _ = ensure_generated_hash_key(&mut payload);
     let content = serde_json::to_string_pretty(&payload)
         .map_err(|error| format!("序列化状态失败：{error}"))?;
-    fs::write(path, content).map_err(|error| format!("写入状态文件失败：{error}"))?;
+    atomic_write(&path, &content)?;
+    Ok(())
+}
+
+fn atomic_write(path: &Path, content: &str) -> Result<(), String> {
+    let tmp_path = path.with_extension(format!("{}.tmp", Uuid::new_v4()));
+    let mut file = fs::File::create(&tmp_path)
+        .map_err(|error| format!("创建临时状态文件失败：{error}"))?;
+    file.write_all(content.as_bytes())
+        .map_err(|error| format!("写入临时状态文件失败：{error}"))?;
+    file.sync_all()
+        .map_err(|error| format!("刷新临时状态文件失败：{error}"))?;
+    drop(file);
+
+    set_owner_only_permissions_if_supported(&tmp_path)?;
+
+    fs::rename(&tmp_path, path).map_err(|error| {
+        let _ = fs::remove_file(&tmp_path);
+        format!("替换状态文件失败：{error}")
+    })?;
+
+    Ok(())
+}
+
+#[cfg(unix)]
+fn set_owner_only_permissions_if_supported(path: &Path) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+
+    fs::set_permissions(path, fs::Permissions::from_mode(0o600))
+        .map_err(|error| format!("设置状态文件权限失败：{error}"))
+}
+
+#[cfg(not(unix))]
+fn set_owner_only_permissions_if_supported(_path: &Path) -> Result<(), String> {
     Ok(())
 }

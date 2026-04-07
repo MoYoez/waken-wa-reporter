@@ -70,6 +70,7 @@ pub fn discover_existing_reporter_config(
             } else {
                 parsed.generated_hash_key
             },
+            use_system_proxy: crate::models::default_use_system_proxy(),
             device: if parsed.device_name.trim().is_empty() {
                 crate::models::default_device_name()
             } else {

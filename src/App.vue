@@ -176,6 +176,12 @@ function onViewportResize() {
   syncDeviceTypeByViewport();
 }
 
+function onVisibilityChange() {
+  if (shouldPollReporterSnapshot()) {
+    void refreshReporterSnapshot();
+  }
+}
+
 function handlePresetSaved(preset: RecentPreset) {
   const deduped = recentPresets.value.filter(
     (item) =>
@@ -419,6 +425,10 @@ function closePendingApprovalDialog() {
   pendingApprovalDialogVisible.value = false;
 }
 
+function shouldPollReporterSnapshot() {
+  return reporterSupported.value && document.visibilityState === "visible";
+}
+
 async function handleStartReporter() {
   if (!reporterSupported.value || reporterBusy.value) {
     return;
@@ -540,6 +550,7 @@ watch(
 onMounted(async () => {
   viewportWidth.value = window.innerWidth;
   window.addEventListener("resize", onViewportResize);
+  document.addEventListener("visibilitychange", onVisibilityChange);
 
   const capabilitiesResult = await getClientCapabilities();
   if (capabilitiesResult.success && capabilitiesResult.data) {
@@ -575,6 +586,9 @@ onMounted(async () => {
 
   await refreshReporterSnapshot();
   reporterPollingTimer = window.setInterval(() => {
+    if (!shouldPollReporterSnapshot()) {
+      return;
+    }
     void refreshReporterSnapshot();
   }, 2000);
 
@@ -585,6 +599,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener("resize", onViewportResize);
+  document.removeEventListener("visibilitychange", onVisibilityChange);
   if (reporterPollingTimer) {
     window.clearInterval(reporterPollingTimer);
   }

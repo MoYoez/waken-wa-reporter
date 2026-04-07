@@ -159,6 +159,21 @@ function importConfig() {
                   />
                   <small class="field-help">这个 Key 用于标识当前设备。首次启用或更换后，服务端可能需要重新审核。</small>
                 </label>
+
+                <div class="reporter-enabled-card field-span-2">
+                  <div class="reporter-enabled-copy">
+                    <span class="field-label">使用系统代理</span>
+                    <strong>{{ modelValue.useSystemProxy ? "已开启" : "已关闭" }}</strong>
+                    <span>
+                      开启后会按系统与运行环境中的代理配置发起请求，常见包括 `HTTP_PROXY`、`HTTPS_PROXY` 和 `ALL_PROXY`。
+                    </span>
+                  </div>
+                  <ToggleSwitch
+                    :model-value="modelValue.useSystemProxy"
+                    input-id="onboarding-use-system-proxy"
+                    @update:model-value="updateField('useSystemProxy', Boolean($event))"
+                  />
+                </div>
               </div>
 
               <template v-if="reporterSupported">
@@ -273,6 +288,21 @@ function importConfig() {
               />
               <small class="field-help">这个 Key 用于标识当前设备。首次启用或更换后，服务端可能需要重新审核。</small>
             </label>
+
+            <div class="reporter-enabled-card field-span-2">
+              <div class="reporter-enabled-copy">
+                <span class="field-label">使用系统代理</span>
+                <strong>{{ modelValue.useSystemProxy ? "已开启" : "已关闭" }}</strong>
+                <span>
+                  开启后会按系统与运行环境中的代理配置发起请求，常见包括 `HTTP_PROXY`、`HTTPS_PROXY` 和 `ALL_PROXY`。
+                </span>
+              </div>
+              <ToggleSwitch
+                :model-value="modelValue.useSystemProxy"
+                input-id="settings-use-system-proxy"
+                @update:model-value="updateField('useSystemProxy', Boolean($event))"
+              />
+            </div>
           </div>
         </div>
 

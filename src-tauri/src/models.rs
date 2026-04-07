@@ -27,6 +27,10 @@ pub fn default_push_mode() -> String {
     "realtime".into()
 }
 
+pub fn default_use_system_proxy() -> bool {
+    true
+}
+
 pub fn default_poll_interval_ms() -> u64 {
     2_000
 }
@@ -83,6 +87,8 @@ pub struct ClientConfig {
     pub api_token: String,
     #[serde(default)]
     pub generated_hash_key: String,
+    #[serde(default = "default_use_system_proxy")]
+    pub use_system_proxy: bool,
     #[serde(default = "default_device_name")]
     pub device: String,
     #[serde(default = "default_device_type")]
@@ -105,6 +111,7 @@ impl Default for ClientConfig {
             base_url: String::new(),
             api_token: String::new(),
             generated_hash_key: String::new(),
+            use_system_proxy: default_use_system_proxy(),
             device: default_device_name(),
             device_type: default_device_type(),
             push_mode: default_push_mode(),

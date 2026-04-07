@@ -1,5 +1,6 @@
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 use serde_json::{json, Value};
+use std::time::Duration;
 
 use crate::models::ApiResult;
 
@@ -24,16 +25,17 @@ pub async fn request_json(
     base_url: &str,
     path: &str,
     token: Option<&str>,
+    use_system_proxy: bool,
     method: reqwest::Method,
     body: Option<Value>,
 ) -> ApiResult<Value> {
-    let client = reqwest::Client::builder()
-        .user_agent("waken-wa-tauri-client/0.1.0")
-        .build();
-
-    let client = match client {
+    let client = match build_async_client(
+        "waken-wa-tauri-client/0.1.0",
+        Some(Duration::from_secs(15)),
+        use_system_proxy,
+    ) {
         Ok(client) => client,
-        Err(error) => return ApiResult::failure(0, format!("创建 HTTP 客户端失败：{error}"), None),
+        Err(error) => return ApiResult::failure(0, error, None),
     };
 
     let url = format!("{}{}", normalize_base_url(base_url), path);
@@ -81,4 +83,44 @@ pub async fn request_json(
 
     let data = payload.get("data").cloned().unwrap_or(payload);
     ApiResult::success(status, data)
+}
+
+pub fn build_async_client(
+    user_agent: &str,
+    timeout: Option<Duration>,
+    use_system_proxy: bool,
+) -> Result<reqwest::Client, String> {
+    let mut builder = reqwest::Client::builder().user_agent(user_agent);
+
+    if let Some(timeout) = timeout {
+        builder = builder.timeout(timeout);
+    }
+
+    if !use_system_proxy {
+        builder = builder.no_proxy();
+    }
+
+    builder
+        .build()
+        .map_err(|error| format!("创建 HTTP 客户端失败：{error}"))
+}
+
+pub fn build_blocking_client(
+    user_agent: &str,
+    timeout: Option<Duration>,
+    use_system_proxy: bool,
+) -> Result<reqwest::blocking::Client, String> {
+    let mut builder = reqwest::blocking::Client::builder().user_agent(user_agent);
+
+    if let Some(timeout) = timeout {
+        builder = builder.timeout(timeout);
+    }
+
+    if !use_system_proxy {
+        builder = builder.no_proxy();
+    }
+
+    builder
+        .build()
+        .map_err(|error| format!("创建 HTTP 客户端失败：{error}"))
 }

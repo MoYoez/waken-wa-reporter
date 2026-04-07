@@ -12,6 +12,7 @@ export interface ClientConfig {
   baseUrl: string;
   apiToken: string;
   generatedHashKey: string;
+  useSystemProxy: boolean;
   device: string;
   deviceType: DeviceType;
   pushMode: PushMode;
