@@ -57,7 +57,7 @@ impl ReporterRuntime {
     }
 
     pub fn snapshot(&self) -> RealtimeReporterSnapshot {
-        let inner = self.inner.lock().expect("reporter state poisoned");
+        let inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         snapshot_from_inner(&inner)
     }
 
@@ -67,7 +67,7 @@ impl ReporterRuntime {
         let stop_flag = Arc::new(AtomicBool::new(false));
 
         {
-            let mut inner = self.inner.lock().expect("reporter state poisoned");
+            let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
             if inner.running {
                 return Ok(snapshot_from_inner(&inner));
             }
@@ -97,7 +97,7 @@ impl ReporterRuntime {
 
     pub fn stop(&self) -> RealtimeReporterSnapshot {
         {
-            let mut inner = self.inner.lock().expect("reporter state poisoned");
+            let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
             if let Some(flag) = inner.stop_flag.take() {
                 flag.store(true, Ordering::SeqCst);
             }
@@ -121,7 +121,7 @@ impl ReporterRuntime {
             detail: detail.to_string(),
             payload,
         };
-        let mut inner = self.inner.lock().expect("reporter state poisoned");
+        let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         inner.logs.insert(0, entry);
         if inner.logs.len() > MAX_LOGS {
             inner.logs.truncate(MAX_LOGS);
@@ -379,7 +379,7 @@ fn update_snapshot(
     last_error: Option<String>,
     last_heartbeat_at: Option<String>,
 ) {
-    let mut inner = state.lock().expect("reporter state poisoned");
+    let mut inner = state.lock().unwrap_or_else(|e| e.into_inner());
     inner.current_activity = Some(ReporterActivity {
         process_name: snapshot.process_name.clone(),
         process_title: Some(snapshot.process_title.clone()),
@@ -398,7 +398,7 @@ fn update_snapshot(
 }
 
 fn set_last_error(state: &Arc<Mutex<ReporterInner>>, error: Option<String>) {
-    let mut inner = state.lock().expect("reporter state poisoned");
+    let mut inner = state.lock().unwrap_or_else(|e| e.into_inner());
     inner.last_error = error;
 }
 
@@ -407,13 +407,13 @@ fn set_pending_approval(
     message: Option<String>,
     approval_url: Option<String>,
 ) {
-    let mut inner = state.lock().expect("reporter state poisoned");
+    let mut inner = state.lock().unwrap_or_else(|e| e.into_inner());
     inner.last_pending_approval_message = message;
     inner.last_pending_approval_url = approval_url;
 }
 
 fn mark_stopped(state: &Arc<Mutex<ReporterInner>>, error: Option<String>) {
-    let mut inner = state.lock().expect("reporter state poisoned");
+    let mut inner = state.lock().unwrap_or_else(|e| e.into_inner());
     inner.running = false;
     inner.stop_flag = None;
     if error.is_some() {
@@ -439,7 +439,7 @@ fn push_background_log(
     };
     *sequence += 1;
 
-    let mut inner = state.lock().expect("reporter state poisoned");
+    let mut inner = state.lock().unwrap_or_else(|e| e.into_inner());
     inner.logs.insert(0, entry);
     if inner.logs.len() > MAX_LOGS {
         inner.logs.truncate(MAX_LOGS);
