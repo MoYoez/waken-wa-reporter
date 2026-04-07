@@ -420,7 +420,7 @@ function closePendingApprovalDialog() {
 }
 
 async function handleStartReporter() {
-  if (!reporterSupported.value) {
+  if (!reporterSupported.value || reporterBusy.value) {
     return;
   }
 
@@ -452,7 +452,7 @@ async function handleStartReporter() {
 }
 
 async function handleStopReporter() {
-  if (!reporterSupported.value) {
+  if (!reporterSupported.value || reporterBusy.value) {
     return;
   }
 

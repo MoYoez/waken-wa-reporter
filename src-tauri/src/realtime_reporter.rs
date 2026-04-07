@@ -21,6 +21,7 @@ use crate::{
 };
 
 const MAX_LOGS: usize = 120;
+const MAX_ERROR_BACKOFF_MS: u64 = 30_000;
 
 enum PostActivityResult {
     Success,
@@ -57,30 +58,24 @@ impl ReporterRuntime {
 
     pub fn snapshot(&self) -> RealtimeReporterSnapshot {
         let inner = self.inner.lock().expect("reporter state poisoned");
-        RealtimeReporterSnapshot {
-            running: inner.running,
-            logs: inner.logs.clone(),
-            current_activity: inner.current_activity.clone(),
-            last_heartbeat_at: inner.last_heartbeat_at.clone(),
-            last_error: inner.last_error.clone(),
-            last_pending_approval_message: inner.last_pending_approval_message.clone(),
-            last_pending_approval_url: inner.last_pending_approval_url.clone(),
-        }
+        snapshot_from_inner(&inner)
     }
 
     pub fn start(&self, config: ClientConfig) -> Result<RealtimeReporterSnapshot, String> {
         validate_reporter_config(&config)?;
 
-        {
-            let inner = self.inner.lock().expect("reporter state poisoned");
-            if inner.running {
-                return Ok(self.snapshot());
-            }
-        }
-
         let stop_flag = Arc::new(AtomicBool::new(false));
+
         {
             let mut inner = self.inner.lock().expect("reporter state poisoned");
+            if inner.running {
+                return Ok(snapshot_from_inner(&inner));
+            }
+
+            if let Some(old_flag) = inner.stop_flag.take() {
+                old_flag.store(true, Ordering::SeqCst);
+            }
+
             inner.running = true;
             inner.stop_flag = Some(stop_flag.clone());
             inner.last_error = None;
@@ -134,6 +129,18 @@ impl ReporterRuntime {
     }
 }
 
+fn snapshot_from_inner(inner: &ReporterInner) -> RealtimeReporterSnapshot {
+    RealtimeReporterSnapshot {
+        running: inner.running,
+        logs: inner.logs.clone(),
+        current_activity: inner.current_activity.clone(),
+        last_heartbeat_at: inner.last_heartbeat_at.clone(),
+        last_error: inner.last_error.clone(),
+        last_pending_approval_message: inner.last_pending_approval_message.clone(),
+        last_pending_approval_url: inner.last_pending_approval_url.clone(),
+    }
+}
+
 fn run_reporter_loop(
     state: Arc<Mutex<ReporterInner>>,
     config: ClientConfig,
@@ -181,8 +188,11 @@ fn run_reporter_loop(
 
     let mut last_signature: Option<String> = None;
     let mut last_report_at: Option<SystemTime> = None;
+    let mut consecutive_errors: u32 = 0;
 
     while !stop_flag.load(Ordering::SeqCst) {
+        let mut iteration_had_error = false;
+
         match get_foreground_snapshot() {
             Ok(snapshot) => {
                 let media = match get_now_playing() {
@@ -270,6 +280,7 @@ fn run_reporter_loop(
                                 approval_url.clone(),
                             );
                             update_snapshot(&state, &snapshot, Some(message), None);
+                            iteration_had_error = true;
                         }
                         Err(error) => {
                             push_background_log(
@@ -278,9 +289,10 @@ fn run_reporter_loop(
                                 "error",
                                 "实时上报失败",
                                 &error,
-                                serde_json::to_value(&payload).ok(),
+                                None,
                             );
                             update_snapshot(&state, &snapshot, Some(error), None);
+                            iteration_had_error = true;
                         }
                     }
                 }
@@ -295,10 +307,25 @@ fn run_reporter_loop(
                     None,
                 );
                 set_last_error(&state, Some(error));
+                iteration_had_error = true;
             }
         }
 
-        sleep_with_stop(poll_interval, &stop_flag);
+        if iteration_had_error {
+            consecutive_errors = consecutive_errors.saturating_add(1);
+        } else {
+            consecutive_errors = 0;
+        }
+
+        let effective_sleep = if consecutive_errors > 1 {
+            let backoff_ms =
+                (poll_interval.as_millis() as u64).saturating_mul(1 << consecutive_errors.min(4));
+            Duration::from_millis(backoff_ms.min(MAX_ERROR_BACKOFF_MS))
+        } else {
+            poll_interval
+        };
+
+        sleep_with_stop(effective_sleep, &stop_flag);
     }
 
     mark_stopped(&state, None);
