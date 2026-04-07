@@ -17,6 +17,7 @@ concurrency:
 env:
   NODE_VERSION: "20"
   PNPM_VERSION: "9"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   quality-code:
@@ -33,7 +34,7 @@ jobs:
 
     steps:
       - name: checkout-code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: install-linux-build-deps
         if: matrix.os == 'ubuntu-latest'
@@ -60,16 +61,16 @@ jobs:
             librsvg2-dev \
             patchelf
 
-      - name: install-pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
       - name: install-nodejs
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
+
+      - name: enable-corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@${{ env.PNPM_VERSION }} --activate
 
       - name: install-rust-toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -115,7 +116,7 @@ jobs:
 
     steps:
       - name: checkout-code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: install-linux-build-deps
         if: matrix.os == 'ubuntu-latest'
@@ -142,16 +143,16 @@ jobs:
             librsvg2-dev \
             patchelf
 
-      - name: install-pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
       - name: install-nodejs
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
+
+      - name: enable-corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@${{ env.PNPM_VERSION }} --activate
 
       - name: install-rust-toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -165,12 +166,19 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: build-tauri-desktop
+        id: build_tauri_desktop
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: ${{ matrix.tauri_args }}
-          uploadWorkflowArtifacts: true
+
+      - name: upload-desktop-artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: tauri-desktop-${{ matrix.name }}
+          path: ${{ join(fromJSON(steps.build_tauri_desktop.outputs.artifactPaths), '\n') }}
+          if-no-files-found: error
 
   build-android:
     name: build-android
@@ -184,21 +192,21 @@ jobs:
 
     steps:
       - name: checkout-code
-        uses: actions/checkout@v4
-
-      - name: install-pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
+        uses: actions/checkout@v6
 
       - name: install-nodejs
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
+      - name: enable-corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@${{ env.PNPM_VERSION }} --activate
+
       - name: install-java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -263,7 +271,7 @@ jobs:
         run: pnpm tauri android build --ci --apk --target aarch64
 
       - name: upload-android-artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: tauri-android-artifacts
           path: |
