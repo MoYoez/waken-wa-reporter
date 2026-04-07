@@ -90,6 +90,7 @@ const onboardingSetupMode = ref(false);
 const viewportWidth = ref<number>(1200);
 
 let reporterPollingTimer: number | undefined;
+let reporterSnapshotRefreshInFlight = false;
 const REPORTER_SNAPSHOT_POLL_MS = 5000;
 
 const sections: SectionNavItem[] = [
@@ -178,6 +179,7 @@ function onViewportResize() {
 }
 
 function onVisibilityChange() {
+  syncReporterPolling();
   if (shouldPollReporterSnapshot()) {
     void refreshReporterSnapshot();
   }
@@ -414,12 +416,20 @@ async function refreshReporterSnapshot() {
   if (!reporterSupported.value || activeSection.value === "inspiration") {
     return;
   }
-
-  const result = await getRealtimeReporterSnapshot();
-  if (!result.success || !result.data) {
+  if (reporterSnapshotRefreshInFlight) {
     return;
   }
-  Object.assign(reporterSnapshot.value, result.data);
+
+  reporterSnapshotRefreshInFlight = true;
+  try {
+    const result = await getRealtimeReporterSnapshot();
+    if (!result.success || !result.data) {
+      return;
+    }
+    Object.assign(reporterSnapshot.value, result.data);
+  } finally {
+    reporterSnapshotRefreshInFlight = false;
+  }
 }
 
 function closePendingApprovalDialog() {
