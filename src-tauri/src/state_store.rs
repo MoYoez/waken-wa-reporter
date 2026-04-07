@@ -36,8 +36,21 @@ fn ensure_generated_hash_key(payload: &mut AppStatePayload) -> bool {
 pub fn load_app_state(app: &AppHandle) -> Result<AppStatePayload, String> {
     let path = app_state_path(app)?;
     let mut payload = match fs::read_to_string(&path) {
-        Ok(content) => serde_json::from_str(&content).unwrap_or_default(),
-        Err(_) => AppStatePayload::default(),
+        Ok(content) if content.trim().is_empty() => AppStatePayload::default(),
+        Ok(content) => match serde_json::from_str(&content) {
+            Ok(parsed) => parsed,
+            Err(error) => {
+                let backup = path.with_extension("json.corrupt");
+                let _ = fs::copy(&path, &backup);
+                eprintln!(
+                    "客户端状态文件损坏，已备份到 {}：{error}",
+                    backup.display()
+                );
+                AppStatePayload::default()
+            }
+        },
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => AppStatePayload::default(),
+        Err(error) => return Err(format!("读取状态文件失败：{error}")),
     };
 
     if ensure_generated_hash_key(&mut payload) {
