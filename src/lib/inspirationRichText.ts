@@ -50,6 +50,23 @@ export function escapeHtml(value: string) {
     .replace(/'/g, "&#39;");
 }
 
+function isSafeUrl(url: string): boolean {
+  const trimmed = url.trim();
+  if (!trimmed) return false;
+  if (/^https?:\/\//i.test(trimmed)) return true;
+  if (trimmed.startsWith("/") || trimmed.startsWith("./") || trimmed.startsWith("../")) return true;
+  if (/^data:image\//i.test(trimmed)) return true;
+  return false;
+}
+
+function sanitizeHref(url: string): string {
+  return isSafeUrl(url) ? url : "#";
+}
+
+function sanitizeSrc(url: string): string {
+  return isSafeUrl(url) ? url : "";
+}
+
 function applyTextFormat(text: string, format = 0) {
   let out = escapeHtml(text);
   if (format & 16) out = `<code>${out}</code>`;
@@ -77,7 +94,7 @@ function renderTextNode(
     if (start > last) {
       html += applyTextFormat(text.slice(last, start), Number(node.format ?? 0));
     }
-    const src = resolveUrl(String(match[1] ?? "").trim());
+    const src = sanitizeSrc(resolveUrl(String(match[1] ?? "").trim()));
     if (src) {
       html += `<img src="${escapeHtml(src)}" alt="" class="rich-inline-image" />`;
     }
@@ -91,50 +108,57 @@ function renderTextNode(
   return html || applyTextFormat(text, Number(node.format ?? 0));
 }
 
+const MAX_RENDER_DEPTH = 32;
+
 function renderChildren(
   nodes: LexicalNode[] | undefined,
   resolveUrl: (value: string) => string,
+  depth: number,
 ) {
-  if (!Array.isArray(nodes) || nodes.length === 0) return "";
-  return nodes.map((node) => renderLexicalNode(node, resolveUrl)).join("");
+  if (!Array.isArray(nodes) || nodes.length === 0 || depth > MAX_RENDER_DEPTH) return "";
+  return nodes.map((node) => renderLexicalNode(node, resolveUrl, depth)).join("");
 }
 
 function renderLexicalNode(
   node: LexicalNode,
   resolveUrl: (value: string) => string,
+  depth = 0,
 ): string {
+  if (depth > MAX_RENDER_DEPTH) return "";
+
   const type = node.type ?? "";
+  const next = depth + 1;
 
   if (type === "text") return renderTextNode(node, resolveUrl);
   if (type === "linebreak") return "<br />";
   if (type === "paragraph") {
-    return `<p>${renderChildren(node.children, resolveUrl)}</p>`;
+    return `<p>${renderChildren(node.children, resolveUrl, next)}</p>`;
   }
   if (type === "heading") {
     const tag = node.tag === "h1" || node.tag === "h2" || node.tag === "h3" ? node.tag : "h3";
-    return `<${tag}>${renderChildren(node.children, resolveUrl)}</${tag}>`;
+    return `<${tag}>${renderChildren(node.children, resolveUrl, next)}</${tag}>`;
   }
   if (type === "quote") {
-    return `<blockquote>${renderChildren(node.children, resolveUrl)}</blockquote>`;
+    return `<blockquote>${renderChildren(node.children, resolveUrl, next)}</blockquote>`;
   }
   if (type === "list") {
     const tag = node.listType === "number" ? "ol" : "ul";
-    return `<${tag}>${renderChildren(node.children, resolveUrl)}</${tag}>`;
+    return `<${tag}>${renderChildren(node.children, resolveUrl, next)}</${tag}>`;
   }
   if (type === "listitem") {
-    return `<li>${renderChildren(node.children, resolveUrl)}</li>`;
+    return `<li>${renderChildren(node.children, resolveUrl, next)}</li>`;
   }
   if (type === "link") {
-    const href = resolveUrl(String(node.url ?? ""));
-    return `<a href="${escapeHtml(href || "#")}" target="_blank" rel="noopener noreferrer nofollow">${renderChildren(node.children, resolveUrl)}</a>`;
+    const href = sanitizeHref(resolveUrl(String(node.url ?? "")));
+    return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer nofollow">${renderChildren(node.children, resolveUrl, next)}</a>`;
   }
   if (type === "image") {
-    const src = resolveUrl(String(node.src ?? ""));
+    const src = sanitizeSrc(resolveUrl(String(node.src ?? "")));
     if (!src) return "";
     return `<img src="${escapeHtml(src)}" alt="" class="rich-inline-image" />`;
   }
 
-  return renderChildren(node.children, resolveUrl);
+  return renderChildren(node.children, resolveUrl, next);
 }
 
 export function lexicalTextContent(input: unknown): string {
@@ -143,7 +167,8 @@ export function lexicalTextContent(input: unknown): string {
 
   const output: string[] = [];
 
-  const collectText = (node: LexicalNode) => {
+  const collectText = (node: LexicalNode, depth = 0) => {
+    if (depth > MAX_RENDER_DEPTH) return;
     if (typeof node.text === "string" && node.text.length > 0) {
       output.push(node.text);
     }
@@ -151,7 +176,7 @@ export function lexicalTextContent(input: unknown): string {
       output.push("\n");
     }
     if (Array.isArray(node.children)) {
-      for (const child of node.children) collectText(child);
+      for (const child of node.children) collectText(child, depth + 1);
       if (["paragraph", "heading", "quote", "listitem"].includes(String(node.type ?? ""))) {
         output.push("\n");
       }
@@ -241,8 +266,8 @@ function applyInlineMarkdown(
   html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   html = html.replace(/\*([^*]+)\*/g, "<em>$1</em>");
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label: string, href: string) => {
-    const resolvedHref = escapeHtml(resolveUrl(href));
-    return `<a href="${resolvedHref}" target="_blank" rel="noreferrer">${label}</a>`;
+    const resolvedHref = sanitizeHref(resolveUrl(href));
+    return `<a href="${escapeHtml(resolvedHref)}" target="_blank" rel="noopener noreferrer nofollow">${label}</a>`;
   });
   return html;
 }
