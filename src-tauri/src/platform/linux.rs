@@ -1,9 +1,17 @@
-use std::{env, fs, path::Path, process::Command};
+use std::{
+    env, fs,
+    path::Path,
+    process::{Command, Output, Stdio},
+    thread,
+    time::{Duration, Instant},
+};
 
 use serde_json::Value;
 
 use super::{build_self_test_result, make_probe, ForegroundSnapshot, MediaInfo};
 use crate::models::PlatformSelfTestResult;
+
+const COMMAND_TIMEOUT: Duration = Duration::from_millis(1500);
 
 pub fn get_foreground_snapshot() -> Result<ForegroundSnapshot, String> {
     let wayland = has_env("WAYLAND_DISPLAY");
@@ -31,14 +39,15 @@ pub fn get_foreground_snapshot() -> Result<ForegroundSnapshot, String> {
 }
 
 pub fn get_now_playing() -> Result<MediaInfo, String> {
-    let output = Command::new("playerctl")
-        .args([
+    let output = command_output_with_timeout(
+        "playerctl",
+        &[
             "metadata",
             "--format",
             "{{title}}\n{{artist}}\n{{album}}\n{{playerName}}",
-        ])
-        .output()
-        .map_err(|error| format!("调用 playerctl 失败：{error}"))?;
+        ],
+    )
+    .map_err(|error| format!("调用 playerctl 失败：{error}"))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -77,9 +86,7 @@ pub fn get_now_playing() -> Result<MediaInfo, String> {
 }
 
 fn get_foreground_snapshot_x11() -> Result<ForegroundSnapshot, String> {
-    let active_output = Command::new("xprop")
-        .args(["-root", "_NET_ACTIVE_WINDOW"])
-        .output()
+    let active_output = command_output_with_timeout("xprop", &["-root", "_NET_ACTIVE_WINDOW"])
         .map_err(|error| format!("调用 xprop 失败：{error}"))?;
 
     if !active_output.status.success() {
@@ -98,17 +105,18 @@ fn get_foreground_snapshot_x11() -> Result<ForegroundSnapshot, String> {
         return Err("当前没有活动窗口。".into());
     }
 
-    let detail_output = Command::new("xprop")
-        .args([
+    let detail_output = command_output_with_timeout(
+        "xprop",
+        &[
             "-id",
             &window_id,
             "WM_CLASS",
             "_NET_WM_NAME",
             "WM_NAME",
             "_NET_WM_PID",
-        ])
-        .output()
-        .map_err(|error| format!("调用 xprop 读取窗口详情失败：{error}"))?;
+        ],
+    )
+    .map_err(|error| format!("调用 xprop 读取窗口详情失败：{error}"))?;
 
     if !detail_output.status.success() {
         let stderr = String::from_utf8_lossy(&detail_output.stderr);
@@ -155,8 +163,9 @@ fn get_foreground_snapshot_wayland() -> Result<ForegroundSnapshot, String> {
 }
 
 fn get_foreground_snapshot_gnome_focused_window_dbus() -> Result<ForegroundSnapshot, String> {
-    let output = Command::new("gdbus")
-        .args([
+    let output = command_output_with_timeout(
+        "gdbus",
+        &[
             "call",
             "--session",
             "--dest",
@@ -165,9 +174,9 @@ fn get_foreground_snapshot_gnome_focused_window_dbus() -> Result<ForegroundSnaps
             "/org/gnome/shell/extensions/FocusedWindow",
             "--method",
             "org.gnome.shell.extensions.FocusedWindow.Get",
-        ])
-        .output()
-        .map_err(|error| format!("调用 gdbus 失败：{error}"))?;
+        ],
+    )
+    .map_err(|error| format!("调用 gdbus 失败：{error}"))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -224,9 +233,7 @@ fn get_foreground_snapshot_kde_kdotool() -> Result<ForegroundSnapshot, String> {
 }
 
 fn run_command_trimmed<const N: usize>(program: &str, args: [&str; N]) -> Result<String, String> {
-    let output = Command::new(program)
-        .args(args)
-        .output()
+    let output = command_output_with_timeout(program, &args)
         .map_err(|error| format!("调用 {program} 失败：{error}"))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -241,6 +248,33 @@ fn run_command_trimmed<const N: usize>(program: &str, args: [&str; N]) -> Result
     }
 
     Ok(stdout.lines().next().unwrap_or_default().trim().to_string())
+}
+
+fn command_output_with_timeout(program: &str, args: &[&str]) -> Result<Output, String> {
+    let mut child = Command::new(program)
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| error.to_string())?;
+
+    let start = Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => return child.wait_with_output().map_err(|error| error.to_string()),
+            Ok(None) if start.elapsed() >= COMMAND_TIMEOUT => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!("命令执行超时（>{}ms）", COMMAND_TIMEOUT.as_millis()));
+            }
+            Ok(None) => thread::sleep(Duration::from_millis(25)),
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(error.to_string());
+            }
+        }
+    }
 }
 
 fn parse_gdbus_string_tuple(stdout: &str) -> Option<String> {

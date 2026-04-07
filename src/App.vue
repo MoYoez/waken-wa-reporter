@@ -90,6 +90,7 @@ const onboardingSetupMode = ref(false);
 const viewportWidth = ref<number>(1200);
 
 let reporterPollingTimer: number | undefined;
+const REPORTER_SNAPSHOT_POLL_MS = 5000;
 
 const sections: SectionNavItem[] = [
   { key: "overview", title: "概览", kicker: "查看当前连接与同步状态", icon: "pi pi-home" },
@@ -426,7 +427,32 @@ function closePendingApprovalDialog() {
 }
 
 function shouldPollReporterSnapshot() {
-  return reporterSupported.value && document.visibilityState === "visible";
+  return reporterSupported.value
+    && reporterSnapshot.value.running
+    && document.visibilityState === "visible";
+}
+
+function stopReporterPolling() {
+  if (reporterPollingTimer !== undefined) {
+    window.clearInterval(reporterPollingTimer);
+    reporterPollingTimer = undefined;
+  }
+}
+
+function syncReporterPolling() {
+  stopReporterPolling();
+
+  if (!shouldPollReporterSnapshot()) {
+    return;
+  }
+
+  reporterPollingTimer = window.setInterval(() => {
+    if (!shouldPollReporterSnapshot()) {
+      stopReporterPolling();
+      return;
+    }
+    void refreshReporterSnapshot();
+  }, REPORTER_SNAPSHOT_POLL_MS);
 }
 
 async function handleStartReporter() {
@@ -511,6 +537,7 @@ watch(
     if (reporterSupported.value && section !== "inspiration") {
       void refreshReporterSnapshot();
     }
+    syncReporterPolling();
   },
 );
 
@@ -525,8 +552,17 @@ watch(
   () => capabilities.value,
   () => {
     syncDeviceTypeByViewport();
+    syncReporterPolling();
   },
   { deep: true },
+);
+
+watch(
+  () => reporterSnapshot.value.running,
+  () => {
+    syncReporterPolling();
+  },
+  { immediate: true },
 );
 
 watch(
@@ -585,12 +621,7 @@ onMounted(async () => {
   }
 
   await refreshReporterSnapshot();
-  reporterPollingTimer = window.setInterval(() => {
-    if (!shouldPollReporterSnapshot()) {
-      return;
-    }
-    void refreshReporterSnapshot();
-  }, 2000);
+  syncReporterPolling();
 
   if (config.value.reporterEnabled && !reporterSnapshot.value.running && readiness.value) {
     void handleStartReporter();
@@ -600,9 +631,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener("resize", onViewportResize);
   document.removeEventListener("visibilitychange", onVisibilityChange);
-  if (reporterPollingTimer) {
-    window.clearInterval(reporterPollingTimer);
-  }
+  stopReporterPolling();
 });
 </script>
 

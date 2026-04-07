@@ -48,6 +48,14 @@ interface ActivitySelectOption {
   deviceName: string;
 }
 
+const MAX_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024;
+const SUPPORTED_IMAGE_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+]);
+
 const props = defineProps<{
   config: ClientConfig;
   capabilities: ClientCapabilities;
@@ -231,6 +239,25 @@ function formatTime(value: string) {
   return date.toLocaleString();
 }
 
+function validateImageFile(file: File) {
+  if (!SUPPORTED_IMAGE_TYPES.has(file.type)) {
+    throw new Error("仅支持 PNG、JPEG、WebP 或 GIF 图片。");
+  }
+
+  if (file.size > MAX_IMAGE_UPLOAD_BYTES) {
+    throw new Error(`图片过大，请选择 5 MB 以内的图片。`);
+  }
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error ?? new Error("读取图片失败。"));
+    reader.readAsDataURL(file);
+  });
+}
+
 async function loadEntries() {
   if (!props.config.baseUrl.trim()) {
     loadError.value = "请先填写站点地址，再加载灵感内容列表。";
@@ -398,24 +425,28 @@ async function onFileSelected(event: Event) {
   if (!file) return;
 
   uploadPending.value = true;
+  try {
+    validateImageFile(file);
+    const dataUrl = await readFileAsDataUrl(file);
+    inlineImageDataUrl.value = dataUrl;
 
-  const dataUrl = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ""));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-
-  inlineImageDataUrl.value = dataUrl;
-  uploadPending.value = false;
-  if (target) target.value = "";
-
-  notify({
-    severity: "success",
-    summary: "头图已准备",
-    detail: "这张图片会作为本条灵感的头图一并发布。",
-    life: 3000,
-  });
+    notify({
+      severity: "success",
+      summary: "头图已准备",
+      detail: "这张图片会作为本条灵感的头图一并发布。",
+      life: 3000,
+    });
+  } catch (error) {
+    notify({
+      severity: "error",
+      summary: "头图读取失败",
+      detail: error instanceof Error ? error.message : "图片读取失败，请重试。",
+      life: 4000,
+    });
+  } finally {
+    uploadPending.value = false;
+    if (target) target.value = "";
+  }
 }
 
 async function detectStatusBattery() {
@@ -447,12 +478,8 @@ async function onBodyImageSelected(event: Event) {
   inlineUploadPending.value = true;
 
   try {
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result ?? ""));
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    });
+    validateImageFile(file);
+    const dataUrl = await readFileAsDataUrl(file);
 
     const result = await uploadInspirationAsset(props.config, dataUrl);
     const pendingApproval = extractPendingApprovalInfo(result);
@@ -810,7 +837,11 @@ async function submitEntry() {
 
         <div class="inspiration-upload">
           <label class="upload-label">
-            <input type="file" accept="image/*" @change="onFileSelected" />
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              @change="onFileSelected"
+            />
             <span><i class="pi pi-image" /> 选择头图</span>
           </label>
           <Button
@@ -830,6 +861,9 @@ async function submitEntry() {
           </Message>
           <Message v-if="activityLoadError" severity="warn" :closable="false">
             {{ activityLoadError }}
+          </Message>
+          <Message severity="secondary" :closable="false">
+            图片仅支持 PNG、JPEG、WebP、GIF，且大小需在 5 MB 以内。
           </Message>
         </div>
 

@@ -12,6 +12,8 @@ use crate::{
     platform, reporter_config, state_store,
 };
 
+const MAX_IMAGE_DATA_URL_BYTES: usize = 7 * 1024 * 1024;
+
 #[cfg(desktop)]
 use crate::realtime_reporter::{snapshot_result, ReporterRuntime};
 #[cfg(desktop)]
@@ -146,6 +148,8 @@ pub async fn create_inspiration_entry(
     config: ClientConfig,
     input: InspirationEntryCreateInput,
 ) -> Result<ApiResult<serde_json::Value>, String> {
+    validate_image_data_url(input.image_data_url.as_deref())?;
+
     let body = json!({
         "title": input.title.trim(),
         "content": input.content.trim(),
@@ -175,6 +179,8 @@ pub async fn upload_inspiration_asset(
     config: ClientConfig,
     image_data_url: String,
 ) -> Result<ApiResult<serde_json::Value>, String> {
+    validate_image_data_url(Some(&image_data_url))?;
+
     let body = json!({
         "imageDataUrl": image_data_url,
         "generatedHashKey": config.generated_hash_key.trim(),
@@ -228,4 +234,20 @@ pub fn discover_existing_reporter_config(
 ) -> Result<ApiResult<ExistingReporterConfig>, String> {
     let config = reporter_config::discover_existing_reporter_config(&app)?;
     Ok(ApiResult::success(200, config))
+}
+
+fn validate_image_data_url(value: Option<&str>) -> Result<(), String> {
+    let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(());
+    };
+
+    if value.len() > MAX_IMAGE_DATA_URL_BYTES {
+        return Err("图片数据过大，请选择更小的图片。".into());
+    }
+
+    if !value.starts_with("data:image/") {
+        return Err("图片格式无效，请重新选择图片。".into());
+    }
+
+    Ok(())
 }

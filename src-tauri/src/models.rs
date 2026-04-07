@@ -32,7 +32,7 @@ pub fn default_use_system_proxy() -> bool {
 }
 
 pub fn default_poll_interval_ms() -> u64 {
-    2_000
+    5_000
 }
 
 pub fn default_heartbeat_interval_ms() -> u64 {

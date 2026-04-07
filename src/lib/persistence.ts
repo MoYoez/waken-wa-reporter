@@ -10,7 +10,7 @@ export const defaultClientConfig = (): ClientConfig => ({
   device: "",
   deviceType: "desktop",
   pushMode: "realtime",
-  pollIntervalMs: 2000,
+  pollIntervalMs: 5000,
   heartbeatIntervalMs: 60000,
   reporterMetadataJson: "{\n  \"source\": \"waken-wa-client\"\n}",
   reporterEnabled: false,

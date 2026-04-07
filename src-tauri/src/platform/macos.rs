@@ -1,9 +1,13 @@
 use std::ffi::{c_char, CStr};
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Output, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
 
 use super::{build_self_test_result, make_probe, ForegroundSnapshot, MediaInfo};
 use crate::models::PlatformSelfTestResult;
+
+const COMMAND_TIMEOUT: Duration = Duration::from_millis(1500);
 
 unsafe extern "C" {
     fn waken_frontmost_app_name() -> *mut c_char;
@@ -34,10 +38,7 @@ fn get_now_playing_via_nowplaying_cli() -> Result<MediaInfo, String> {
             continue;
         }
 
-        match Command::new(candidate)
-            .args(["get", "title", "artist", "album"])
-            .output()
-        {
+        match command_output_with_timeout(candidate, &["get", "title", "artist", "album"]) {
             Ok(output) => {
                 if !output.status.success() {
                     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -82,6 +83,33 @@ fn get_now_playing_via_nowplaying_cli() -> Result<MediaInfo, String> {
         current_path,
         last_error.unwrap_or_else(|| "未知错误".to_string())
     ))
+}
+
+fn command_output_with_timeout(program: &str, args: &[&str]) -> Result<Output, String> {
+    let mut child = Command::new(program)
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| error.to_string())?;
+
+    let start = Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => return child.wait_with_output().map_err(|error| error.to_string()),
+            Ok(None) if start.elapsed() >= COMMAND_TIMEOUT => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!("命令执行超时（>{}ms）", COMMAND_TIMEOUT.as_millis()));
+            }
+            Ok(None) => thread::sleep(Duration::from_millis(25)),
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(error.to_string());
+            }
+        }
+    }
 }
 
 pub fn get_foreground_snapshot() -> Result<ForegroundSnapshot, String> {

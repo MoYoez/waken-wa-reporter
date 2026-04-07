@@ -35,6 +35,7 @@ enum PostActivityResult {
 #[derive(Default)]
 struct ReporterInner {
     running: bool,
+    active_run_id: Option<u64>,
     logs: Vec<ReporterLogEntry>,
     current_activity: Option<ReporterActivity>,
     last_heartbeat_at: Option<String>,
@@ -66,6 +67,7 @@ impl ReporterRuntime {
         validate_reporter_config(&config)?;
 
         let stop_flag = Arc::new(AtomicBool::new(false));
+        let run_id = self.sequence.fetch_add(1, Ordering::SeqCst);
 
         {
             let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
@@ -78,6 +80,7 @@ impl ReporterRuntime {
             }
 
             inner.running = true;
+            inner.active_run_id = Some(run_id);
             inner.stop_flag = Some(stop_flag.clone());
             inner.last_error = None;
             inner.last_pending_approval_message = None;
@@ -90,7 +93,7 @@ impl ReporterRuntime {
         let sequence_seed = self.sequence.fetch_add(1, Ordering::SeqCst);
 
         thread::spawn(move || {
-            run_reporter_loop(state, config, stop_flag, sequence_seed);
+            run_reporter_loop(state, config, stop_flag, sequence_seed, run_id);
         });
 
         Ok(self.snapshot())
@@ -103,6 +106,7 @@ impl ReporterRuntime {
                 flag.store(true, Ordering::SeqCst);
             }
             inner.running = false;
+            inner.active_run_id = None;
         }
         self.push_log("warn", "实时上报已停止", "后台轮询任务已停止。", None);
         self.snapshot()
@@ -147,6 +151,7 @@ fn run_reporter_loop(
     config: ClientConfig,
     stop_flag: Arc<AtomicBool>,
     mut sequence_seed: u64,
+    run_id: u64,
 ) {
     let client = match build_http_client(config.use_system_proxy) {
         Ok(client) => client,
@@ -159,7 +164,7 @@ fn run_reporter_loop(
                 &error,
                 None,
             );
-            mark_stopped(&state, Some(error));
+            mark_stopped(&state, Some(error), run_id);
             return;
         }
     };
@@ -175,7 +180,7 @@ fn run_reporter_loop(
                 &error,
                 None,
             );
-            mark_stopped(&state, Some(error));
+            mark_stopped(&state, Some(error), run_id);
             return;
         }
     };
@@ -329,7 +334,7 @@ fn run_reporter_loop(
         sleep_with_stop(effective_sleep, &stop_flag);
     }
 
-    mark_stopped(&state, None);
+    mark_stopped(&state, None, run_id);
 }
 
 fn validate_reporter_config(config: &ClientConfig) -> Result<(), String> {
@@ -413,9 +418,13 @@ fn set_pending_approval(
     inner.last_pending_approval_url = approval_url;
 }
 
-fn mark_stopped(state: &Arc<Mutex<ReporterInner>>, error: Option<String>) {
+fn mark_stopped(state: &Arc<Mutex<ReporterInner>>, error: Option<String>, run_id: u64) {
     let mut inner = state.lock().unwrap_or_else(|e| e.into_inner());
+    if inner.active_run_id != Some(run_id) {
+        return;
+    }
     inner.running = false;
+    inner.active_run_id = None;
     inner.stop_flag = None;
     if error.is_some() {
         inner.last_error = error;
