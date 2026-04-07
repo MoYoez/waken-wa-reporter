@@ -206,6 +206,10 @@ export async function runPlatformSelfTest(): Promise<ApiResult<PlatformSelfTestR
   return invokeApi("run_platform_self_test");
 }
 
+export async function requestAccessibilityPermission(): Promise<ApiResult<boolean>> {
+  return invokeApi("request_accessibility_permission");
+}
+
 export async function discoverExistingReporterConfig(): Promise<ApiResult<ExistingReporterConfig>> {
   return invokeApi("discover_existing_reporter_config");
 }

@@ -77,6 +77,7 @@ pub fn run() {
         commands::stop_realtime_reporter,
         commands::get_realtime_reporter_snapshot,
         commands::run_platform_self_test,
+        commands::request_accessibility_permission,
         commands::discover_existing_reporter_config
     ]);
 
@@ -93,6 +94,7 @@ pub fn run() {
         commands::create_inspiration_entry,
         commands::upload_inspiration_asset,
         commands::run_platform_self_test,
+        commands::request_accessibility_permission,
         commands::discover_existing_reporter_config
     ]);
 

@@ -7,7 +7,7 @@ import Tag from "primevue/tag";
 import { useToast } from "primevue/usetoast";
 
 import ConnectionPanel from "./ConnectionPanel.vue";
-import { runPlatformSelfTest } from "../lib/api";
+import { requestAccessibilityPermission, runPlatformSelfTest } from "../lib/api";
 import { createNotifier } from "../lib/notify";
 import type {
   ClientCapabilities,
@@ -18,6 +18,7 @@ import type {
 
 const toast = useToast();
 const selfTestLoading = ref(false);
+const accessibilityPermissionLoading = ref(false);
 const selfTestResult = ref<PlatformSelfTestResult | null>(null);
 
 const props = defineProps<{
@@ -34,6 +35,10 @@ const configReady = computed(
 const reporterSupported = computed(() => props.capabilities.realtimeReporter);
 const selfTestSupported = computed(() => props.capabilities.platformSelfTest);
 const isNativeNotice = computed(() => !props.capabilities.realtimeReporter);
+const canRequestAccessibilityPermission = computed(() => {
+  if (typeof navigator === "undefined") return false;
+  return /mac/i.test(navigator.userAgent);
+});
 const { notify } = createNotifier(toast, () => isNativeNotice.value);
 
 defineEmits<{
@@ -128,6 +133,33 @@ async function handleSelfTest() {
     life: 3000,
   });
 }
+
+async function handleRequestAccessibilityPermission() {
+  accessibilityPermissionLoading.value = true;
+  const result = await requestAccessibilityPermission();
+  accessibilityPermissionLoading.value = false;
+
+  if (!result.success) {
+    notify({
+      severity: "error",
+      summary: "权限申请未完成",
+      detail: result.error?.message ?? "辅助功能权限申请失败。",
+      life: 4000,
+    });
+    return;
+  }
+
+  notify({
+    severity: result.data ? "success" : "info",
+    summary: result.data ? "辅助功能权限已可用" : "已请求辅助功能权限",
+    detail: result.data
+      ? "系统已允许读取窗口标题。"
+      : "系统权限面板应该已经打开，请在“系统设置 -> 隐私与安全性 -> 辅助功能”中允许当前应用。",
+    life: 5000,
+  });
+
+  await handleSelfTest();
+}
 </script>
 
 <template>
@@ -210,6 +242,15 @@ async function handleSelfTest() {
             v-if="selfTestSupported"
             @click="handleSelfTest"
           />
+          <Button
+            v-if="canRequestAccessibilityPermission"
+            label="授权辅助功能权限"
+            icon="pi pi-shield"
+            severity="secondary"
+            outlined
+            :loading="accessibilityPermissionLoading"
+            @click="handleRequestAccessibilityPermission"
+          />
         </div>
 
         <div class="message-stack">
@@ -280,6 +321,16 @@ async function handleSelfTest() {
             <p v-if="firstGuidance(selfTestResult.windowTitle.guidance)" class="self-test-summary">
               {{ firstGuidance(selfTestResult.windowTitle.guidance) }}
             </p>
+            <div v-if="selfTestResult.platform === 'macos' && !selfTestResult.windowTitle.success" class="actions-row">
+              <Button
+                label="授权辅助功能权限"
+                icon="pi pi-shield"
+                severity="secondary"
+                outlined
+                :loading="accessibilityPermissionLoading"
+                @click="handleRequestAccessibilityPermission"
+              />
+            </div>
           </article>
 
           <article class="self-test-card">

@@ -63,6 +63,17 @@ char *waken_frontmost_window_title(void) {
     return result;
 }
 
+bool waken_accessibility_is_trusted(void) {
+    return AXIsProcessTrusted();
+}
+
+bool waken_request_accessibility_permission(void) {
+    NSDictionary *options = @{
+        (__bridge NSString *)kAXTrustedCheckOptionPrompt : @YES
+    };
+    return AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)options);
+}
+
 char *waken_media_now_playing_json(void) {
     dispatch_semaphore_t sem = dispatch_semaphore_create(0);
     __block char *result = NULL;

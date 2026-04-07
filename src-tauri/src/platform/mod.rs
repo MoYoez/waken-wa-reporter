@@ -103,6 +103,15 @@ pub use stub::run_self_test;
 #[cfg(target_os = "windows")]
 pub use windows::run_self_test;
 
+#[cfg(target_os = "linux")]
+pub use linux::request_accessibility_permission;
+#[cfg(target_os = "macos")]
+pub use macos::request_accessibility_permission;
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+pub use stub::request_accessibility_permission;
+#[cfg(target_os = "windows")]
+pub use windows::request_accessibility_permission;
+
 pub fn platform_name() -> &'static str {
     #[cfg(target_os = "windows")]
     {

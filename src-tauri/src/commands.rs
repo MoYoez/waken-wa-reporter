@@ -245,6 +245,14 @@ pub fn run_platform_self_test() -> Result<ApiResult<PlatformSelfTestResult>, Str
 }
 
 #[tauri::command]
+pub fn request_accessibility_permission() -> Result<ApiResult<bool>, String> {
+    match platform::request_accessibility_permission() {
+        Ok(granted) => Ok(ApiResult::success(200, granted)),
+        Err(error) => Ok(ApiResult::failure(400, error, None)),
+    }
+}
+
+#[tauri::command]
 pub fn discover_existing_reporter_config(
     app: AppHandle,
 ) -> Result<ApiResult<ExistingReporterConfig>, String> {

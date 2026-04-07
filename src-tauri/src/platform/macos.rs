@@ -11,10 +11,14 @@ use crate::models::PlatformSelfTestResult;
 const COMMAND_TIMEOUT: Duration = Duration::from_millis(1500);
 const COMMAND_POLL_STEP: Duration = Duration::from_millis(100);
 const NOWPLAYING_CLI: &str = "nowplaying-cli";
+const NOWPLAYING_CLI_FALLBACK_PATHS: [&str; 2] =
+    ["/opt/homebrew/bin/nowplaying-cli", "/usr/local/bin/nowplaying-cli"];
 
 unsafe extern "C" {
     fn waken_frontmost_app_name() -> *mut c_char;
     fn waken_frontmost_window_title() -> *mut c_char;
+    fn waken_accessibility_is_trusted() -> bool;
+    fn waken_request_accessibility_permission() -> bool;
     fn waken_string_free(value: *mut c_char);
 }
 
@@ -29,8 +33,16 @@ fn read_bridge_string(fetch: unsafe extern "C" fn() -> *mut c_char) -> Option<St
     Some(value)
 }
 
+pub fn accessibility_permission_granted() -> bool {
+    unsafe { waken_accessibility_is_trusted() }
+}
+
+fn request_accessibility_permission_via_bridge() -> bool {
+    unsafe { waken_request_accessibility_permission() }
+}
+
 enum NowPlayingCliError {
-    NotFound { path: String },
+    NotFound { path: String, attempted: Vec<String> },
     TimedOut,
     Failed(String),
 }
@@ -38,8 +50,11 @@ enum NowPlayingCliError {
 impl NowPlayingCliError {
     fn into_user_message(self) -> String {
         match self {
-            Self::NotFound { path } => {
-                format!("调用 nowplaying-cli 失败：未在全局环境中找到可执行文件。PATH={path}")
+            Self::NotFound { path, attempted } => {
+                format!(
+                    "调用 nowplaying-cli 失败：未在全局环境或 Homebrew 常见路径中找到可执行文件。已尝试：{}。PATH={path}",
+                    attempted.join(", ")
+                )
             }
             Self::TimedOut => "调用 nowplaying-cli 超时（>1500ms）。".into(),
             Self::Failed(detail) => format!("nowplaying-cli 返回失败：{detail}"),
@@ -60,14 +75,32 @@ struct RawNowPlayingInfo {
 }
 
 fn get_now_playing_via_nowplaying_cli() -> Result<MediaInfo, NowPlayingCliError> {
-    let output =
-        command_output_with_timeout(NOWPLAYING_CLI, &["get-raw"]).map_err(|error| match error {
-            CommandError::NotFound => NowPlayingCliError::NotFound {
-                path: std::env::var("PATH").unwrap_or_default(),
-            },
-            CommandError::TimedOut => NowPlayingCliError::TimedOut,
-            CommandError::Other(detail) => NowPlayingCliError::Failed(detail),
-        })?;
+    let attempted = std::iter::once(NOWPLAYING_CLI)
+        .chain(NOWPLAYING_CLI_FALLBACK_PATHS.iter().copied())
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+
+    let output = {
+        let mut resolved = None;
+        for candidate in std::iter::once(NOWPLAYING_CLI).chain(NOWPLAYING_CLI_FALLBACK_PATHS.iter().copied()) {
+            match command_output_with_timeout(candidate, &["get-raw"]) {
+                Ok(output) => {
+                    resolved = Some(output);
+                    break;
+                }
+                Err(CommandError::NotFound) => {}
+                Err(CommandError::TimedOut) => return Err(NowPlayingCliError::TimedOut),
+                Err(CommandError::Other(detail)) => return Err(NowPlayingCliError::Failed(detail)),
+            }
+        }
+        resolved
+    }
+    .ok_or_else(|| {
+        NowPlayingCliError::NotFound {
+            path: std::env::var("PATH").unwrap_or_default(),
+            attempted,
+        }
+    })?;
 
     if !output.status.success() {
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -223,7 +256,12 @@ fn macos_guidance(error: &str, probe: &str) -> Vec<String> {
     }
 
     if probe == "window" {
-        guidance.push("macOS 窗口标题采集依赖“辅助功能”授权。".into());
+        if accessibility_permission_granted() {
+            guidance.push("已检测到“辅助功能”权限；如果仍然没有标题，通常是当前应用本身未暴露稳定标题。".into());
+        } else {
+            guidance.push("macOS 窗口标题采集依赖“辅助功能”授权。".into());
+            guidance.push("可以在设置页点“申请辅助功能权限”，或前往“系统设置 -> 隐私与安全性 -> 辅助功能”手动开启。".into());
+        }
         guidance.push("部分应用即使已授权，也可能不会返回稳定的窗口标题。".into());
     }
 
@@ -265,7 +303,11 @@ pub fn run_self_test() -> PlatformSelfTestResult {
                 "窗口标题采集正常"
             },
             if snapshot.process_title.trim().is_empty() {
-                "当前前台窗口没有可用标题，或尚未授予辅助功能权限。".to_string()
+                if accessibility_permission_granted() {
+                    "当前前台窗口没有可用标题。".to_string()
+                } else {
+                    "当前前台窗口没有可用标题，且尚未授予辅助功能权限。".to_string()
+                }
             } else {
                 snapshot.process_title
             },
@@ -298,4 +340,8 @@ pub fn run_self_test() -> PlatformSelfTestResult {
     };
 
     build_self_test_result(foreground, window_title, media)
+}
+
+pub fn request_accessibility_permission() -> Result<bool, String> {
+    Ok(request_accessibility_permission_via_bridge())
 }

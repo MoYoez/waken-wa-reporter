@@ -628,3 +628,7 @@ impl EmptyFallback for str {
         }
     }
 }
+
+pub fn request_accessibility_permission() -> Result<bool, String> {
+    Err("当前平台不支持辅助功能权限申请。".into())
+}
