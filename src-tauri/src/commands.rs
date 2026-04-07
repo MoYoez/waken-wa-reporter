@@ -2,7 +2,7 @@ use serde_json::json;
 use tauri::{AppHandle, State};
 
 use crate::{
-    http_client::request_json,
+    http_client::{request_json, request_json_payload},
     import_config::parse_import_payload,
     models::{
         default_client_capabilities, effective_device_name, ActivityPayload, ApiResult,
@@ -110,10 +110,26 @@ pub async fn get_public_activity_feed(
 #[tauri::command]
 pub async fn list_inspiration_entries(
     config: ClientConfig,
+    limit: Option<u32>,
+    offset: Option<u32>,
 ) -> Result<ApiResult<serde_json::Value>, String> {
-    Ok(request_json(
+    let mut params = Vec::new();
+    if let Some(limit) = limit {
+        params.push(format!("limit={limit}"));
+    }
+    if let Some(offset) = offset {
+        params.push(format!("offset={offset}"));
+    }
+
+    let path = if params.is_empty() {
+        "/api/inspiration/entries".to_string()
+    } else {
+        format!("/api/inspiration/entries?{}", params.join("&"))
+    };
+
+    Ok(request_json_payload(
         &config.base_url,
-        "/api/inspiration/entries",
+        &path,
         None,
         config.use_system_proxy,
         reqwest::Method::GET,

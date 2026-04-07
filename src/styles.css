@@ -777,6 +777,41 @@ select {
   line-height: 1.7;
 }
 
+.compact-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.compact-toggle-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 72px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(154, 131, 102, 0.14);
+  background: rgba(255, 251, 245, 0.82);
+}
+
+.compact-toggle-copy {
+  display: grid;
+  gap: 3px;
+}
+
+.compact-toggle-copy strong {
+  color: #3d2d20;
+  font-size: 0.95rem;
+  line-height: 1.3;
+}
+
+.compact-toggle-copy span {
+  color: #776451;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
 .activity-form-stack {
   display: grid;
   gap: 16px;
@@ -1117,6 +1152,12 @@ select {
 .entry-list {
   display: grid;
   gap: 16px;
+}
+
+.entry-list-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
 }
 
 .entry-card {
@@ -1484,7 +1525,8 @@ select {
   }
 
   .panel-grid,
-  .feed-columns {
+  .feed-columns,
+  .compact-toggle-grid {
     grid-template-columns: 1fr;
   }
 

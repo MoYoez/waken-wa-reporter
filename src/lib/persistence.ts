@@ -12,8 +12,12 @@ export const defaultClientConfig = (): ClientConfig => ({
   pushMode: "realtime",
   pollIntervalMs: 5000,
   heartbeatIntervalMs: 60000,
-  reporterMetadataJson: "{\n  \"source\": \"waken-wa-client\"\n}",
+  reporterMetadataJson: "",
   reporterEnabled: false,
+  reportForegroundApp: true,
+  reportWindowTitle: true,
+  reportMedia: true,
+  reportPlaySource: true,
 });
 
 export async function loadAppState(): Promise<AppStatePayload> {

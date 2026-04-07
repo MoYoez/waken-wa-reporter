@@ -25,6 +25,7 @@
     "pinia": "^3.0.4",
     "primeicons": "^7.0.0",
     "primevue": "^4.5.4",
+    "tauri-plugin-device-info-api": "^1.0.1",
     "vue": "^3.5.13"
   },
   "devDependencies": {

@@ -18,7 +18,9 @@ use crate::{
         effective_device_name, ActivityPayload, ApiResult, ClientConfig, RealtimeReporterSnapshot,
         ReporterActivity, ReporterLogEntry,
     },
-    platform::{get_foreground_snapshot, get_now_playing, ForegroundSnapshot, MediaInfo},
+    platform::{
+        get_foreground_snapshot_for_reporting, get_now_playing, ForegroundSnapshot, MediaInfo,
+    },
 };
 
 const MAX_LOGS: usize = 120;
@@ -261,31 +263,48 @@ fn run_reporter_loop(
     while !stop_flag.load(Ordering::SeqCst) {
         let mut iteration_had_error = false;
 
-        match get_foreground_snapshot() {
+        let collect_foreground = config.report_foreground_app || config.report_window_title;
+        let collect_media = config.report_media || config.report_play_source;
+
+        let foreground = if collect_foreground {
+            get_foreground_snapshot_for_reporting(
+                config.report_foreground_app,
+                config.report_window_title,
+            )
+        } else {
+            Ok(ForegroundSnapshot::default())
+        };
+
+        match foreground {
             Ok(snapshot) => {
-                let media = match get_now_playing() {
-                    Ok(media) => {
-                        last_media_error = None;
-                        media
-                    }
-                    Err(error) => {
-                        let should_log = last_media_error
-                            .as_ref()
-                            .map(|last| last != &error)
-                            .unwrap_or(true);
-                        last_media_error = Some(error.clone());
-                        if should_log {
-                            push_background_log(
-                                &state,
-                                &mut sequence_seed,
-                                "warn",
-                                "媒体信息读取失败",
-                                &error,
-                                None,
-                            );
+                let media = if collect_media {
+                    match get_now_playing() {
+                        Ok(media) => {
+                            last_media_error = None;
+                            media
                         }
-                        MediaInfo::default()
+                        Err(error) => {
+                            let should_log = last_media_error
+                                .as_ref()
+                                .map(|last| last != &error)
+                                .unwrap_or(true);
+                            last_media_error = Some(error.clone());
+                            if should_log {
+                                push_background_log(
+                                    &state,
+                                    &mut sequence_seed,
+                                    "warn",
+                                    "媒体信息读取失败",
+                                    &error,
+                                    None,
+                                );
+                            }
+                            MediaInfo::default()
+                        }
                     }
+                } else {
+                    last_media_error = None;
+                    MediaInfo::default()
                 };
 
                 let signature = format!(
@@ -555,13 +574,10 @@ fn build_payload(
     media: &MediaInfo,
     mut metadata: Map<String, Value>,
 ) -> ActivityPayload {
-    if !metadata.contains_key("source") {
-        metadata.insert("source".into(), Value::String("waken-wa-client".into()));
-    }
-
     if let Some(media_map) = media.as_metadata_map() {
         metadata.insert("media".into(), Value::Object(media_map));
     }
+
     if !media.source_app_id.trim().is_empty() && !metadata.contains_key("play_source") {
         metadata.insert(
             "play_source".into(),
@@ -571,15 +587,23 @@ fn build_payload(
 
     ActivityPayload {
         generated_hash_key: config.generated_hash_key.trim().to_string(),
-        process_name: snapshot.process_name.clone(),
+        process_name: if config.report_foreground_app || !snapshot.process_name.is_empty() {
+            snapshot.process_name.clone()
+        } else {
+            String::new()
+        },
         device: Some(effective_device_name(&config.device)),
-        process_title: Some(snapshot.process_title.clone()).filter(|value| !value.is_empty()),
+        process_title: if config.report_window_title || !snapshot.process_title.is_empty() {
+            Some(snapshot.process_title.clone()).filter(|value| !value.is_empty())
+        } else {
+            None
+        },
         persist_minutes: None,
         battery_level: None,
         is_charging: None,
         device_type: Some(config.device_type.trim().to_string()).filter(|value| !value.is_empty()),
         push_mode: Some(config.push_mode.trim().to_string()).filter(|value| !value.is_empty()),
-        metadata: Some(Value::Object(metadata)),
+        metadata: (!metadata.is_empty()).then_some(Value::Object(metadata)),
     }
 }
 

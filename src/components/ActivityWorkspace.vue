@@ -14,7 +14,7 @@ import {
   submitActivityReport,
   validateConfig,
 } from "../lib/api";
-import { readBatterySnapshot } from "../lib/battery";
+import { readBatterySnapshot } from "../lib/deviceInfo";
 import { createNotifier } from "../lib/notify";
 import type {
   ActivityPayload,
@@ -27,8 +27,7 @@ import type {
 interface ActivityFormState {
   processName: string;
   processTitle: string;
-  batteryLevel: number | null;
-  isCharging: boolean;
+  includeBattery: boolean;
   persistMinutes: number;
 }
 
@@ -52,8 +51,7 @@ const mobileRuntime = computed(() => !props.capabilities.realtimeReporter);
 const form = reactive<ActivityFormState>({
   processName: "",
   processTitle: "",
-  batteryLevel: null,
-  isCharging: false,
+  includeBattery: true,
   persistMinutes: 30,
 });
 
@@ -61,43 +59,30 @@ const submitting = ref(false);
 
 const configIssues = computed(() => validateConfig(props.config, props.capabilities));
 
-async function detectBattery() {
-  try {
-    const battery = await readBatterySnapshot();
-    form.batteryLevel = battery.levelPercent;
-    form.isCharging = battery.charging;
-    notify({
-      severity: "success",
-      summary: "电量已读取",
-      detail: `当前电量 ${battery.levelPercent}%${battery.charging ? "（充电中）" : ""}`,
-      life: 2500,
-    });
-  } catch (error) {
-    notify({
-      severity: "warn",
-      summary: "无法获取电池信息",
-      detail: error instanceof Error ? error.message : "当前运行环境不支持读取电量。",
-      life: 3500,
-    });
-  }
-}
-
 function applyPreset(preset: RecentPreset) {
   form.processName = preset.process_name;
   form.processTitle = preset.process_title ?? "";
 }
 
 async function buildRequestPayload(): Promise<ActivityPayload> {
-  let batteryLevel = form.batteryLevel;
-  let isCharging = form.isCharging;
+  let batteryLevel: number | null = null;
+  let isCharging = false;
 
-  if (mobileRuntime.value) {
+  if (mobileRuntime.value || form.includeBattery) {
     try {
       const battery = await readBatterySnapshot();
       batteryLevel = battery.levelPercent;
       isCharging = battery.charging;
-    } catch {
+    } catch (error) {
       batteryLevel = null;
+      if (form.includeBattery) {
+        notify({
+          severity: "warn",
+          summary: "无法获取电池信息",
+          detail: error instanceof Error ? error.message : "当前运行环境不支持读取电量。",
+          life: 3500,
+        });
+      }
     }
   }
 
@@ -110,9 +95,6 @@ async function buildRequestPayload(): Promise<ActivityPayload> {
     persist_minutes: Math.min(Math.max(Math.round(form.persistMinutes || 30), 1), 1440),
     ...(typeof batteryLevel === "number" ? { battery_level: batteryLevel } : {}),
     ...(typeof batteryLevel === "number" ? { is_charging: isCharging } : {}),
-    metadata: {
-      source: "waken-wa-client",
-    },
   };
 }
 
@@ -130,8 +112,8 @@ async function submitReport() {
   if (!form.processName.trim()) {
     notify({
       severity: "warn",
-      summary: "请填写进程名称",
-      detail: "添加活动前，需要提供进程名称。",
+      summary: "请填写名称",
+      detail: "添加活动前，需要提供名称。",
       life: 3000,
     });
     return;
@@ -194,41 +176,27 @@ async function submitReport() {
         <div class="activity-form-stack">
           <div class="panel-grid">
             <label class="field-block">
-              <span class="field-label">进程名称</span>
+              <span class="field-label">名称</span>
               <InputText v-model="form.processName" placeholder="例如：VS Code" />
             </label>
           </div>
 
           <label class="field-block field-span-2">
-            <span class="field-label">进程标题（可选）</span>
+            <span class="field-label">标题（可选）</span>
             <InputText v-model="form.processTitle" placeholder="例如：编辑 index.tsx" />
           </label>
 
           <div v-if="!mobileRuntime" class="panel-grid">
-            <label class="field-block">
-              <span class="field-label">电量（可选，0-100）</span>
-              <InputNumber
-                v-model="form.batteryLevel"
-                :min="0"
-                :max="100"
-                placeholder="留空则不上报"
-                fluid
-              />
-            </label>
-            <div class="field-block charging-field">
-              <span class="field-label">&nbsp;</span>
-              <div class="charging-row">
-                <ToggleSwitch v-model="form.isCharging" input-id="manual-is-charging" />
-                <label for="manual-is-charging">充电中</label>
-                <Button
-                  label="读取电量信息"
-                  icon="pi pi-bolt"
-                  severity="secondary"
-                  text
-                  size="small"
-                  @click="detectBattery"
-                />
+            <div class="reporter-enabled-card field-span-2">
+              <div class="reporter-enabled-copy">
+                <span class="field-label">附带设备电量</span>
+                <strong>{{ form.includeBattery ? "已开启" : "已关闭" }}</strong>
+                <span>开启后，提交时会自动读取当前设备电量与充电状态并一起上报。</span>
               </div>
+              <ToggleSwitch
+                v-model="form.includeBattery"
+                input-id="manual-include-battery"
+              />
             </div>
           </div>
 

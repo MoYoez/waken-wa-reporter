@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
-pub fn default_device_name() -> String {
+pub fn system_device_name() -> String {
     hostname::get()
         .ok()
         .and_then(|value| value.into_string().ok())
@@ -10,10 +10,14 @@ pub fn default_device_name() -> String {
         .unwrap_or_else(|| "Waken-Wa Client".into())
 }
 
+pub fn default_device_name() -> String {
+    String::new()
+}
+
 pub fn effective_device_name(value: &str) -> String {
     let normalized = value.trim();
     if normalized.is_empty() {
-        default_device_name()
+        system_device_name()
     } else {
         normalized.to_string()
     }
@@ -40,7 +44,23 @@ pub fn default_heartbeat_interval_ms() -> u64 {
 }
 
 pub fn default_reporter_metadata_json() -> String {
-    "{\n  \"source\": \"waken-wa-client\"\n}".into()
+    String::new()
+}
+
+pub fn default_report_foreground_app() -> bool {
+    true
+}
+
+pub fn default_report_window_title() -> bool {
+    true
+}
+
+pub fn default_report_media() -> bool {
+    true
+}
+
+pub fn default_report_play_source() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -103,6 +123,14 @@ pub struct ClientConfig {
     pub reporter_metadata_json: String,
     #[serde(default)]
     pub reporter_enabled: bool,
+    #[serde(default = "default_report_foreground_app")]
+    pub report_foreground_app: bool,
+    #[serde(default = "default_report_window_title")]
+    pub report_window_title: bool,
+    #[serde(default = "default_report_media")]
+    pub report_media: bool,
+    #[serde(default = "default_report_play_source")]
+    pub report_play_source: bool,
 }
 
 impl Default for ClientConfig {
@@ -119,6 +147,10 @@ impl Default for ClientConfig {
             heartbeat_interval_ms: default_heartbeat_interval_ms(),
             reporter_metadata_json: default_reporter_metadata_json(),
             reporter_enabled: false,
+            report_foreground_app: default_report_foreground_app(),
+            report_window_title: default_report_window_title(),
+            report_media: default_report_media(),
+            report_play_source: default_report_play_source(),
         }
     }
 }

@@ -22,7 +22,7 @@ import {
   uploadInspirationAsset,
   validateConfig,
 } from "../lib/api";
-import { readBatterySnapshot } from "../lib/battery";
+import { readBatterySnapshot } from "../lib/deviceInfo";
 import {
   appendParagraphTextToLexical,
   previewInspirationContent,
@@ -49,6 +49,7 @@ interface ActivitySelectOption {
 }
 
 const MAX_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024;
+const ENTRY_PAGE_SIZE = 10;
 const SUPPORTED_IMAGE_TYPES = new Set([
   "image/png",
   "image/jpeg",
@@ -80,6 +81,7 @@ const compose = reactive({
 const entries = ref<InspirationEntry[]>([]);
 const selectedEntry = ref<InspirationEntry | null>(null);
 const loading = ref(false);
+const loadingMore = ref(false);
 const submitting = ref(false);
 const uploadPending = ref(false);
 const inlineUploadPending = ref(false);
@@ -98,6 +100,7 @@ const statusBatteryCharging = ref<boolean | null>(null);
 const activityOptions = ref<ActivitySelectOption[]>([]);
 const activityLoading = ref(false);
 const editorFaulted = ref(false);
+const entryTotal = ref(0);
 
 const mobileRuntime = computed(() => !props.capabilities.realtimeReporter);
 const configIssues = computed(() => validateConfig(props.config, props.capabilities));
@@ -143,6 +146,11 @@ const selectedEntryVisible = computed({
     }
   },
 });
+
+const hasMoreEntries = computed(() => entryTotal.value > entries.value.length);
+const entryCountLabel = computed(() =>
+  entryTotal.value > 0 ? `${entries.value.length} / ${entryTotal.value} 条记录` : `${entries.value.length} 条记录`,
+);
 
 onErrorCaptured((error, instance, info) => {
   console.error("[InspirationWorkspace] render error:", error, info, instance);
@@ -258,24 +266,9 @@ function readFileAsDataUrl(file: File) {
   });
 }
 
-async function loadEntries() {
-  if (!props.config.baseUrl.trim()) {
-    loadError.value = "请先填写站点地址，再加载灵感内容列表。";
-    return;
-  }
-
-  loading.value = true;
-  loadError.value = "";
-
-  const result = await listInspirationEntries(props.config);
-  loading.value = false;
-
-  if (!result.success) {
-    loadError.value = result.error?.message ?? "内容列表加载失败。";
-    return;
-  }
-
-  const normalized = (result.data ?? []).map((entry) => ({
+function normalizeEntries(payload: unknown) {
+  const rows = Array.isArray(payload) ? payload : [];
+  return rows.map((entry) => ({
     ...entry,
     title: typeof entry.title === "string" ? entry.title : null,
     content: typeof entry.content === "string" ? entry.content : "",
@@ -287,7 +280,57 @@ async function loadEntries() {
         ? entry.createdAt
         : new Date().toISOString(),
   }));
-  entries.value = normalized;
+}
+
+async function loadEntries(options?: { reset?: boolean }) {
+  if (!props.config.baseUrl.trim()) {
+    loadError.value = "请先填写站点地址，再加载灵感内容列表。";
+    return;
+  }
+
+  const reset = options?.reset !== false;
+  const offset = reset ? 0 : entries.value.length;
+
+  if (reset) {
+    loading.value = true;
+    loadError.value = "";
+  } else {
+    if (loadingMore.value || !hasMoreEntries.value) return;
+    loadingMore.value = true;
+  }
+
+  const result = await listInspirationEntries(props.config, {
+    limit: ENTRY_PAGE_SIZE,
+    offset,
+  });
+  loading.value = false;
+  loadingMore.value = false;
+
+  if (!result.success) {
+    loadError.value = result.error?.message ?? "内容列表加载失败。";
+    return;
+  }
+
+  const normalized = normalizeEntries(result.data?.data);
+  entryTotal.value = Math.max(
+    0,
+    Number(result.data?.pagination?.total ?? (reset ? normalized.length : entries.value.length)),
+  );
+
+  if (reset) {
+    entries.value = normalized;
+    return;
+  }
+
+  const merged = [...entries.value, ...normalized];
+  entries.value = merged.filter(
+    (entry, index, all) =>
+      index === all.findIndex((candidate) => candidate.id === entry.id),
+  );
+}
+
+function loadMoreEntries() {
+  void loadEntries({ reset: false });
 }
 
 async function loadActivityOptions() {
@@ -346,7 +389,7 @@ function pickDefaultActivity() {
 
 onMounted(() => {
   if (props.config.baseUrl.trim()) {
-    void loadEntries();
+    void loadEntries({ reset: true });
     if (!mobileRuntime.value) {
       void loadActivityOptions();
     }
@@ -358,6 +401,7 @@ watch(
   (nextBaseUrl, previousBaseUrl) => {
     if (!nextBaseUrl) {
       entries.value = [];
+      entryTotal.value = 0;
       loadError.value = "";
       activityOptions.value = [];
       activityLoadError.value = "";
@@ -365,7 +409,7 @@ watch(
     }
 
     if (nextBaseUrl !== previousBaseUrl) {
-      void loadEntries();
+      void loadEntries({ reset: true });
       if (!mobileRuntime.value) {
         void loadActivityOptions();
       }
@@ -646,7 +690,7 @@ async function submitEntry() {
   statusBatteryPercent.value = null;
   statusBatteryCharging.value = null;
 
-  void loadEntries();
+  void loadEntries({ reset: true });
 }
 </script>
 
@@ -665,7 +709,7 @@ async function submitEntry() {
             severity="secondary"
             text
             :loading="loading"
-            @click="loadEntries"
+            @click="loadEntries({ reset: true })"
           />
         </div>
       </template>
@@ -889,7 +933,7 @@ async function submitEntry() {
             <p class="eyebrow">灵感列表</p>
             <h3>查看最近发布到 Waken-Wa 的内容</h3>
           </div>
-          <Tag :value="`${entries.length} 条记录`" rounded />
+          <Tag :value="entryCountLabel" rounded />
         </div>
       </template>
       <template #content>
@@ -933,6 +977,16 @@ async function submitEntry() {
         <Message v-else-if="!loading && !loadError" severity="secondary" :closable="false">
           还没有加载到内容。可以先在左侧创作区发布第一条。
         </Message>
+        <div v-if="entries.length && hasMoreEntries" class="entry-list-actions">
+          <Button
+            label="加载更多"
+            icon="pi pi-angle-down"
+            severity="secondary"
+            outlined
+            :loading="loadingMore"
+            @click="loadMoreEntries"
+          />
+        </div>
       </template>
     </Card>
 

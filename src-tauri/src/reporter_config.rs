@@ -87,6 +87,10 @@ pub fn discover_existing_reporter_config(
                 .unwrap_or_else(crate::models::default_heartbeat_interval_ms),
             reporter_metadata_json: metadata_json,
             reporter_enabled: false,
+            report_foreground_app: crate::models::default_report_foreground_app(),
+            report_window_title: crate::models::default_report_window_title(),
+            report_media: crate::models::default_report_media(),
+            report_play_source: crate::models::default_report_play_source(),
         }),
     })
 }

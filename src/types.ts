@@ -20,6 +20,10 @@ export interface ClientConfig {
   heartbeatIntervalMs: number;
   reporterMetadataJson: string;
   reporterEnabled: boolean;
+  reportForegroundApp: boolean;
+  reportWindowTitle: boolean;
+  reportMedia: boolean;
+  reportPlaySource: boolean;
 }
 
 export interface ActivityMedia {
@@ -72,6 +76,17 @@ export interface InspirationEntry {
   statusSnapshot?: string | null;
   createdAt: string;
   updatedAt?: string;
+}
+
+export interface PaginationMeta {
+  limit: number;
+  offset: number;
+  total: number;
+}
+
+export interface InspirationEntryListResponse {
+  data: InspirationEntry[];
+  pagination?: PaginationMeta;
 }
 
 export interface InspirationEntryCreateInput {

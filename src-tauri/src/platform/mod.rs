@@ -11,7 +11,7 @@ use serde_json::{Map, Value};
 
 use crate::models::{PlatformProbeResult, PlatformSelfTestResult};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ForegroundSnapshot {
     pub process_name: String,
     pub process_title: String,
@@ -86,13 +86,13 @@ impl MediaInfo {
 }
 
 #[cfg(target_os = "linux")]
-pub use linux::{get_foreground_snapshot, get_now_playing};
+pub use linux::{get_foreground_snapshot_for_reporting, get_now_playing};
 #[cfg(target_os = "macos")]
-pub use macos::{get_foreground_snapshot, get_now_playing};
+pub use macos::{get_foreground_snapshot_for_reporting, get_now_playing};
 #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-pub use stub::{get_foreground_snapshot, get_now_playing};
+pub use stub::{get_foreground_snapshot_for_reporting, get_now_playing};
 #[cfg(target_os = "windows")]
-pub use windows::{get_foreground_snapshot, get_now_playing};
+pub use windows::{get_foreground_snapshot_for_reporting, get_now_playing};
 
 #[cfg(target_os = "linux")]
 pub use linux::run_self_test;

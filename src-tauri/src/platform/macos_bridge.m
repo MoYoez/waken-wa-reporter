@@ -1,5 +1,7 @@
 #import "macos_bridge.h"
 
+#import <AppKit/AppKit.h>
+#import <ApplicationServices/ApplicationServices.h>
 #import <CoreGraphics/CoreGraphics.h>
 #import <Foundation/Foundation.h>
 #import <dispatch/dispatch.h>
@@ -8,34 +10,56 @@
 void MRMediaRemoteGetNowPlayingInfo(dispatch_queue_t queue, void (^handler)(NSDictionary *info));
 
 char *waken_frontmost_app_name(void) {
-    CFArrayRef windowList = CGWindowListCopyWindowInfo(
-        kCGWindowListOptionOnScreenOnly | kCGWindowListOptionOnScreenAboveWindow,
-        kCGNullWindowID
+    NSRunningApplication *frontmostApp = [[NSWorkspace sharedWorkspace] frontmostApplication];
+    if (!frontmostApp) return NULL;
+
+    NSString *localizedName = frontmostApp.localizedName;
+    if (!localizedName || localizedName.length == 0) return NULL;
+
+    return strdup([localizedName UTF8String]);
+}
+
+char *waken_frontmost_window_title(void) {
+    NSRunningApplication *frontmostApp = [[NSWorkspace sharedWorkspace] frontmostApplication];
+    if (!frontmostApp) return NULL;
+
+    pid_t pid = frontmostApp.processIdentifier;
+    if (pid <= 0) return NULL;
+
+    AXUIElementRef appElement = AXUIElementCreateApplication(pid);
+    if (!appElement) return NULL;
+
+    CFTypeRef focusedWindow = NULL;
+    AXError windowError = AXUIElementCopyAttributeValue(
+        appElement,
+        kAXFocusedWindowAttribute,
+        &focusedWindow
     );
 
-    if (!windowList) return NULL;
-
-    CFIndex count = CFArrayGetCount(windowList);
     char *result = NULL;
+    if (windowError == kAXErrorSuccess && focusedWindow) {
+        CFTypeRef titleValue = NULL;
+        AXError titleError = AXUIElementCopyAttributeValue(
+            (AXUIElementRef)focusedWindow,
+            kAXTitleAttribute,
+            &titleValue
+        );
 
-    for (CFIndex i = 0; i < count; i++) {
-        CFDictionaryRef window = CFArrayGetValueAtIndex(windowList, i);
-        CFNumberRef layer = CFDictionaryGetValue(window, kCGWindowLayer);
-
-        int layerValue = 0;
-        if (layer && CFNumberGetValue(layer, kCFNumberIntType, &layerValue)) {
-            if (layerValue == 0) {
-                CFStringRef ownerName = CFDictionaryGetValue(window, kCGWindowOwnerName);
-                if (ownerName) {
-                    NSString *name = (__bridge NSString *)ownerName;
-                    result = strdup([name UTF8String]);
-                    break;
+        if (titleError == kAXErrorSuccess && titleValue) {
+            if (CFGetTypeID(titleValue) == CFStringGetTypeID()) {
+                NSString *title = (__bridge NSString *)titleValue;
+                NSString *trimmed = [title stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+                if (trimmed.length > 0) {
+                    result = strdup([trimmed UTF8String]);
                 }
             }
+            CFRelease(titleValue);
         }
+
+        CFRelease(focusedWindow);
     }
 
-    CFRelease(windowList);
+    CFRelease(appElement);
     return result;
 }
 

@@ -3,6 +3,8 @@ use std::process::{Command, Output, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use serde::Deserialize;
+
 use super::{build_self_test_result, make_probe, ForegroundSnapshot, MediaInfo};
 use crate::models::PlatformSelfTestResult;
 
@@ -12,6 +14,7 @@ const NOWPLAYING_CLI: &str = "nowplaying-cli";
 
 unsafe extern "C" {
     fn waken_frontmost_app_name() -> *mut c_char;
+    fn waken_frontmost_window_title() -> *mut c_char;
     fn waken_string_free(value: *mut c_char);
 }
 
@@ -44,9 +47,21 @@ impl NowPlayingCliError {
     }
 }
 
+#[derive(Debug, Default, Deserialize)]
+struct RawNowPlayingInfo {
+    #[serde(rename = "kMRMediaRemoteNowPlayingInfoTitle")]
+    title: Option<String>,
+    #[serde(rename = "kMRMediaRemoteNowPlayingInfoArtist")]
+    artist: Option<String>,
+    #[serde(rename = "kMRMediaRemoteNowPlayingInfoAlbum")]
+    album: Option<String>,
+    #[serde(rename = "kMRMediaRemoteNowPlayingInfoClientBundleIdentifier")]
+    client_bundle_identifier: Option<String>,
+}
+
 fn get_now_playing_via_nowplaying_cli() -> Result<MediaInfo, NowPlayingCliError> {
-    let output = command_output_with_timeout(NOWPLAYING_CLI, &["get", "title", "artist", "album"])
-        .map_err(|error| match error {
+    let output =
+        command_output_with_timeout(NOWPLAYING_CLI, &["get-raw"]).map_err(|error| match error {
             CommandError::NotFound => NowPlayingCliError::NotFound {
                 path: std::env::var("PATH").unwrap_or_default(),
             },
@@ -78,24 +93,31 @@ fn get_now_playing_via_nowplaying_cli() -> Result<MediaInfo, NowPlayingCliError>
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut lines = stdout.lines().map(str::trim);
-    let title = lines.next().unwrap_or_default().to_string();
-    let artist = lines.next().unwrap_or_default().to_string();
-    let album = lines.next().unwrap_or_default().to_string();
-
     let normalize = |value: String| {
         if value.eq_ignore_ascii_case("null") {
             String::new()
         } else {
-            value
+            value.trim().to_string()
         }
     };
 
+    let raw: RawNowPlayingInfo = serde_json::from_str(&stdout)
+        .map_err(|error| NowPlayingCliError::Failed(format!("解析 get-raw 输出失败：{error}")))?;
+
+    let title = raw.title.map(normalize).unwrap_or_default();
+    let artist = raw.artist.map(normalize).unwrap_or_default();
+    let album = raw.album.map(normalize).unwrap_or_default();
+    let source_app_id = raw
+        .client_bundle_identifier
+        .map(normalize)
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| NOWPLAYING_CLI.to_string());
+
     Ok(MediaInfo {
-        title: normalize(title),
-        artist: normalize(artist),
-        album: normalize(album),
-        source_app_id: NOWPLAYING_CLI.into(),
+        title,
+        artist,
+        album,
+        source_app_id,
     })
 }
 
@@ -143,10 +165,39 @@ pub fn get_foreground_snapshot() -> Result<ForegroundSnapshot, String> {
     let process_name = read_bridge_string(waken_frontmost_app_name)
         .filter(|value| !value.trim().is_empty())
         .ok_or_else(|| "读取 macOS 前台应用失败。".to_string())?;
+    let process_title = read_bridge_string(waken_frontmost_window_title).unwrap_or_default();
 
     Ok(ForegroundSnapshot {
         process_name,
-        process_title: String::new(),
+        process_title,
+    })
+}
+
+pub fn get_foreground_snapshot_for_reporting(
+    include_process_name: bool,
+    include_process_title: bool,
+) -> Result<ForegroundSnapshot, String> {
+    if !include_process_name && !include_process_title {
+        return Ok(ForegroundSnapshot::default());
+    }
+
+    if include_process_name {
+        let mut snapshot = get_foreground_snapshot()?;
+        if !include_process_title {
+            snapshot.process_title.clear();
+        }
+        return Ok(snapshot);
+    }
+
+    let process_title = if include_process_title {
+        read_bridge_string(waken_frontmost_window_title).unwrap_or_default()
+    } else {
+        String::new()
+    };
+
+    Ok(ForegroundSnapshot {
+        process_name: String::new(),
+        process_title,
     })
 }
 
@@ -172,7 +223,8 @@ fn macos_guidance(error: &str, probe: &str) -> Vec<String> {
     }
 
     if probe == "window" {
-        guidance.push("当前版本暂未在 macOS 上实现窗口标题采集。".into());
+        guidance.push("macOS 窗口标题采集依赖“辅助功能”授权。".into());
+        guidance.push("部分应用即使已授权，也可能不会返回稳定的窗口标题。".into());
     }
 
     if probe == "media" || lower.contains("nowplaying-cli") {
@@ -204,12 +256,28 @@ pub fn run_self_test() -> PlatformSelfTestResult {
         ),
     };
 
-    let window_title = make_probe(
-        false,
-        "窗口标题暂未支持",
-        "当前版本已移除 osascript，macOS 上暂未实现窗口标题采集。".to_string(),
-        macos_guidance("", "window"),
-    );
+    let window_title = match get_foreground_snapshot_for_reporting(false, true) {
+        Ok(snapshot) => make_probe(
+            !snapshot.process_title.trim().is_empty(),
+            if snapshot.process_title.trim().is_empty() {
+                "窗口标题为空"
+            } else {
+                "窗口标题采集正常"
+            },
+            if snapshot.process_title.trim().is_empty() {
+                "当前前台窗口没有可用标题，或尚未授予辅助功能权限。".to_string()
+            } else {
+                snapshot.process_title
+            },
+            macos_guidance("", "window"),
+        ),
+        Err(error) => make_probe(
+            false,
+            "窗口标题采集失败",
+            error.clone(),
+            macos_guidance(&error, "window"),
+        ),
+    };
 
     let media = match get_now_playing() {
         Ok(info) if !info.is_empty() => {

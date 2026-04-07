@@ -5,6 +5,13 @@ pub fn get_foreground_snapshot() -> Result<ForegroundSnapshot, String> {
     Err("当前平台暂不支持实时采集。".into())
 }
 
+pub fn get_foreground_snapshot_for_reporting(
+    _include_process_name: bool,
+    _include_process_title: bool,
+) -> Result<ForegroundSnapshot, String> {
+    Ok(ForegroundSnapshot::default())
+}
+
 pub fn get_now_playing() -> Result<MediaInfo, String> {
     Ok(MediaInfo::default())
 }

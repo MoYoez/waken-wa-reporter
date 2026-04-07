@@ -22,6 +22,7 @@ import {
   startRealtimeReporter,
   stopRealtimeReporter,
 } from "./lib/api";
+import { readDeviceName } from "./lib/deviceInfo";
 import { createNotifier } from "./lib/notify";
 import { defaultClientConfig, loadAppState, saveAppState } from "./lib/persistence";
 import type {
@@ -367,6 +368,30 @@ async function persistAppState(configOverride?: ClientConfig) {
   );
 }
 
+async function hydrateDeviceNameFromSystem() {
+  if (config.value.device.trim()) {
+    return;
+  }
+
+  try {
+    const deviceName = (await readDeviceName()).trim();
+    if (!deviceName) {
+      return;
+    }
+
+    const nextConfig = normalizeConfigByCapabilities({
+      ...config.value,
+      device: deviceName,
+    });
+    config.value = nextConfig;
+    persistedConfig.value = { ...nextConfig };
+    onboardingDraftConfig.value = { ...nextConfig };
+    await persistAppState(nextConfig);
+  } catch {
+    // Ignore plugin read failures and keep backend fallback behavior.
+  }
+}
+
 async function applySettingsChanges() {
   try {
     config.value = normalizeConfigByCapabilities({ ...config.value });
@@ -615,6 +640,8 @@ onMounted(async () => {
     ? (state.reporterConfigPromptHandled ?? false)
     : true;
   hydrated.value = true;
+
+  await hydrateDeviceNameFromSystem();
 
   ensureVisibleSection();
   syncDeviceTypeByViewport();

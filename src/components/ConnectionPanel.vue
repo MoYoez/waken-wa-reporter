@@ -35,6 +35,32 @@ const issues = computed(() => validateConfig(props.modelValue, props.capabilitie
 const reporterSupported = computed(() => props.capabilities.realtimeReporter);
 const isOnboarding = computed(() => props.variant === "onboarding");
 const currentGeneratedHashKey = computed(() => props.modelValue.generatedHashKey.trim());
+const reporterContentOptions = [
+  {
+    key: "reportForegroundApp" as const,
+    label: "当前应用",
+    description: "当前正在使用的应用",
+    inputId: "report-foreground-app",
+  },
+  {
+    key: "reportWindowTitle" as const,
+    label: "窗口名称",
+    description: "当前窗口标题或名称",
+    inputId: "report-window-title",
+  },
+  {
+    key: "reportMedia" as const,
+    label: "播放内容",
+    description: "正在播放的媒体内容",
+    inputId: "report-media",
+  },
+  {
+    key: "reportPlaySource" as const,
+    label: "播放来源",
+    description: "媒体来自哪个应用",
+    inputId: "report-play-source",
+  },
+];
 
 function updateField<K extends keyof ClientConfig>(key: K, value: ClientConfig[K]) {
   emit("update:modelValue", {
@@ -179,7 +205,7 @@ function importConfig() {
               <template v-if="reporterSupported">
                 <div class="settings-section-head settings-disclosure-subhead">
                   <strong>后台同步附加配置</strong>
-                  <span>控制后台同步的轮询节奏、心跳频率，以及是否在启动后自动开启同步。</span>
+                  <span>控制后台同步的轮询节奏、心跳频率、自动启动，以及自动同步包含哪些内容。</span>
                 </div>
                 <div class="panel-grid">
                   <label class="field-block">
@@ -213,6 +239,29 @@ function importConfig() {
                       input-id="onboarding-reporter-enabled"
                       @update:model-value="updateField('reporterEnabled', Boolean($event))"
                     />
+                  </div>
+
+                  <div class="settings-section-head settings-disclosure-subhead field-span-2">
+                    <strong>自动同步包含内容</strong>
+                    <span>选择自动同步时要包含的内容。</span>
+                  </div>
+
+                  <div class="compact-toggle-grid field-span-2">
+                    <div
+                      v-for="option in reporterContentOptions"
+                      :key="`onboarding-${option.key}`"
+                      class="compact-toggle-card"
+                    >
+                      <div class="compact-toggle-copy">
+                        <strong>{{ option.label }}</strong>
+                        <span>{{ option.description }}</span>
+                      </div>
+                      <ToggleSwitch
+                        :model-value="modelValue[option.key]"
+                        :input-id="`onboarding-${option.inputId}`"
+                        @update:model-value="updateField(option.key, Boolean($event))"
+                      />
+                    </div>
                   </div>
                 </div>
               </template>
@@ -309,7 +358,7 @@ function importConfig() {
         <div v-if="reporterSupported" class="settings-section">
           <div class="settings-section-head">
             <strong>后台同步</strong>
-            <span>控制后台同步的轮询节奏、心跳频率，以及是否在启动后自动开启同步。</span>
+            <span>控制后台同步的轮询节奏、心跳频率、自动启动，以及自动上报包含哪些内容。</span>
           </div>
           <div class="panel-grid">
             <label class="field-block">
@@ -343,6 +392,29 @@ function importConfig() {
                 input-id="settings-reporter-enabled"
                 @update:model-value="updateField('reporterEnabled', Boolean($event))"
               />
+            </div>
+
+            <div class="settings-section-head field-span-2">
+              <strong>自动同步包含内容</strong>
+              <span>选择自动同步时要包含的内容。</span>
+            </div>
+
+            <div class="compact-toggle-grid field-span-2">
+              <div
+                v-for="option in reporterContentOptions"
+                :key="option.key"
+                class="compact-toggle-card"
+              >
+                <div class="compact-toggle-copy">
+                  <strong>{{ option.label }}</strong>
+                  <span>{{ option.description }}</span>
+                </div>
+                <ToggleSwitch
+                  :model-value="modelValue[option.key]"
+                  :input-id="option.inputId"
+                  @update:model-value="updateField(option.key, Boolean($event))"
+                />
+              </div>
             </div>
           </div>
         </div>

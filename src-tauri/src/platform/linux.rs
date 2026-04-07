@@ -39,6 +39,50 @@ pub fn get_foreground_snapshot() -> Result<ForegroundSnapshot, String> {
     })
 }
 
+pub fn get_foreground_snapshot_for_reporting(
+    include_process_name: bool,
+    include_process_title: bool,
+) -> Result<ForegroundSnapshot, String> {
+    if !include_process_name && !include_process_title {
+        return Ok(ForegroundSnapshot::default());
+    }
+
+    let wayland = has_env("WAYLAND_DISPLAY");
+
+    if wayland {
+        let wayland_error = match get_foreground_snapshot_wayland_for_reporting(
+            include_process_name,
+            include_process_title,
+        ) {
+            Ok(snapshot) => return Ok(snapshot),
+            Err(error) => error,
+        };
+
+        if has_env("DISPLAY") {
+            if let Ok(snapshot) = get_foreground_snapshot_x11_for_reporting(
+                include_process_name,
+                include_process_title,
+            ) {
+                return Ok(snapshot);
+            }
+        }
+
+        return Err(wayland_error);
+    }
+
+    get_foreground_snapshot_x11_for_reporting(include_process_name, include_process_title).or_else(
+        |x11_error| {
+            get_foreground_snapshot_wayland_for_reporting(
+                include_process_name,
+                include_process_title,
+            )
+            .map_err(|wayland_error| {
+                format!("读取 Linux 前台窗口失败。X11：{x11_error}；Wayland：{wayland_error}")
+            })
+        },
+    )
+}
+
 pub fn get_now_playing() -> Result<MediaInfo, String> {
     let output = command_output_with_timeout(
         "playerctl",
@@ -87,59 +131,38 @@ pub fn get_now_playing() -> Result<MediaInfo, String> {
 }
 
 fn get_foreground_snapshot_x11() -> Result<ForegroundSnapshot, String> {
-    let active_output = command_output_with_timeout("xprop", &["-root", "_NET_ACTIVE_WINDOW"])
-        .map_err(|error| format!("调用 xprop 失败：{error}"))?;
+    get_foreground_snapshot_x11_for_reporting(true, true)
+}
 
-    if !active_output.status.success() {
-        let stderr = String::from_utf8_lossy(&active_output.stderr);
-        return Err(format!(
-            "读取活动窗口失败：{}",
-            stderr.trim().if_empty("xprop 返回失败")
-        ));
-    }
+fn get_foreground_snapshot_x11_for_reporting(
+    include_process_name: bool,
+    include_process_title: bool,
+) -> Result<ForegroundSnapshot, String> {
+    let window_id = get_active_window_id_x11()?;
+    let detail_stdout =
+        read_x11_window_detail(&window_id, include_process_name, include_process_title)?;
 
-    let active_stdout = String::from_utf8_lossy(&active_output.stdout);
-    let window_id = parse_active_window_id(&active_stdout)
-        .ok_or_else(|| "无法解析 _NET_ACTIVE_WINDOW。".to_string())?;
+    let process_title = if include_process_title {
+        parse_window_title(&detail_stdout).unwrap_or_default()
+    } else {
+        String::new()
+    };
 
-    if window_id == "0x0" {
-        return Err("当前没有活动窗口。".into());
-    }
-
-    let detail_output = command_output_with_timeout(
-        "xprop",
-        &[
-            "-id",
-            &window_id,
-            "WM_CLASS",
-            "_NET_WM_NAME",
-            "WM_NAME",
-            "_NET_WM_PID",
-        ],
-    )
-    .map_err(|error| format!("调用 xprop 读取窗口详情失败：{error}"))?;
-
-    if !detail_output.status.success() {
-        let stderr = String::from_utf8_lossy(&detail_output.stderr);
-        return Err(format!(
-            "读取窗口详情失败：{}",
-            stderr.trim().if_empty("xprop 返回失败")
-        ));
-    }
-
-    let detail_stdout = String::from_utf8_lossy(&detail_output.stdout);
-    let process_title = parse_window_title(&detail_stdout).unwrap_or_default();
-    let wm_class = parse_wm_class(&detail_stdout).unwrap_or_default();
-    let process_name = parse_window_pid(&detail_stdout)
-        .and_then(read_process_name_from_pid)
-        .or_else(|| {
-            if wm_class.trim().is_empty() {
-                None
-            } else {
-                Some(wm_class)
-            }
-        })
-        .unwrap_or_else(|| "unknown".to_string());
+    let process_name = if include_process_name {
+        let wm_class = parse_wm_class(&detail_stdout).unwrap_or_default();
+        parse_window_pid(&detail_stdout)
+            .and_then(read_process_name_from_pid)
+            .or_else(|| {
+                if wm_class.trim().is_empty() {
+                    None
+                } else {
+                    Some(wm_class)
+                }
+            })
+            .unwrap_or_else(|| "unknown".to_string())
+    } else {
+        String::new()
+    };
 
     Ok(ForegroundSnapshot {
         process_name,
@@ -156,6 +179,28 @@ fn get_foreground_snapshot_wayland() -> Result<ForegroundSnapshot, String> {
     }
 
     match get_foreground_snapshot_kde_kdotool() {
+        Ok(snapshot) => return Ok(snapshot),
+        Err(error) => errors.push(format!("KDE kdotool：{error}")),
+    }
+
+    Err(format!("Wayland 前台窗口采集失败。{}", errors.join("；")))
+}
+
+fn get_foreground_snapshot_wayland_for_reporting(
+    include_process_name: bool,
+    include_process_title: bool,
+) -> Result<ForegroundSnapshot, String> {
+    let mut errors = Vec::new();
+
+    match get_foreground_snapshot_gnome_focused_window_dbus() {
+        Ok(snapshot) => return Ok(snapshot),
+        Err(error) => errors.push(format!("GNOME Focused Window D-Bus：{error}")),
+    }
+
+    match get_foreground_snapshot_kde_kdotool_for_reporting(
+        include_process_name,
+        include_process_title,
+    ) {
         Ok(snapshot) => return Ok(snapshot),
         Err(error) => errors.push(format!("KDE kdotool：{error}")),
     }
@@ -212,25 +257,92 @@ fn get_foreground_snapshot_gnome_focused_window_dbus() -> Result<ForegroundSnaps
 }
 
 fn get_foreground_snapshot_kde_kdotool() -> Result<ForegroundSnapshot, String> {
+    get_foreground_snapshot_kde_kdotool_for_reporting(true, true)
+}
+
+fn get_foreground_snapshot_kde_kdotool_for_reporting(
+    include_process_name: bool,
+    include_process_title: bool,
+) -> Result<ForegroundSnapshot, String> {
     let window_id = run_command_trimmed("kdotool", ["getactivewindow"])
         .map_err(|error| format!("读取活动窗口失败：{error}"))?;
     if window_id == "0" {
         return Err("当前没有活动窗口。".into());
     }
 
-    let process_name = run_command_trimmed("kdotool", ["getwindowclassname", &window_id])
-        .map_err(|error| format!("读取窗口类名失败：{error}"))?;
-    if process_name.is_empty() {
-        return Err("kdotool 未返回窗口类名。".into());
-    }
+    let process_name = if include_process_name {
+        let value = run_command_trimmed("kdotool", ["getwindowclassname", &window_id])
+            .map_err(|error| format!("读取窗口类名失败：{error}"))?;
+        if value.is_empty() {
+            return Err("kdotool 未返回窗口类名。".into());
+        }
+        value
+    } else {
+        String::new()
+    };
 
-    let process_title =
-        run_command_trimmed("kdotool", ["getwindowname", &window_id]).unwrap_or_default();
+    let process_title = if include_process_title {
+        run_command_trimmed("kdotool", ["getwindowname", &window_id]).unwrap_or_default()
+    } else {
+        String::new()
+    };
 
     Ok(ForegroundSnapshot {
         process_name,
         process_title,
     })
+}
+
+fn get_active_window_id_x11() -> Result<String, String> {
+    let active_output = command_output_with_timeout("xprop", &["-root", "_NET_ACTIVE_WINDOW"])
+        .map_err(|error| format!("调用 xprop 失败：{error}"))?;
+
+    if !active_output.status.success() {
+        let stderr = String::from_utf8_lossy(&active_output.stderr);
+        return Err(format!(
+            "读取活动窗口失败：{}",
+            stderr.trim().if_empty("xprop 返回失败")
+        ));
+    }
+
+    let active_stdout = String::from_utf8_lossy(&active_output.stdout);
+    let window_id = parse_active_window_id(&active_stdout)
+        .ok_or_else(|| "无法解析 _NET_ACTIVE_WINDOW。".to_string())?;
+
+    if window_id == "0x0" {
+        return Err("当前没有活动窗口。".into());
+    }
+
+    Ok(window_id)
+}
+
+fn read_x11_window_detail(
+    window_id: &str,
+    include_process_name: bool,
+    include_process_title: bool,
+) -> Result<String, String> {
+    let mut args = vec!["-id", window_id];
+    if include_process_name {
+        args.push("WM_CLASS");
+        args.push("_NET_WM_PID");
+    }
+    if include_process_title {
+        args.push("_NET_WM_NAME");
+        args.push("WM_NAME");
+    }
+
+    let detail_output = command_output_with_timeout("xprop", &args)
+        .map_err(|error| format!("调用 xprop 读取窗口详情失败：{error}"))?;
+
+    if !detail_output.status.success() {
+        let stderr = String::from_utf8_lossy(&detail_output.stderr);
+        return Err(format!(
+            "读取窗口详情失败：{}",
+            stderr.trim().if_empty("xprop 返回失败")
+        ));
+    }
+
+    Ok(String::from_utf8_lossy(&detail_output.stdout).to_string())
 }
 
 fn run_command_trimmed<const N: usize>(program: &str, args: [&str; N]) -> Result<String, String> {

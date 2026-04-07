@@ -10,6 +10,7 @@ import type {
   ImportedIntegrationConfig,
   InspirationAssetUploadResult,
   InspirationEntry,
+  InspirationEntryListResponse,
   InspirationEntryCreateInput,
   PendingApprovalInfo,
   PlatformSelfTestResult,
@@ -148,8 +149,13 @@ export async function getPublicActivityFeed(
 
 export async function listInspirationEntries(
   config: ClientConfig,
-): Promise<ApiResult<InspirationEntry[]>> {
-  return invokeApi("list_inspiration_entries", { config });
+  options?: { limit?: number; offset?: number },
+): Promise<ApiResult<InspirationEntryListResponse>> {
+  return invokeApi("list_inspiration_entries", {
+    config,
+    limit: options?.limit,
+    offset: options?.offset,
+  });
 }
 
 export async function probeConnectivity(
