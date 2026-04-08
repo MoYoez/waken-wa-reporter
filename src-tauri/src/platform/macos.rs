@@ -11,8 +11,10 @@ use crate::models::PlatformSelfTestResult;
 const COMMAND_TIMEOUT: Duration = Duration::from_millis(1500);
 const COMMAND_POLL_STEP: Duration = Duration::from_millis(100);
 const NOWPLAYING_CLI: &str = "nowplaying-cli";
-const NOWPLAYING_CLI_FALLBACK_PATHS: [&str; 2] =
-    ["/opt/homebrew/bin/nowplaying-cli", "/usr/local/bin/nowplaying-cli"];
+const NOWPLAYING_CLI_FALLBACK_PATHS: [&str; 2] = [
+    "/opt/homebrew/bin/nowplaying-cli",
+    "/usr/local/bin/nowplaying-cli",
+];
 
 unsafe extern "C" {
     fn waken_frontmost_app_name() -> *mut c_char;
@@ -42,7 +44,10 @@ fn request_accessibility_permission_via_bridge() -> bool {
 }
 
 enum NowPlayingCliError {
-    NotFound { path: String, attempted: Vec<String> },
+    NotFound {
+        path: String,
+        attempted: Vec<String>,
+    },
     TimedOut,
     Failed(String),
 }
@@ -82,7 +87,9 @@ fn get_now_playing_via_nowplaying_cli() -> Result<MediaInfo, NowPlayingCliError>
 
     let output = {
         let mut resolved = None;
-        for candidate in std::iter::once(NOWPLAYING_CLI).chain(NOWPLAYING_CLI_FALLBACK_PATHS.iter().copied()) {
+        for candidate in
+            std::iter::once(NOWPLAYING_CLI).chain(NOWPLAYING_CLI_FALLBACK_PATHS.iter().copied())
+        {
             match command_output_with_timeout(candidate, &["get-raw"]) {
                 Ok(output) => {
                     resolved = Some(output);
@@ -95,11 +102,9 @@ fn get_now_playing_via_nowplaying_cli() -> Result<MediaInfo, NowPlayingCliError>
         }
         resolved
     }
-    .ok_or_else(|| {
-        NowPlayingCliError::NotFound {
-            path: std::env::var("PATH").unwrap_or_default(),
-            attempted,
-        }
+    .ok_or_else(|| NowPlayingCliError::NotFound {
+        path: std::env::var("PATH").unwrap_or_default(),
+        attempted,
     })?;
 
     if !output.status.success() {
@@ -257,7 +262,10 @@ fn macos_guidance(error: &str, probe: &str) -> Vec<String> {
 
     if probe == "window" {
         if accessibility_permission_granted() {
-            guidance.push("已检测到“辅助功能”权限；如果仍然没有标题，通常是当前应用本身未暴露稳定标题。".into());
+            guidance.push(
+                "已检测到“辅助功能”权限；如果仍然没有标题，通常是当前应用本身未暴露稳定标题。"
+                    .into(),
+            );
         } else {
             guidance.push("macOS 窗口标题采集依赖“辅助功能”授权。".into());
             guidance.push("可以在设置页点“申请辅助功能权限”，或前往“系统设置 -> 隐私与安全性 -> 辅助功能”手动开启。".into());
