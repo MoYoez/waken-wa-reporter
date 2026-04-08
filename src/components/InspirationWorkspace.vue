@@ -96,7 +96,6 @@ const selectedActivityKey = ref(draftStore.selectedActivityKey);
 const attachCurrentStatus = ref(draftStore.attachCurrentStatus);
 const attachStatusIncludeDeviceInfo = ref(draftStore.attachStatusIncludeDeviceInfo);
 const statusBatteryPercent = ref<number | null>(null);
-const statusBatteryCharging = ref<boolean | null>(null);
 const activityOptions = ref<ActivitySelectOption[]>([]);
 const activityLoading = ref(false);
 const editorFaulted = ref(false);
@@ -115,7 +114,7 @@ function buildManualSnapshot(input: string, includeDeviceInfo: boolean) {
   const deviceName = statusSnapshotDeviceName.value.trim() || props.config.device.trim();
   const batteryPart =
     typeof statusBatteryPercent.value === "number"
-      ? `${statusBatteryPercent.value}%${statusBatteryCharging.value ? " · 充电中" : ""}`
+      ? `${statusBatteryPercent.value}%`
       : "";
 
   if (deviceName && batteryPart) {
@@ -493,27 +492,6 @@ async function onFileSelected(event: Event) {
   }
 }
 
-async function detectStatusBattery() {
-  try {
-    const battery = await readBatterySnapshot();
-    statusBatteryPercent.value = battery.levelPercent;
-    statusBatteryCharging.value = battery.charging;
-    notify({
-      severity: "success",
-      summary: "电量已读取",
-      detail: `当前电量 ${battery.levelPercent}%${battery.charging ? "（充电中）" : ""}`,
-      life: 2500,
-    });
-  } catch (error) {
-    notify({
-      severity: "warn",
-      summary: "无法获取电量信息",
-      detail: error instanceof Error ? error.message : "当前运行环境不支持读取电量。",
-      life: 3500,
-    });
-  }
-}
-
 async function onBodyImageSelected(event: Event) {
   const target = event.target as HTMLInputElement | null;
   const file = target?.files?.[0];
@@ -618,7 +596,6 @@ async function submitEntry() {
     try {
       const battery = await readBatterySnapshot();
       statusBatteryPercent.value = battery.levelPercent;
-      statusBatteryCharging.value = battery.charging;
     } catch {
       // ignore battery read failure; snapshot will fallback to device only
     }
@@ -688,7 +665,6 @@ async function submitEntry() {
   attachCurrentStatus.value = draftStore.attachCurrentStatus;
   attachStatusIncludeDeviceInfo.value = draftStore.attachStatusIncludeDeviceInfo;
   statusBatteryPercent.value = null;
-  statusBatteryCharging.value = null;
 
   void loadEntries({ reset: true });
 }
@@ -733,15 +709,6 @@ async function submitEntry() {
                 :disabled="!attachCurrentStatus"
               />
               <label for="attach-device-info">快照包含设备与电量</label>
-              <Button
-                v-if="mobileRuntime"
-                label="读取电量信息"
-                icon="pi pi-bolt"
-                severity="secondary"
-                text
-                size="small"
-                @click="detectStatusBattery"
-              />
             </div>
             <div v-if="mobileRuntime" class="activity-select-row">
               <InputText

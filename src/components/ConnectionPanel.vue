@@ -186,7 +186,7 @@ function importConfig() {
                   <small class="field-help">这个 Key 用于标识当前设备。首次启用或更换后，服务端可能需要重新审核。</small>
                 </label>
 
-                <div class="reporter-enabled-card field-span-2">
+                <div v-if="reporterSupported" class="reporter-enabled-card field-span-2">
                   <div class="reporter-enabled-copy">
                     <span class="field-label">使用系统代理</span>
                     <strong>{{ modelValue.useSystemProxy ? "已开启" : "已关闭" }}</strong>
@@ -338,7 +338,7 @@ function importConfig() {
               <small class="field-help">这个 Key 用于标识当前设备。首次启用或更换后，服务端可能需要重新审核。</small>
             </label>
 
-            <div class="reporter-enabled-card field-span-2">
+            <div v-if="reporterSupported" class="reporter-enabled-card field-span-2">
               <div class="reporter-enabled-copy">
                 <span class="field-label">使用系统代理</span>
                 <strong>{{ modelValue.useSystemProxy ? "已开启" : "已关闭" }}</strong>
