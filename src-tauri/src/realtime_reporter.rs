@@ -574,6 +574,13 @@ fn build_payload(
     media: &MediaInfo,
     mut metadata: Map<String, Value>,
 ) -> ActivityPayload {
+    if !config.discord_source_id.trim().is_empty() {
+        metadata.insert(
+            "dc_source".into(),
+            Value::String(config.discord_source_id.trim().to_string()),
+        );
+    }
+
     if let Some(media_map) = media.as_metadata_map() {
         metadata.insert("media".into(), Value::Object(media_map));
     }

@@ -6,6 +6,7 @@ export interface ClientCapabilities {
   realtimeReporter: boolean;
   tray: boolean;
   platformSelfTest: boolean;
+  discordPresence: boolean;
 }
 
 export interface ClientConfig {
@@ -24,6 +25,9 @@ export interface ClientConfig {
   reportWindowTitle: boolean;
   reportMedia: boolean;
   reportPlaySource: boolean;
+  discordEnabled: boolean;
+  discordApplicationId: string;
+  discordSourceId: string;
 }
 
 export interface ActivityMedia {
@@ -168,6 +172,14 @@ export interface RealtimeReporterSnapshot {
   lastError?: string | null;
   lastPendingApprovalMessage?: string | null;
   lastPendingApprovalUrl?: string | null;
+}
+
+export interface DiscordPresenceSnapshot {
+  running: boolean;
+  connected: boolean;
+  lastSyncAt?: string | null;
+  lastError?: string | null;
+  currentSummary?: string | null;
 }
 
 export interface PlatformProbeResult {

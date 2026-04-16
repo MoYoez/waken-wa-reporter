@@ -8,6 +8,7 @@ import Tag from "primevue/tag";
 import type {
   ClientCapabilities,
   ClientConfig,
+  DiscordPresenceSnapshot,
   MobileConnectivityState,
   RealtimeReporterSnapshot,
 } from "../types";
@@ -18,6 +19,7 @@ const props = defineProps<{
   capabilities: ClientCapabilities;
   mobileConnectivity: MobileConnectivityState;
   reporterSnapshot: RealtimeReporterSnapshot;
+  discordPresenceSnapshot: DiscordPresenceSnapshot;
   reporterBusy: boolean;
 }>();
 
@@ -29,6 +31,7 @@ defineEmits<{
 
 const latestLogs = computed(() => props.reporterSnapshot.logs.slice(0, 4));
 const reporterSupported = computed(() => props.capabilities.realtimeReporter);
+const discordSupported = computed(() => props.capabilities.discordPresence);
 const effectiveModeLabel = computed(() => {
   if (!reporterSupported.value) {
     return "活动模式";
@@ -83,6 +86,62 @@ function formatTime(value?: string | null) {
             <span>{{ reporterSupported ? "最近心跳" : "设备类型" }}</span>
             <strong>{{ reporterSupported ? formatTime(reporterSnapshot.lastHeartbeatAt) : config.deviceType }}</strong>
           </div>
+        </div>
+      </template>
+    </Card>
+
+    <Card v-if="discordSupported" class="glass-card">
+      <template #title>
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Discord</p>
+            <h3>Discord 状态同步</h3>
+          </div>
+          <Tag
+            :value="discordPresenceSnapshot.running ? (discordPresenceSnapshot.connected ? '运行中' : '等待 Discord') : '未启动'"
+            :severity="discordPresenceSnapshot.running ? (discordPresenceSnapshot.connected ? 'success' : 'warn') : 'secondary'"
+            rounded
+          />
+        </div>
+      </template>
+      <template #content>
+        <div class="overview-summary">
+          <div class="overview-item">
+            <span>同步状态</span>
+            <strong>{{ discordPresenceSnapshot.running ? "已启动" : "未启动" }}</strong>
+          </div>
+          <div class="overview-item">
+            <span>Discord 连接</span>
+            <strong>{{ discordPresenceSnapshot.connected ? "已连接" : "未连接" }}</strong>
+          </div>
+          <div class="overview-item">
+            <span>当前摘要</span>
+            <strong>{{ discordPresenceSnapshot.currentSummary || "暂无" }}</strong>
+          </div>
+          <div class="overview-item">
+            <span>最近同步</span>
+            <strong>{{ formatTime(discordPresenceSnapshot.lastSyncAt) }}</strong>
+          </div>
+        </div>
+
+        <div class="message-stack">
+          <Message v-if="discordPresenceSnapshot.lastError" severity="warn" :closable="false">
+            {{ discordPresenceSnapshot.lastError }}
+          </Message>
+          <Message
+            v-else-if="discordPresenceSnapshot.running"
+            :severity="discordPresenceSnapshot.connected ? 'success' : 'secondary'"
+            :closable="false"
+          >
+            {{
+              discordPresenceSnapshot.connected
+                ? "当前客户端会根据 public feed 中属于自己的活动更新 Discord 状态。"
+                : "同步任务已启动，等待本机 Discord 桌面端可用。"
+            }}
+          </Message>
+          <Message v-else severity="secondary" :closable="false">
+            你可以在“设置”页配置 Discord Application ID，并单独启动 Discord 状态同步。
+          </Message>
         </div>
       </template>
     </Card>

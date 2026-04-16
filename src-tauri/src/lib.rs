@@ -1,4 +1,5 @@
 mod commands;
+mod discord_presence;
 mod http_client;
 mod import_config;
 mod models;
@@ -17,6 +18,7 @@ use tauri::Manager;
 use tauri::RunEvent;
 
 #[cfg(desktop)]
+use discord_presence::{config_is_ready as discord_config_is_ready, DiscordPresenceRuntime};
 use realtime_reporter::{config_is_ready, ReporterRuntime};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -26,7 +28,9 @@ pub fn run() {
         .plugin(tauri_plugin_device_info::init());
 
     #[cfg(desktop)]
-    let builder = builder.manage(ReporterRuntime::new());
+    let builder = builder
+        .manage(ReporterRuntime::new())
+        .manage(DiscordPresenceRuntime::new());
 
     let builder = builder
         .setup(|app| {
@@ -41,6 +45,13 @@ pub fn run() {
                 if saved_state.config.reporter_enabled && config_is_ready(&saved_state.config) {
                     let reporter = app.state::<ReporterRuntime>();
                     let _ = reporter.start(saved_state.config.clone());
+                }
+
+                if saved_state.config.discord_enabled
+                    && discord_config_is_ready(&saved_state.config)
+                {
+                    let discord_presence_runtime = app.state::<DiscordPresenceRuntime>();
+                    let _ = discord_presence_runtime.start(saved_state.config.clone());
                 }
             }
 
@@ -76,6 +87,9 @@ pub fn run() {
         commands::start_realtime_reporter,
         commands::stop_realtime_reporter,
         commands::get_realtime_reporter_snapshot,
+        commands::start_discord_presence_sync,
+        commands::stop_discord_presence_sync,
+        commands::get_discord_presence_snapshot,
         commands::run_platform_self_test,
         commands::request_accessibility_permission,
         commands::discover_existing_reporter_config

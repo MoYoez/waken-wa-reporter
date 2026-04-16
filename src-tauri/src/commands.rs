@@ -1,13 +1,15 @@
-use serde_json::json;
+use serde_json::{json, Map, Value};
 use tauri::{AppHandle, State};
 
 use crate::{
+    discord_presence::DiscordPresenceRuntime,
     http_client::{request_json, request_json_payload},
     import_config::parse_import_payload,
     models::{
         default_client_capabilities, effective_device_name, ActivityPayload, ApiResult,
-        AppStatePayload, ClientCapabilities, ClientConfig, ExistingReporterConfig,
-        ImportedIntegrationConfig, InspirationEntryCreateInput, PlatformSelfTestResult,
+        AppStatePayload, ClientCapabilities, ClientConfig, DiscordPresenceSnapshot,
+        ExistingReporterConfig, ImportedIntegrationConfig, InspirationEntryCreateInput,
+        PlatformSelfTestResult,
     },
     platform, reporter_config, state_store,
 };
@@ -78,7 +80,7 @@ pub async fn submit_activity_report(
         "is_charging": payload.is_charging,
         "device_type": payload.device_type.map(|value| value.trim().to_string()).filter(|value| !value.is_empty()),
         "push_mode": payload.push_mode.map(|value| value.trim().to_string()).filter(|value| !value.is_empty()),
-        "metadata": payload.metadata,
+        "metadata": with_dc_source_metadata(payload.metadata, &config.discord_source_id),
     });
 
     Ok(request_json(
@@ -239,6 +241,32 @@ pub fn get_realtime_reporter_snapshot(
     Ok(snapshot_result(&reporter))
 }
 
+#[cfg(desktop)]
+#[tauri::command]
+pub fn start_discord_presence_sync(
+    discord_presence_runtime: State<'_, DiscordPresenceRuntime>,
+    config: ClientConfig,
+) -> Result<ApiResult<DiscordPresenceSnapshot>, String> {
+    let snapshot = discord_presence_runtime.start(config)?;
+    Ok(ApiResult::success(200, snapshot))
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub fn stop_discord_presence_sync(
+    discord_presence_runtime: State<'_, DiscordPresenceRuntime>,
+) -> Result<ApiResult<DiscordPresenceSnapshot>, String> {
+    Ok(ApiResult::success(200, discord_presence_runtime.stop()))
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub fn get_discord_presence_snapshot(
+    discord_presence_runtime: State<'_, DiscordPresenceRuntime>,
+) -> Result<ApiResult<DiscordPresenceSnapshot>, String> {
+    Ok(ApiResult::success(200, discord_presence_runtime.snapshot()))
+}
+
 #[tauri::command]
 pub fn run_platform_self_test() -> Result<ApiResult<PlatformSelfTestResult>, String> {
     Ok(ApiResult::success(200, platform::run_self_test()))
@@ -274,4 +302,18 @@ fn validate_image_data_url(value: Option<&str>) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+fn with_dc_source_metadata(metadata: Option<Value>, dc_source: &str) -> Value {
+    let mut map = match metadata {
+        Some(Value::Object(map)) => map,
+        _ => Map::new(),
+    };
+    if !dc_source.trim().is_empty() {
+        map.insert(
+            "dc_source".into(),
+            Value::String(dc_source.trim().to_string()),
+        );
+    }
+    Value::Object(map)
 }

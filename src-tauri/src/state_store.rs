@@ -4,6 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Manager};
 use uuid::Uuid;
 
@@ -34,6 +35,20 @@ fn ensure_generated_hash_key(payload: &mut AppStatePayload) -> bool {
     false
 }
 
+fn ensure_discord_source_id(payload: &mut AppStatePayload) -> bool {
+    if payload.config.discord_source_id.trim().is_empty() {
+        payload.config.discord_source_id = new_discord_source_id();
+        return true;
+    }
+    false
+}
+
+fn new_discord_source_id() -> String {
+    let seed = Uuid::new_v4().to_string();
+    let digest = Sha256::digest(seed.as_bytes());
+    format!("{digest:x}")
+}
+
 pub fn load_app_state(app: &AppHandle) -> Result<AppStatePayload, String> {
     let path = app_state_path(app)?;
     let mut payload = match fs::read_to_string(&path) {
@@ -51,7 +66,9 @@ pub fn load_app_state(app: &AppHandle) -> Result<AppStatePayload, String> {
         Err(error) => return Err(format!("读取状态文件失败：{error}")),
     };
 
-    if ensure_generated_hash_key(&mut payload) {
+    let generated_hash_changed = ensure_generated_hash_key(&mut payload);
+    let discord_source_changed = ensure_discord_source_id(&mut payload);
+    if generated_hash_changed || discord_source_changed {
         save_app_state(app, &payload)?;
     }
 
@@ -63,6 +80,7 @@ pub fn save_app_state(app: &AppHandle, payload: &AppStatePayload) -> Result<(), 
     ensure_parent_dir(&path)?;
     let mut payload = payload.clone();
     let _ = ensure_generated_hash_key(&mut payload);
+    let _ = ensure_discord_source_id(&mut payload);
     let content = serde_json::to_string_pretty(&payload)
         .map_err(|error| format!("序列化状态失败：{error}"))?;
     atomic_write(&path, &content)?;

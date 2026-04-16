@@ -6,6 +6,7 @@ import type {
   ApiResult,
   ClientCapabilities,
   ClientConfig,
+  DiscordPresenceSnapshot,
   ExistingReporterConfig,
   ImportedIntegrationConfig,
   InspirationAssetUploadResult,
@@ -33,6 +34,7 @@ const DEFAULT_CAPABILITIES: ClientCapabilities = {
   realtimeReporter: true,
   tray: true,
   platformSelfTest: true,
+  discordPresence: true,
 };
 
 export function validateConfig(
@@ -66,6 +68,36 @@ export function validateConfig(
     if (!Number.isFinite(config.heartbeatIntervalMs) || config.heartbeatIntervalMs < 0) {
       issues.push("心跳间隔不能小于 0。");
     }
+  }
+
+  return issues;
+}
+
+export function validateDiscordPresenceConfig(
+  config: ClientConfig,
+  capabilities: ClientCapabilities = DEFAULT_CAPABILITIES,
+) {
+  if (!capabilities.discordPresence) {
+    return [];
+  }
+
+  const issues: string[] = [];
+
+  if (!config.baseUrl.trim()) {
+    issues.push("Base URL 为必填项。");
+  } else {
+    try {
+      const url = new URL(config.baseUrl.trim());
+      if (!["http:", "https:"].includes(url.protocol)) {
+        issues.push("Base URL 必须以 http:// 或 https:// 开头。");
+      }
+    } catch {
+      issues.push("Base URL 格式不正确。");
+    }
+  }
+
+  if (!config.discordApplicationId.trim()) {
+    issues.push("Discord Application ID 为必填项。");
   }
 
   return issues;
@@ -200,6 +232,20 @@ export async function stopRealtimeReporter(): Promise<ApiResult<RealtimeReporter
 
 export async function getRealtimeReporterSnapshot(): Promise<ApiResult<RealtimeReporterSnapshot>> {
   return invokeApi("get_realtime_reporter_snapshot");
+}
+
+export async function startDiscordPresenceSync(
+  config: ClientConfig,
+): Promise<ApiResult<DiscordPresenceSnapshot>> {
+  return invokeApi("start_discord_presence_sync", { config });
+}
+
+export async function stopDiscordPresenceSync(): Promise<ApiResult<DiscordPresenceSnapshot>> {
+  return invokeApi("stop_discord_presence_sync");
+}
+
+export async function getDiscordPresenceSnapshot(): Promise<ApiResult<DiscordPresenceSnapshot>> {
+  return invokeApi("get_discord_presence_snapshot");
 }
 
 export async function runPlatformSelfTest(): Promise<ApiResult<PlatformSelfTestResult>> {

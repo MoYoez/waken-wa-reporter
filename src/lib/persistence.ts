@@ -18,6 +18,9 @@ export const defaultClientConfig = (): ClientConfig => ({
   reportWindowTitle: true,
   reportMedia: true,
   reportPlaySource: true,
+  discordEnabled: false,
+  discordApplicationId: "",
+  discordSourceId: "",
 });
 
 export async function loadAppState(): Promise<AppStatePayload> {

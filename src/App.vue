@@ -17,9 +17,12 @@ import {
   extractPendingApprovalInfo,
   formatPendingApprovalDetail,
   getClientCapabilities,
+  getDiscordPresenceSnapshot,
   getRealtimeReporterSnapshot,
   probeConnectivity,
+  startDiscordPresenceSync,
   startRealtimeReporter,
+  stopDiscordPresenceSync,
   stopRealtimeReporter,
 } from "./lib/api";
 import { readDeviceName } from "./lib/deviceInfo";
@@ -28,6 +31,7 @@ import { defaultClientConfig, loadAppState, saveAppState } from "./lib/persisten
 import type {
   ClientCapabilities,
   ClientConfig,
+  DiscordPresenceSnapshot,
   DeviceType,
   ExistingReporterConfig,
   MobileConnectivityState,
@@ -50,6 +54,7 @@ const defaultCapabilities: ClientCapabilities = {
   realtimeReporter: true,
   tray: true,
   platformSelfTest: true,
+  discordPresence: true,
 };
 
 const toast = useToast();
@@ -64,6 +69,7 @@ const hydrated = ref(false);
 const onboardingDismissed = ref(false);
 const reporterConfigPromptHandled = ref(false);
 const reporterBusy = ref(false);
+const discordBusy = ref(false);
 const importingReporterConfig = ref(false);
 const existingReporterConfig = ref<ExistingReporterConfig | null>(null);
 const verifiedGeneratedHashKey = ref("");
@@ -84,6 +90,13 @@ const reporterSnapshot = ref<RealtimeReporterSnapshot>({
   lastPendingApprovalMessage: null,
   lastPendingApprovalUrl: null,
 });
+const discordPresenceSnapshot = ref<DiscordPresenceSnapshot>({
+  running: false,
+  connected: false,
+  lastSyncAt: null,
+  lastError: null,
+  currentSummary: null,
+});
 const pendingApprovalDialogVisible = ref(false);
 const lastPendingApprovalSeen = ref("");
 const lastMobileConnectivitySignature = ref("");
@@ -92,6 +105,8 @@ const viewportWidth = ref<number>(1200);
 
 let reporterPollingTimer: number | undefined;
 let reporterSnapshotRefreshInFlight = false;
+let discordPollingTimer: number | undefined;
+let discordSnapshotRefreshInFlight = false;
 const REPORTER_SNAPSHOT_POLL_MS = 5000;
 
 const sections: SectionNavItem[] = [
@@ -109,6 +124,7 @@ const sections: SectionNavItem[] = [
 ];
 
 const reporterSupported = computed(() => capabilities.value.realtimeReporter);
+const discordSupported = computed(() => capabilities.value.discordPresence);
 const traySupported = computed(() => capabilities.value.tray);
 const isPhone = computed(() => viewportWidth.value < 900);
 const isNativeNotice = computed(() => !reporterSupported.value);
@@ -126,6 +142,9 @@ const readiness = computed(() => {
   ];
   return required.every(Boolean);
 });
+const discordReadiness = computed(
+  () => !!config.value.baseUrl.trim() && !!config.value.discordApplicationId.trim(),
+);
 
 const shouldShowOnboarding = computed(
   () => hydrated.value && !onboardingDismissed.value && !readiness.value,
@@ -159,6 +178,7 @@ function normalizeConfigByCapabilities(raw: ClientConfig): ClientConfig {
     deviceType: inferMobileDeviceType(),
     pushMode: "active",
     reporterEnabled: false,
+    discordEnabled: false,
   };
 }
 
@@ -181,8 +201,12 @@ function onViewportResize() {
 
 function onVisibilityChange() {
   syncReporterPolling();
+  syncDiscordPresencePolling();
   if (shouldPollReporterSnapshot()) {
     void refreshReporterSnapshot();
+  }
+  if (shouldPollDiscordPresenceSnapshot()) {
+    void refreshDiscordPresenceSnapshot();
   }
 }
 
@@ -457,6 +481,26 @@ async function refreshReporterSnapshot() {
   }
 }
 
+async function refreshDiscordPresenceSnapshot() {
+  if (!discordSupported.value) {
+    return;
+  }
+  if (discordSnapshotRefreshInFlight) {
+    return;
+  }
+
+  discordSnapshotRefreshInFlight = true;
+  try {
+    const result = await getDiscordPresenceSnapshot();
+    if (!result.success || !result.data) {
+      return;
+    }
+    Object.assign(discordPresenceSnapshot.value, result.data);
+  } finally {
+    discordSnapshotRefreshInFlight = false;
+  }
+}
+
 function closePendingApprovalDialog() {
   pendingApprovalDialogVisible.value = false;
 }
@@ -467,10 +511,23 @@ function shouldPollReporterSnapshot() {
     && document.visibilityState === "visible";
 }
 
+function shouldPollDiscordPresenceSnapshot() {
+  return discordSupported.value
+    && discordPresenceSnapshot.value.running
+    && document.visibilityState === "visible";
+}
+
 function stopReporterPolling() {
   if (reporterPollingTimer !== undefined) {
     window.clearInterval(reporterPollingTimer);
     reporterPollingTimer = undefined;
+  }
+}
+
+function stopDiscordPresencePolling() {
+  if (discordPollingTimer !== undefined) {
+    window.clearInterval(discordPollingTimer);
+    discordPollingTimer = undefined;
   }
 }
 
@@ -487,6 +544,22 @@ function syncReporterPolling() {
       return;
     }
     void refreshReporterSnapshot();
+  }, REPORTER_SNAPSHOT_POLL_MS);
+}
+
+function syncDiscordPresencePolling() {
+  stopDiscordPresencePolling();
+
+  if (!shouldPollDiscordPresenceSnapshot()) {
+    return;
+  }
+
+  discordPollingTimer = window.setInterval(() => {
+    if (!shouldPollDiscordPresenceSnapshot()) {
+      stopDiscordPresencePolling();
+      return;
+    }
+    void refreshDiscordPresenceSnapshot();
   }, REPORTER_SNAPSHOT_POLL_MS);
 }
 
@@ -550,6 +623,62 @@ async function handleStopReporter() {
   });
 }
 
+async function handleStartDiscordPresence() {
+  if (!discordSupported.value || discordBusy.value) {
+    return;
+  }
+
+  discordBusy.value = true;
+  const result = await startDiscordPresenceSync(config.value);
+  discordBusy.value = false;
+
+  if (!result.success || !result.data) {
+    notify({
+      severity: "error",
+      summary: "Discord 同步启动失败",
+      detail: result.error?.message ?? "Discord 状态同步启动失败。",
+      life: 4000,
+    });
+    return;
+  }
+
+  Object.assign(discordPresenceSnapshot.value, result.data);
+  notify({
+    severity: "success",
+    summary: "Discord 同步已开启",
+    detail: "客户端会定时拉取 public feed 并更新 Discord 状态。",
+    life: 3000,
+  });
+}
+
+async function handleStopDiscordPresence() {
+  if (!discordSupported.value || discordBusy.value) {
+    return;
+  }
+
+  discordBusy.value = true;
+  const result = await stopDiscordPresenceSync();
+  discordBusy.value = false;
+
+  if (!result.success || !result.data) {
+    notify({
+      severity: "error",
+      summary: "Discord 同步停止失败",
+      detail: result.error?.message ?? "Discord 状态同步停止失败。",
+      life: 4000,
+    });
+    return;
+  }
+
+  Object.assign(discordPresenceSnapshot.value, result.data);
+  notify({
+    severity: "success",
+    summary: "Discord 同步已停止",
+    detail: "客户端已停止更新 Discord 状态。",
+    life: 3000,
+  });
+}
+
 watch(
   () => [
     reporterSnapshot.value.lastPendingApprovalMessage,
@@ -572,7 +701,11 @@ watch(
     if (reporterSupported.value && section !== "inspiration") {
       void refreshReporterSnapshot();
     }
+    if (discordSupported.value) {
+      void refreshDiscordPresenceSnapshot();
+    }
     syncReporterPolling();
+    syncDiscordPresencePolling();
   },
 );
 
@@ -588,6 +721,7 @@ watch(
   () => {
     syncDeviceTypeByViewport();
     syncReporterPolling();
+    syncDiscordPresencePolling();
   },
   { deep: true },
 );
@@ -596,6 +730,14 @@ watch(
   () => reporterSnapshot.value.running,
   () => {
     syncReporterPolling();
+  },
+  { immediate: true },
+);
+
+watch(
+  () => discordPresenceSnapshot.value.running,
+  () => {
+    syncDiscordPresencePolling();
   },
   { immediate: true },
 );
@@ -659,9 +801,14 @@ onMounted(async () => {
 
   await refreshReporterSnapshot();
   syncReporterPolling();
+  await refreshDiscordPresenceSnapshot();
+  syncDiscordPresencePolling();
 
   if (config.value.reporterEnabled && !reporterSnapshot.value.running && readiness.value) {
     void handleStartReporter();
+  }
+  if (config.value.discordEnabled && !discordPresenceSnapshot.value.running && discordReadiness.value) {
+    void handleStartDiscordPresence();
   }
 });
 
@@ -669,6 +816,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("resize", onViewportResize);
   document.removeEventListener("visibilitychange", onVisibilityChange);
   stopReporterPolling();
+  stopDiscordPresencePolling();
 });
 </script>
 
@@ -858,6 +1006,12 @@ onBeforeUnmount(() => {
             :severity="reporterSnapshot.running ? 'success' : 'secondary'"
             rounded
           />
+          <Tag
+            v-if="discordSupported"
+            :value="discordPresenceSnapshot.running ? (discordPresenceSnapshot.connected ? 'Discord 同步运行中' : 'Discord 等待连接') : 'Discord 同步未开启'"
+            :severity="discordPresenceSnapshot.running ? (discordPresenceSnapshot.connected ? 'success' : 'warn') : 'secondary'"
+            rounded
+          />
           <small v-if="traySupported">关闭主窗口后会最小化到系统托盘，可在后台继续驻留。</small>
           <small v-else>当前平台使用移动端模式，已关闭后台实时同步与托盘能力。</small>
         </div>
@@ -871,6 +1025,7 @@ onBeforeUnmount(() => {
           :capabilities="capabilities"
           :mobile-connectivity="mobileConnectivity"
           :reporter-snapshot="reporterSnapshot"
+          :discord-presence-snapshot="discordPresenceSnapshot"
           :reporter-busy="reporterBusy"
           @start-reporter="handleStartReporter"
           @stop-reporter="handleStopReporter"
@@ -882,12 +1037,16 @@ onBeforeUnmount(() => {
           :model-value="config"
           :capabilities="capabilities"
           :reporter-snapshot="reporterSnapshot"
+          :discord-presence-snapshot="discordPresenceSnapshot"
           :reporter-busy="reporterBusy"
+          :discord-busy="discordBusy"
           :verified-generated-hash-key="verifiedGeneratedHashKey"
           @update:model-value="config = normalizeConfigByCapabilities($event)"
           @imported="notifyImport"
           @start-reporter="handleStartReporter"
           @stop-reporter="handleStopReporter"
+          @start-discord-presence="handleStartDiscordPresence"
+          @stop-discord-presence="handleStopDiscordPresence"
         />
 
         <ActivityWorkspace

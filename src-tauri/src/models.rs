@@ -63,12 +63,21 @@ pub fn default_report_play_source() -> bool {
     true
 }
 
+pub fn default_discord_application_id() -> String {
+    String::new()
+}
+
+pub fn default_discord_source_id() -> String {
+    String::new()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClientCapabilities {
     pub realtime_reporter: bool,
     pub tray: bool,
     pub platform_self_test: bool,
+    pub discord_presence: bool,
 }
 
 #[cfg(desktop)]
@@ -77,6 +86,7 @@ pub fn default_client_capabilities() -> ClientCapabilities {
         realtime_reporter: true,
         tray: true,
         platform_self_test: true,
+        discord_presence: true,
     }
 }
 
@@ -86,6 +96,7 @@ pub fn default_client_capabilities() -> ClientCapabilities {
         realtime_reporter: false,
         tray: false,
         platform_self_test: false,
+        discord_presence: false,
     }
 }
 
@@ -95,6 +106,7 @@ pub fn default_client_capabilities() -> ClientCapabilities {
         realtime_reporter: false,
         tray: false,
         platform_self_test: false,
+        discord_presence: false,
     }
 }
 
@@ -131,6 +143,12 @@ pub struct ClientConfig {
     pub report_media: bool,
     #[serde(default = "default_report_play_source")]
     pub report_play_source: bool,
+    #[serde(default)]
+    pub discord_enabled: bool,
+    #[serde(default = "default_discord_application_id")]
+    pub discord_application_id: String,
+    #[serde(default = "default_discord_source_id")]
+    pub discord_source_id: String,
 }
 
 impl Default for ClientConfig {
@@ -151,6 +169,9 @@ impl Default for ClientConfig {
             report_window_title: default_report_window_title(),
             report_media: default_report_media(),
             report_play_source: default_report_play_source(),
+            discord_enabled: false,
+            discord_application_id: default_discord_application_id(),
+            discord_source_id: default_discord_source_id(),
         }
     }
 }
@@ -309,6 +330,21 @@ pub struct RealtimeReporterSnapshot {
     pub last_pending_approval_message: Option<String>,
     #[serde(default)]
     pub last_pending_approval_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscordPresenceSnapshot {
+    #[serde(default)]
+    pub running: bool,
+    #[serde(default)]
+    pub connected: bool,
+    #[serde(default)]
+    pub last_sync_at: Option<String>,
+    #[serde(default)]
+    pub last_error: Option<String>,
+    #[serde(default)]
+    pub current_summary: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

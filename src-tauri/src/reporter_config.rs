@@ -91,6 +91,9 @@ pub fn discover_existing_reporter_config(
             report_window_title: crate::models::default_report_window_title(),
             report_media: crate::models::default_report_media(),
             report_play_source: crate::models::default_report_play_source(),
+            discord_enabled: false,
+            discord_application_id: crate::models::default_discord_application_id(),
+            discord_source_id: crate::models::default_discord_source_id(),
         }),
     })
 }

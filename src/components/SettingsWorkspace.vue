@@ -2,16 +2,23 @@
 import { computed, ref } from "vue";
 import Button from "primevue/button";
 import Card from "primevue/card";
+import InputText from "primevue/inputtext";
 import Message from "primevue/message";
 import Tag from "primevue/tag";
+import ToggleSwitch from "primevue/toggleswitch";
 import { useToast } from "primevue/usetoast";
 
 import ConnectionPanel from "./ConnectionPanel.vue";
-import { requestAccessibilityPermission, runPlatformSelfTest } from "../lib/api";
+import {
+  requestAccessibilityPermission,
+  runPlatformSelfTest,
+  validateDiscordPresenceConfig,
+} from "../lib/api";
 import { createNotifier } from "../lib/notify";
 import type {
   ClientCapabilities,
   ClientConfig,
+  DiscordPresenceSnapshot,
   PlatformSelfTestResult,
   RealtimeReporterSnapshot,
 } from "../types";
@@ -25,7 +32,9 @@ const props = defineProps<{
   modelValue: ClientConfig;
   capabilities: ClientCapabilities;
   reporterSnapshot: RealtimeReporterSnapshot;
+  discordPresenceSnapshot: DiscordPresenceSnapshot;
   reporterBusy: boolean;
+  discordBusy: boolean;
   verifiedGeneratedHashKey: string;
 }>();
 
@@ -33,6 +42,7 @@ const configReady = computed(
   () => !!props.modelValue.baseUrl.trim() && !!props.modelValue.apiToken.trim(),
 );
 const reporterSupported = computed(() => props.capabilities.realtimeReporter);
+const discordSupported = computed(() => props.capabilities.discordPresence);
 const selfTestSupported = computed(() => props.capabilities.platformSelfTest);
 const isNativeNotice = computed(() => !props.capabilities.realtimeReporter);
 const canRequestAccessibilityPermission = computed(() => {
@@ -40,13 +50,27 @@ const canRequestAccessibilityPermission = computed(() => {
   return /mac/i.test(navigator.userAgent);
 });
 const { notify } = createNotifier(toast, () => isNativeNotice.value);
+const discordConfigIssues = computed(() =>
+  validateDiscordPresenceConfig(props.modelValue, props.capabilities),
+);
+const discordConfigReady = computed(() => discordConfigIssues.value.length === 0);
 
-defineEmits<{
+const emit = defineEmits<{
   "update:modelValue": [value: ClientConfig];
   imported: [message: string];
   startReporter: [];
   stopReporter: [];
+  startDiscordPresence: [];
+  stopDiscordPresence: [];
 }>();
+
+function updateField<K extends keyof ClientConfig>(key: K, value: ClientConfig[K]) {
+  const nextValue = {
+    ...props.modelValue,
+    [key]: value,
+  };
+  emit("update:modelValue", nextValue);
+}
 
 function formatTime(value?: string | null) {
   if (!value) return "暂无";
@@ -280,6 +304,111 @@ async function handleRequestAccessibilityPermission() {
         <div class="message-stack">
           <Message severity="secondary" :closable="false">
             当前客户端不提供后台实时同步与系统托盘能力。你仍可手动提交活动并发布灵感内容。
+          </Message>
+        </div>
+      </template>
+    </Card>
+
+    <Card v-if="discordSupported" class="glass-card">
+      <template #title>
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Discord 状态</p>
+            <h3>管理 Discord Rich Presence 同步</h3>
+          </div>
+          <Tag
+            :value="discordPresenceSnapshot.running ? (discordPresenceSnapshot.connected ? '运行中' : '等待 Discord') : '未启动'"
+            :severity="discordPresenceSnapshot.running ? (discordPresenceSnapshot.connected ? 'success' : 'warn') : 'secondary'"
+            rounded
+          />
+        </div>
+      </template>
+      <template #content>
+        <div class="panel-grid">
+          <label class="field-block field-span-2">
+            <span class="field-label">Discord Application ID</span>
+            <InputText
+              :model-value="modelValue.discordApplicationId"
+              placeholder="填入 Discord Developer Portal 里的 Application ID"
+              @update:model-value="updateField('discordApplicationId', $event ?? '')"
+            />
+          </label>
+
+          <div class="reporter-enabled-card discord-autostart-card field-span-2">
+            <div class="reporter-enabled-copy">
+              <span class="field-label">启动后自动开启 Discord 同步</span>
+              <strong>{{ modelValue.discordEnabled ? "已开启" : "未开启" }}</strong>
+              <span>
+                开启后，这台客户端在下次启动时会自动拉取 public feed，并更新 Discord 状态。
+              </span>
+            </div>
+            <ToggleSwitch
+              :model-value="modelValue.discordEnabled"
+              input-id="settings-discord-enabled"
+              @update:model-value="updateField('discordEnabled', Boolean($event))"
+            />
+          </div>
+        </div>
+
+        <div class="overview-summary discord-presence-summary">
+          <div class="overview-item">
+            <span>运行状态</span>
+            <strong>{{ discordPresenceSnapshot.running ? "运行中" : "未启动" }}</strong>
+          </div>
+          <div class="overview-item">
+            <span>Discord 连接</span>
+            <strong>{{ discordPresenceSnapshot.connected ? "已连接" : "未连接" }}</strong>
+          </div>
+          <div class="overview-item">
+            <span>当前摘要</span>
+            <strong>{{ discordPresenceSnapshot.currentSummary || "暂无" }}</strong>
+          </div>
+          <div class="overview-item">
+            <span>最近同步</span>
+            <strong>{{ formatTime(discordPresenceSnapshot.lastSyncAt) }}</strong>
+          </div>
+        </div>
+
+        <div class="actions-row discord-presence-actions">
+          <Button
+            label="开启 Discord 同步"
+            icon="pi pi-desktop"
+            :loading="discordBusy"
+            :disabled="discordPresenceSnapshot.running || !discordConfigReady"
+            @click="$emit('startDiscordPresence')"
+          />
+          <Button
+            label="停止 Discord 同步"
+            icon="pi pi-stop"
+            severity="secondary"
+            outlined
+            :loading="discordBusy"
+            :disabled="!discordPresenceSnapshot.running"
+            @click="$emit('stopDiscordPresence')"
+          />
+        </div>
+
+        <div class="message-stack">
+          <Message
+            v-for="issue in discordConfigIssues"
+            :key="issue"
+            severity="warn"
+            :closable="false"
+          >
+            {{ issue }}
+          </Message>
+          <Message v-if="discordPresenceSnapshot.lastError" severity="warn" :closable="false">
+            {{ discordPresenceSnapshot.lastError }}
+          </Message>
+          <Message
+            v-else-if="modelValue.discordEnabled"
+            severity="secondary"
+            :closable="false"
+          >
+            已启用启动后自动同步，客户端下次打开时会自动尝试连接 Discord。
+          </Message>
+          <Message v-else severity="secondary" :closable="false">
+            Discord 同步只会读取 public feed 中属于当前客户端自己的活动，不会干涉其他机器。
           </Message>
         </div>
       </template>

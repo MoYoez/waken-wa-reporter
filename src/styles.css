@@ -756,10 +756,22 @@ select {
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  padding: 16px 18px;
+  padding: 18px 20px;
   border-radius: 20px;
   border: 1px solid rgba(197, 145, 91, 0.24);
   background: linear-gradient(135deg, rgba(255, 248, 239, 0.98), rgba(245, 236, 224, 0.92));
+}
+
+.discord-autostart-card {
+  padding-bottom: 24px;
+}
+
+.discord-presence-summary {
+  margin-top: 14px;
+}
+
+.discord-presence-actions {
+  margin-top: 14px;
 }
 
 .reporter-enabled-copy {

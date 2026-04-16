@@ -30,3 +30,5 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 windows = { version = "0.58", features = ["Foundation", "Media_Control", "Win32_System_Com", "Win32_UI_WindowsAndMessaging", "Win32_System_Threading", "Win32_Storage_FileSystem"] }
 uuid = { version = "1", features = ["v4"] }
 hostname = "0.4"
+discord-rich-presence = "1.1.0"
+sha2 = "0.10"
