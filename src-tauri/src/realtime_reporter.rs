@@ -154,7 +154,11 @@ impl ReporterRuntime {
         self.push_log(
             "info",
             localized_text("reporterLogs.started.title", None, "实时上报已启动"),
-            localized_text("reporterLogs.started.detail", None, "后台轮询任务已经开始。"),
+            localized_text(
+                "reporterLogs.started.detail",
+                None,
+                "后台轮询任务已经开始。",
+            ),
             None,
         );
 
@@ -198,21 +202,13 @@ impl ReporterRuntime {
                 )
             } else {
                 (
-                    localized_text(
-                        "reporterLogs.stopped.detail",
-                        None,
-                        "后台轮询任务已停止。",
-                    ),
+                    localized_text("reporterLogs.stopped.detail", None, "后台轮询任务已停止。"),
                     true,
                 )
             }
         } else {
             (
-                localized_text(
-                    "reporterLogs.stopped.detail",
-                    None,
-                    "后台轮询任务已停止。",
-                ),
+                localized_text("reporterLogs.stopped.detail", None, "后台轮询任务已停止。"),
                 true,
             )
         };
@@ -231,7 +227,13 @@ impl ReporterRuntime {
         self.snapshot()
     }
 
-    fn push_log(&self, level: &str, title: LogTextSpec, detail: LogTextSpec, payload: Option<Value>) {
+    fn push_log(
+        &self,
+        level: &str,
+        title: LogTextSpec,
+        detail: LogTextSpec,
+        payload: Option<Value>,
+    ) {
         let id = format!(
             "{}-{}",
             now_unix_millis(),
@@ -415,8 +417,7 @@ fn run_reporter_loop(
                     let payload = build_payload(&config, &snapshot, &media, metadata.clone());
                     match post_activity_blocking(&client, &config, &payload, locale) {
                         Ok(PostActivityResult::Success) => {
-                            let detail =
-                                build_log_detail(&snapshot, &media, is_heartbeat, locale);
+                            let detail = build_log_detail(&snapshot, &media, is_heartbeat, locale);
                             push_background_log(
                                 &state,
                                 &mut sequence_seed,
@@ -592,8 +593,13 @@ fn build_log_detail(
             Some(base_params),
             format!(
                 "{}{} / {}",
-                if locale.is_en() { format!("{action}: ") } else { format!("{action}：") },
-                snapshot.process_name, snapshot.process_title
+                if locale.is_en() {
+                    format!("{action}: ")
+                } else {
+                    format!("{action}：")
+                },
+                snapshot.process_name,
+                snapshot.process_title
             ),
         )
     } else {
@@ -610,7 +616,11 @@ fn build_log_detail(
             })),
             format!(
                 "{}{} / {} | {}{}",
-                if locale.is_en() { format!("{action}: ") } else { format!("{action}：") },
+                if locale.is_en() {
+                    format!("{action}: ")
+                } else {
+                    format!("{action}：")
+                },
                 snapshot.process_name,
                 snapshot.process_title,
                 if locale.is_en() { "" } else { "媒体：" },
@@ -710,7 +720,10 @@ fn build_http_client(use_system_proxy: bool, locale: BackendLocale) -> Result<Cl
     )
 }
 
-fn parse_reporter_metadata(input: &str, locale: BackendLocale) -> Result<Map<String, Value>, String> {
+fn parse_reporter_metadata(
+    input: &str,
+    locale: BackendLocale,
+) -> Result<Map<String, Value>, String> {
     let trimmed = input.trim();
     if trimmed.is_empty() {
         return Ok(Map::new());
@@ -784,9 +797,14 @@ fn post_activity_blocking(
     payload: &ActivityPayload,
     locale: BackendLocale,
 ) -> Result<PostActivityResult, String> {
-    let body =
-        serde_json::to_value(payload)
-            .map_err(|error| format_error(locale, "序列化上报数据失败", "Failed to encode report payload", error))?;
+    let body = serde_json::to_value(payload).map_err(|error| {
+        format_error(
+            locale,
+            "序列化上报数据失败",
+            "Failed to encode report payload",
+            error,
+        )
+    })?;
     let url = format!("{}/api/activity", config.base_url.trim_end_matches('/'));
 
     let response = client

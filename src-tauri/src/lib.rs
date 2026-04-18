@@ -14,10 +14,10 @@ mod tray;
 use serde::Serialize;
 use tauri::WindowEvent;
 
-#[cfg(desktop)]
-use tauri::{Emitter, Manager};
 #[cfg(all(desktop, target_os = "macos"))]
 use tauri::RunEvent;
+#[cfg(desktop)]
+use tauri::{Emitter, Manager};
 #[cfg(desktop)]
 use tauri_plugin_autostart::MacosLauncher;
 
@@ -43,13 +43,7 @@ pub fn run() {
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
         let _ = tray::show_main_window(app);
-        let _ = app.emit(
-            SINGLE_INSTANCE_EVENT,
-            SingleInstancePayload {
-                args,
-                cwd,
-            },
-        );
+        let _ = app.emit(SINGLE_INSTANCE_EVENT, SingleInstancePayload { args, cwd });
     }));
 
     let builder = builder

@@ -418,8 +418,7 @@ fn reporter_start_error_code(error: &str) -> Option<&'static str> {
         Some("backendErrors.reporterConfigBaseUrlMissing")
     } else if error.contains("缺少 API Token") || error.contains("API Token is required") {
         Some("backendErrors.reporterConfigApiTokenMissing")
-    } else if error.contains("缺少 GeneratedHashKey")
-        || error.contains("Device key is required")
+    } else if error.contains("缺少 GeneratedHashKey") || error.contains("Device key is required")
     {
         Some("backendErrors.reporterConfigGeneratedHashKeyMissing")
     } else if error.contains("仍在退出") || error.contains("still stopping") {

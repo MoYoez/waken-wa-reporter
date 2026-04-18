@@ -93,7 +93,12 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), String> {
         true,
         None::<&str>,
     )
-    .map_err(|error| format!("{}: {error}", tray_text(&locale, TrayText::CreateMenuFailed)))?;
+    .map_err(|error| {
+        format!(
+            "{}: {error}",
+            tray_text(&locale, TrayText::CreateMenuFailed)
+        )
+    })?;
     let hide_item = MenuItem::with_id(
         app,
         MENU_ID_HIDE,
@@ -101,7 +106,12 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), String> {
         true,
         None::<&str>,
     )
-    .map_err(|error| format!("{}: {error}", tray_text(&locale, TrayText::CreateMenuFailed)))?;
+    .map_err(|error| {
+        format!(
+            "{}: {error}",
+            tray_text(&locale, TrayText::CreateMenuFailed)
+        )
+    })?;
     let quit_item = MenuItem::with_id(
         app,
         MENU_ID_QUIT,
@@ -109,10 +119,19 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), String> {
         true,
         None::<&str>,
     )
-    .map_err(|error| format!("{}: {error}", tray_text(&locale, TrayText::CreateMenuFailed)))?;
+    .map_err(|error| {
+        format!(
+            "{}: {error}",
+            tray_text(&locale, TrayText::CreateMenuFailed)
+        )
+    })?;
 
-    let menu = Menu::with_items(app, &[&show_item, &hide_item, &quit_item])
-        .map_err(|error| format!("{}: {error}", tray_text(&locale, TrayText::CreateMenuFailed)))?;
+    let menu = Menu::with_items(app, &[&show_item, &hide_item, &quit_item]).map_err(|error| {
+        format!(
+            "{}: {error}",
+            tray_text(&locale, TrayText::CreateMenuFailed)
+        )
+    })?;
     let icon = Image::from_bytes(include_bytes!("../icons/32x32.png"))
         .map_err(|error| format!("{}: {error}", tray_text(&locale, TrayText::LoadIconFailed)))?;
 
@@ -143,7 +162,12 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), String> {
             }
         })
         .build(app)
-        .map_err(|error| format!("{}: {error}", tray_text(&locale, TrayText::CreateTrayFailed)))?;
+        .map_err(|error| {
+            format!(
+                "{}: {error}",
+                tray_text(&locale, TrayText::CreateTrayFailed)
+            )
+        })?;
 
     Ok(())
 }

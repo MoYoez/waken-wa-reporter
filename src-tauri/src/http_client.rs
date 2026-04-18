@@ -114,8 +114,7 @@ pub async fn request_json(
     if status >= 400 || !payload_success {
         return ApiResult::failure_localized(
             status,
-            extract_code(&payload)
-                .or_else(|| Some("backendErrors.requestRejected".to_string())),
+            extract_code(&payload).or_else(|| Some("backendErrors.requestRejected".to_string())),
             extract_message(&payload).unwrap_or_else(|| "请求失败".into()),
             extract_params(&payload).or_else(|| Some(json!({ "status": status }))),
             Some(payload),
@@ -205,8 +204,7 @@ pub async fn request_json_payload(
     if status >= 400 || !payload_success {
         return ApiResult::failure_localized(
             status,
-            extract_code(&payload)
-                .or_else(|| Some("backendErrors.requestRejected".to_string())),
+            extract_code(&payload).or_else(|| Some("backendErrors.requestRejected".to_string())),
             extract_message(&payload).unwrap_or_else(|| "请求失败".into()),
             extract_params(&payload).or_else(|| Some(json!({ "status": status }))),
             Some(payload),
@@ -273,13 +271,11 @@ pub fn build_blocking_client(
         builder = builder.no_proxy();
     }
 
-    builder
-        .build()
-        .map_err(|error| {
-            if locale.is_en() {
-                format!("Failed to create HTTP client: {error}")
-            } else {
-                format!("创建 HTTP 客户端失败：{error}")
-            }
-        })
+    builder.build().map_err(|error| {
+        if locale.is_en() {
+            format!("Failed to create HTTP client: {error}")
+        } else {
+            format!("创建 HTTP 客户端失败：{error}")
+        }
+    })
 }

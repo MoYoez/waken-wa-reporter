@@ -410,18 +410,16 @@ pub fn run_self_test() -> PlatformSelfTestResult {
     };
 
     let media = match get_now_playing() {
-        Ok(info) if !info.is_empty() => {
-            make_probe(
-                true,
-                localized_text("platformSelfTest.summary.mediaOk", None, "媒体采集正常"),
-                localized_text(
-                    "platformSelfTest.detail.mediaCurrent",
-                    Some(json!({ "mediaSummary": info.summary() })),
-                    info.summary(),
-                ),
-                Vec::new(),
-            )
-        }
+        Ok(info) if !info.is_empty() => make_probe(
+            true,
+            localized_text("platformSelfTest.summary.mediaOk", None, "媒体采集正常"),
+            localized_text(
+                "platformSelfTest.detail.mediaCurrent",
+                Some(json!({ "mediaSummary": info.summary() })),
+                info.summary(),
+            ),
+            Vec::new(),
+        ),
         Ok(_) => make_probe(
             true,
             localized_text(

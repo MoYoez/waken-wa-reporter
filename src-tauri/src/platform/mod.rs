@@ -152,7 +152,10 @@ pub fn make_probe(
         success,
         summary: summary_fallback,
         detail: detail_fallback,
-        guidance: guidance.iter().map(|entry| entry.fallback.clone()).collect(),
+        guidance: guidance
+            .iter()
+            .map(|entry| entry.fallback.clone())
+            .collect(),
         summary_key: summary_key.map(str::to_string),
         summary_params,
         detail_key: detail_key.map(str::to_string),

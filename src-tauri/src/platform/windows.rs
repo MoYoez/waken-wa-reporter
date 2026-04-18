@@ -2,9 +2,7 @@ use std::path::Path;
 
 use serde_json::json;
 
-use super::{
-    build_self_test_result, localized_text, make_probe, ForegroundSnapshot, MediaInfo,
-};
+use super::{build_self_test_result, localized_text, make_probe, ForegroundSnapshot, MediaInfo};
 use crate::models::PlatformSelfTestResult;
 
 #[cfg(target_os = "windows")]
@@ -248,11 +246,7 @@ pub fn run_self_test() -> PlatformSelfTestResult {
                 None,
                 "前台应用采集失败",
             ),
-            localized_text(
-                "platformSelfTest.detail.foregroundReadFailed",
-                None,
-                error,
-            ),
+            localized_text("platformSelfTest.detail.foregroundReadFailed", None, error),
             Vec::new(),
         ),
     };
@@ -295,28 +289,22 @@ pub fn run_self_test() -> PlatformSelfTestResult {
                 None,
                 "窗口标题采集失败",
             ),
-            localized_text(
-                "platformSelfTest.detail.windowTitleReadFailed",
-                None,
-                error,
-            ),
+            localized_text("platformSelfTest.detail.windowTitleReadFailed", None, error),
             Vec::new(),
         ),
     };
 
     let media = match get_now_playing() {
-        Ok(info) if !info.is_empty() => {
-            make_probe(
-                true,
-                localized_text("platformSelfTest.summary.mediaOk", None, "媒体采集正常"),
-                localized_text(
-                    "platformSelfTest.detail.mediaCurrent",
-                    Some(json!({ "mediaSummary": info.summary() })),
-                    info.summary(),
-                ),
-                Vec::new(),
-            )
-        }
+        Ok(info) if !info.is_empty() => make_probe(
+            true,
+            localized_text("platformSelfTest.summary.mediaOk", None, "媒体采集正常"),
+            localized_text(
+                "platformSelfTest.detail.mediaCurrent",
+                Some(json!({ "mediaSummary": info.summary() })),
+                info.summary(),
+            ),
+            Vec::new(),
+        ),
         Ok(_) => make_probe(
             true,
             localized_text(
@@ -334,11 +322,7 @@ pub fn run_self_test() -> PlatformSelfTestResult {
         Err(error) => make_probe(
             false,
             localized_text("platformSelfTest.summary.mediaFailed", None, "媒体采集失败"),
-            localized_text(
-                "platformSelfTest.detail.mediaReadFailed",
-                None,
-                error,
-            ),
+            localized_text("platformSelfTest.detail.mediaReadFailed", None, error),
             Vec::new(),
         ),
     };

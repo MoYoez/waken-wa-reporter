@@ -222,7 +222,7 @@ fn run_discord_presence_loop(
                         &config.discord_application_id,
                         locale,
                     )
-                        .map(|()| PresenceUpdate::Cleared)
+                    .map(|()| PresenceUpdate::Cleared)
                 };
 
                 match result {
@@ -271,7 +271,14 @@ fn fetch_public_activity_feed_blocking(
         .get(url)
         .header(CONTENT_TYPE, "application/json")
         .send()
-        .map_err(|error| format_error(locale, "拉取公开活动失败", "Failed to fetch public activity", error))?;
+        .map_err(|error| {
+            format_error(
+                locale,
+                "拉取公开活动失败",
+                "Failed to fetch public activity",
+                error,
+            )
+        })?;
 
     let status = response.status().as_u16();
     let text = response.text().unwrap_or_default();
@@ -300,8 +307,14 @@ fn fetch_public_activity_feed_blocking(
     }
 
     let data = payload.get("data").cloned().unwrap_or(payload);
-    serde_json::from_value::<PublicActivityFeed>(data)
-        .map_err(|error| format_error(locale, "解析公开活动失败", "Failed to parse public activity", error))
+    serde_json::from_value::<PublicActivityFeed>(data).map_err(|error| {
+        format_error(
+            locale,
+            "解析公开活动失败",
+            "Failed to parse public activity",
+            error,
+        )
+    })
 }
 
 fn select_dc_source_activity<'a>(
@@ -383,9 +396,14 @@ fn apply_discord_presence(
             activity_payload =
                 activity_payload.timestamps(activity::Timestamps::new().start(started_at));
         }
-        client
-            .set_activity(activity_payload)
-            .map_err(|error| format_error(locale, "更新 Discord 状态失败", "Failed to update Discord presence", error))
+        client.set_activity(activity_payload).map_err(|error| {
+            format_error(
+                locale,
+                "更新 Discord 状态失败",
+                "Failed to update Discord presence",
+                error,
+            )
+        })
     })
 }
 
@@ -395,9 +413,14 @@ fn clear_discord_presence(
     locale: BackendLocale,
 ) -> Result<(), String> {
     with_discord_client(client_slot, application_id, locale, |client| {
-        client
-            .clear_activity()
-            .map_err(|error| format_error(locale, "清空 Discord 状态失败", "Failed to clear Discord presence", error))
+        client.clear_activity().map_err(|error| {
+            format_error(
+                locale,
+                "清空 Discord 状态失败",
+                "Failed to clear Discord presence",
+                error,
+            )
+        })
     })
 }
 
@@ -413,9 +436,14 @@ where
     for _ in 0..2 {
         if client_slot.is_none() {
             let mut client = DiscordIpcClient::new(application_id);
-            client
-                .connect()
-                .map_err(|error| format_error(locale, "连接 Discord IPC 失败", "Failed to connect to Discord IPC", error))?;
+            client.connect().map_err(|error| {
+                format_error(
+                    locale,
+                    "连接 Discord IPC 失败",
+                    "Failed to connect to Discord IPC",
+                    error,
+                )
+            })?;
             *client_slot = Some(client);
         }
 

@@ -1,6 +1,4 @@
-use super::{
-    build_self_test_result, localized_text, make_probe, ForegroundSnapshot, MediaInfo,
-};
+use super::{build_self_test_result, localized_text, make_probe, ForegroundSnapshot, MediaInfo};
 use crate::models::PlatformSelfTestResult;
 
 pub fn get_foreground_snapshot() -> Result<ForegroundSnapshot, String> {
