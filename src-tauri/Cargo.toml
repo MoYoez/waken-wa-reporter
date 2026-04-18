@@ -1,9 +1,9 @@
 [package]
-name = "waken-wa-preview-ui"
-version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
-edition = "2021"
+name = "waken-wa-Reporter"
+version = "0.4.0"
+description = "Hey! You Finally Awaken!"
+authors = ["MoeMagicMango"]
+edition = "2026"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
