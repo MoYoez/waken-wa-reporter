@@ -2,6 +2,7 @@
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { $toggleLink } from "@lexical/link";
 import {
   INSERT_ORDERED_LIST_COMMAND,
@@ -32,6 +33,8 @@ import { OnChangePlugin } from "lexical-vue/LexicalOnChangePlugin";
 import { RichTextPlugin } from "lexical-vue/LexicalRichTextPlugin";
 
 import { lexicalTextContent } from "../lib/inspirationRichText";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   modelValue: string;
@@ -257,20 +260,20 @@ onBeforeUnmount(() => {
 <template>
   <div class="lexical-editor-shell">
     <div class="lexical-toolbar">
-      <Button label="撤销" text size="small" :disabled="!canUndo" @click="dispatchUndo" />
-      <Button label="重做" text size="small" :disabled="!canRedo" @click="dispatchRedo" />
+      <Button :label="t('lexicalEditor.actions.undo')" text size="small" :disabled="!canUndo" @click="dispatchUndo" />
+      <Button :label="t('lexicalEditor.actions.redo')" text size="small" :disabled="!canRedo" @click="dispatchRedo" />
       <span class="lexical-divider" />
-      <Button label="正文" text size="small" @click="setBlock('paragraph')" />
-      <Button label="标题" text size="small" @click="setBlock('heading')" />
-      <Button label="引用" text size="small" @click="setBlock('quote')" />
-      <Button label="加粗" text size="small" @click="formatText('bold')" />
-      <Button label="斜体" text size="small" @click="formatText('italic')" />
-      <Button label="下划线" text size="small" @click="formatText('underline')" />
-      <Button label="代码" text size="small" @click="formatText('code')" />
-      <Button label="无序列表" text size="small" @click="insertList('bullet')" />
-      <Button label="有序列表" text size="small" @click="insertList('number')" />
+      <Button :label="t('lexicalEditor.actions.paragraph')" text size="small" @click="setBlock('paragraph')" />
+      <Button :label="t('lexicalEditor.actions.heading')" text size="small" @click="setBlock('heading')" />
+      <Button :label="t('lexicalEditor.actions.quote')" text size="small" @click="setBlock('quote')" />
+      <Button :label="t('lexicalEditor.actions.bold')" text size="small" @click="formatText('bold')" />
+      <Button :label="t('lexicalEditor.actions.italic')" text size="small" @click="formatText('italic')" />
+      <Button :label="t('lexicalEditor.actions.underline')" text size="small" @click="formatText('underline')" />
+      <Button :label="t('lexicalEditor.actions.code')" text size="small" @click="formatText('code')" />
+      <Button :label="t('lexicalEditor.actions.bulletList')" text size="small" @click="insertList('bullet')" />
+      <Button :label="t('lexicalEditor.actions.orderedList')" text size="small" @click="insertList('number')" />
       <Button
-        label="链接"
+        :label="t('lexicalEditor.actions.link')"
         text
         size="small"
         @click="showLinkInput = !showLinkInput"
@@ -280,10 +283,10 @@ onBeforeUnmount(() => {
     <div v-if="showLinkInput" class="lexical-link-row">
       <InputText
         v-model="linkDraft"
-        placeholder="输入链接，例如 https://example.com"
+        :placeholder="t('lexicalEditor.link.placeholder')"
         @keydown.enter.prevent="insertLink"
       />
-      <Button label="应用链接" size="small" @click="insertLink" />
+      <Button :label="t('lexicalEditor.actions.applyLink')" size="small" @click="insertLink" />
     </div>
 
     <div class="lexical-editor-frame" @click="focusEditor">
@@ -292,7 +295,7 @@ onBeforeUnmount(() => {
           <ContentEditable class="lexical-editor-root">
             <template #placeholder>
               <div v-if="isEmpty" class="lexical-placeholder">
-                {{ placeholder || "写下一段灵感内容..." }}
+                {{ placeholder || t("lexicalEditor.placeholder.default") }}
               </div>
             </template>
           </ContentEditable>

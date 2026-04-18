@@ -1,6 +1,10 @@
 use std::path::Path;
 
-use super::{build_self_test_result, make_probe, ForegroundSnapshot, MediaInfo};
+use serde_json::json;
+
+use super::{
+    build_self_test_result, localized_text, make_probe, ForegroundSnapshot, MediaInfo,
+};
 use crate::models::PlatformSelfTestResult;
 
 #[cfg(target_os = "windows")]
@@ -225,42 +229,118 @@ pub fn run_self_test() -> PlatformSelfTestResult {
     let foreground = match get_foreground_snapshot() {
         Ok(snapshot) => make_probe(
             true,
-            "前台应用采集正常",
-            format!("当前前台应用：{}", snapshot.process_name),
+            localized_text(
+                "platformSelfTest.summary.foregroundOk",
+                None,
+                "前台应用采集正常",
+            ),
+            localized_text(
+                "platformSelfTest.detail.foregroundCurrent",
+                Some(json!({ "processName": snapshot.process_name.clone() })),
+                format!("当前前台应用：{}", snapshot.process_name),
+            ),
             Vec::new(),
         ),
-        Err(error) => make_probe(false, "前台应用采集失败", error, Vec::new()),
+        Err(error) => make_probe(
+            false,
+            localized_text(
+                "platformSelfTest.summary.foregroundFailed",
+                None,
+                "前台应用采集失败",
+            ),
+            localized_text(
+                "platformSelfTest.detail.foregroundReadFailed",
+                None,
+                error,
+            ),
+            Vec::new(),
+        ),
     };
 
     let window_title = match get_foreground_snapshot() {
         Ok(snapshot) => make_probe(
             !snapshot.process_title.trim().is_empty(),
             if snapshot.process_title.trim().is_empty() {
-                "窗口标题为空"
+                localized_text(
+                    "platformSelfTest.summary.windowTitleEmpty",
+                    None,
+                    "窗口标题为空",
+                )
             } else {
-                "窗口标题采集正常"
+                localized_text(
+                    "platformSelfTest.summary.windowTitleOk",
+                    None,
+                    "窗口标题采集正常",
+                )
             },
             if snapshot.process_title.trim().is_empty() {
-                "当前前台窗口没有可用标题。".into()
+                localized_text(
+                    "platformSelfTest.detail.windowTitleEmpty",
+                    None,
+                    "当前前台窗口没有可用标题。",
+                )
             } else {
-                snapshot.process_title
+                localized_text(
+                    "platformSelfTest.detail.windowTitleCurrent",
+                    Some(json!({ "processTitle": snapshot.process_title.clone() })),
+                    snapshot.process_title,
+                )
             },
             Vec::new(),
         ),
-        Err(error) => make_probe(false, "窗口标题采集失败", error, Vec::new()),
+        Err(error) => make_probe(
+            false,
+            localized_text(
+                "platformSelfTest.summary.windowTitleFailed",
+                None,
+                "窗口标题采集失败",
+            ),
+            localized_text(
+                "platformSelfTest.detail.windowTitleReadFailed",
+                None,
+                error,
+            ),
+            Vec::new(),
+        ),
     };
 
     let media = match get_now_playing() {
         Ok(info) if !info.is_empty() => {
-            make_probe(true, "媒体采集正常", info.summary(), Vec::new())
+            make_probe(
+                true,
+                localized_text("platformSelfTest.summary.mediaOk", None, "媒体采集正常"),
+                localized_text(
+                    "platformSelfTest.detail.mediaCurrent",
+                    Some(json!({ "mediaSummary": info.summary() })),
+                    info.summary(),
+                ),
+                Vec::new(),
+            )
         }
         Ok(_) => make_probe(
             true,
-            "当前没有播放中的媒体",
-            "系统当前没有可用的正在播放信息。".to_string(),
+            localized_text(
+                "platformSelfTest.summary.mediaNone",
+                None,
+                "当前没有播放中的媒体",
+            ),
+            localized_text(
+                "platformSelfTest.detail.mediaNone",
+                None,
+                "系统当前没有可用的正在播放信息。",
+            ),
             Vec::new(),
         ),
-        Err(error) => make_probe(false, "媒体采集失败", error, Vec::new()),
+        Err(error) => make_probe(
+            false,
+            localized_text("platformSelfTest.summary.mediaFailed", None, "媒体采集失败"),
+            localized_text(
+                "platformSelfTest.detail.mediaReadFailed",
+                None,
+                error,
+            ),
+            Vec::new(),
+        ),
     };
 
     build_self_test_result(foreground, window_title, media)

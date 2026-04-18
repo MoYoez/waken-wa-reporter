@@ -7,6 +7,7 @@ export interface ClientCapabilities {
   tray: boolean;
   platformSelfTest: boolean;
   discordPresence: boolean;
+  autostart: boolean;
 }
 
 export interface ClientConfig {
@@ -28,6 +29,7 @@ export interface ClientConfig {
   discordEnabled: boolean;
   discordApplicationId: string;
   discordSourceId: string;
+  launchOnStartup: boolean;
 }
 
 export interface ActivityMedia {
@@ -114,6 +116,8 @@ export interface InspirationAssetUploadResult {
 export interface ApiError {
   status: number;
   message: string;
+  code?: string | null;
+  params?: Record<string, unknown> | null;
   details?: unknown;
 }
 
@@ -149,6 +153,7 @@ export interface AppStatePayload {
   config: ClientConfig;
   recentPresets: RecentPreset[];
   onboardingDismissed: boolean;
+  locale?: string;
   reporterConfigPromptHandled?: boolean;
   verifiedGeneratedHashKey?: string;
 }
@@ -161,6 +166,10 @@ export interface ReporterLogEntry {
   level: ReporterLogLevel;
   title: string;
   detail: string;
+  titleKey?: string | null;
+  titleParams?: Record<string, unknown> | null;
+  detailKey?: string | null;
+  detailParams?: Record<string, unknown> | null;
   payload?: Record<string, unknown> | null;
 }
 
@@ -182,11 +191,22 @@ export interface DiscordPresenceSnapshot {
   currentSummary?: string | null;
 }
 
+export interface LocalizedTextEntry {
+  text: string;
+  key?: string | null;
+  params?: Record<string, unknown> | null;
+}
+
 export interface PlatformProbeResult {
   success: boolean;
   summary: string;
   detail: string;
   guidance?: string[];
+  summaryKey?: string | null;
+  summaryParams?: Record<string, unknown> | null;
+  detailKey?: string | null;
+  detailParams?: Record<string, unknown> | null;
+  guidanceEntries?: LocalizedTextEntry[] | null;
 }
 
 export interface PlatformSelfTestResult {

@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import Button from "primevue/button";
 import Card from "primevue/card";
 import Message from "primevue/message";
 import Tag from "primevue/tag";
 
+import { resolveReporterLogDetail, resolveReporterLogTitle } from "../lib/reporterLogText";
 import type {
   ClientCapabilities,
   ClientConfig,
@@ -12,6 +14,8 @@ import type {
   MobileConnectivityState,
   RealtimeReporterSnapshot,
 } from "../types";
+
+const { t, locale } = useI18n();
 
 const props = defineProps<{
   config: ClientConfig;
@@ -34,15 +38,35 @@ const reporterSupported = computed(() => props.capabilities.realtimeReporter);
 const discordSupported = computed(() => props.capabilities.discordPresence);
 const effectiveModeLabel = computed(() => {
   if (!reporterSupported.value) {
-    return "活动模式";
+    return t("overview.modes.activity");
   }
 
-  return props.reporterSnapshot.running ? "实时模式" : "活动模式";
+  return props.reporterSnapshot.running
+    ? t("overview.modes.realtime")
+    : t("overview.modes.activity");
 });
 
 function formatTime(value?: string | null) {
-  if (!value) return "暂无";
-  return new Date(value).toLocaleString();
+  if (!value) return t("overview.common.none");
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString(locale.value);
+}
+
+function translateLogText(key: string, params?: Record<string, unknown> | null) {
+  return params ? t(key, params) : t(key);
+}
+
+function logTitle(log: RealtimeReporterSnapshot["logs"][number]) {
+  return resolveReporterLogTitle(log, translateLogText);
+}
+
+function logDetail(log: RealtimeReporterSnapshot["logs"][number]) {
+  return resolveReporterLogDetail(log, translateLogText);
 }
 </script>
 
@@ -50,20 +74,18 @@ function formatTime(value?: string | null) {
   <div class="workspace-grid">
     <header class="hero-panel">
       <div>
-        <p class="eyebrow">概览</p>
-        <h2>概览</h2>
-        <p class="hero-copy">
-          在这里查看当前连接状态、设备信息和同步运行情况。
-        </p>
+        <p class="eyebrow">{{ t("overview.hero.eyebrow") }}</p>
+        <h2>{{ t("overview.hero.title") }}</h2>
+        <p class="hero-copy">{{ t("overview.hero.description") }}</p>
       </div>
       <div class="hero-actions">
         <Tag
           v-if="reporterSupported"
-          :value="reporterSnapshot.running ? '后台同步运行中' : '后台同步未开启'"
+          :value="reporterSnapshot.running ? t('overview.common.running') : t('overview.common.stopped')"
           :severity="reporterSnapshot.running ? 'success' : 'warn'"
           rounded
         />
-        <Tag v-else value="移动端模式" severity="info" rounded />
+        <Tag v-else :value="t('overview.hero.mobileMode')" severity="info" rounded />
       </div>
     </header>
 
@@ -71,20 +93,24 @@ function formatTime(value?: string | null) {
       <template #content>
         <div class="overview-summary">
           <div class="overview-item">
-            <span>站点地址</span>
-            <strong>{{ config.baseUrl || "未设置" }}</strong>
+            <span>{{ t("overview.summary.siteUrl") }}</span>
+            <strong>{{ config.baseUrl || t("overview.summary.notSet") }}</strong>
           </div>
           <div class="overview-item">
-            <span>设备名称</span>
-            <strong>{{ config.device || "未命名设备" }}</strong>
+            <span>{{ t("overview.summary.deviceName") }}</span>
+            <strong>{{ config.device || t("overview.summary.unnamedDevice") }}</strong>
           </div>
           <div class="overview-item">
-            <span>当前模式</span>
+            <span>{{ t("overview.summary.currentMode") }}</span>
             <strong>{{ effectiveModeLabel }}</strong>
           </div>
           <div class="overview-item">
-            <span>{{ reporterSupported ? "最近心跳" : "设备类型" }}</span>
-            <strong>{{ reporterSupported ? formatTime(reporterSnapshot.lastHeartbeatAt) : config.deviceType }}</strong>
+            <span>
+              {{ reporterSupported ? t("overview.summary.lastHeartbeat") : t("overview.summary.deviceType") }}
+            </span>
+            <strong>
+              {{ reporterSupported ? formatTime(reporterSnapshot.lastHeartbeatAt) : config.deviceType }}
+            </strong>
           </div>
         </div>
       </template>
@@ -94,11 +120,11 @@ function formatTime(value?: string | null) {
       <template #title>
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">Discord</p>
-            <h3>Discord 状态同步</h3>
+            <p class="eyebrow">{{ t("overview.discord.eyebrow") }}</p>
+            <h3>{{ t("overview.discord.title") }}</h3>
           </div>
           <Tag
-            :value="discordPresenceSnapshot.running ? (discordPresenceSnapshot.connected ? '运行中' : '等待 Discord') : '未启动'"
+            :value="discordPresenceSnapshot.running ? (discordPresenceSnapshot.connected ? t('overview.discord.running') : t('overview.discord.waiting')) : t('overview.discord.notStarted')"
             :severity="discordPresenceSnapshot.running ? (discordPresenceSnapshot.connected ? 'success' : 'warn') : 'secondary'"
             rounded
           />
@@ -107,19 +133,23 @@ function formatTime(value?: string | null) {
       <template #content>
         <div class="overview-summary">
           <div class="overview-item">
-            <span>同步状态</span>
-            <strong>{{ discordPresenceSnapshot.running ? "已启动" : "未启动" }}</strong>
+            <span>{{ t("overview.discord.syncStatus") }}</span>
+            <strong>
+              {{ discordPresenceSnapshot.running ? t("overview.discord.started") : t("overview.discord.notStarted") }}
+            </strong>
           </div>
           <div class="overview-item">
-            <span>Discord 连接</span>
-            <strong>{{ discordPresenceSnapshot.connected ? "已连接" : "未连接" }}</strong>
+            <span>{{ t("overview.discord.connection") }}</span>
+            <strong>
+              {{ discordPresenceSnapshot.connected ? t("overview.discord.connected") : t("overview.discord.disconnected") }}
+            </strong>
           </div>
           <div class="overview-item">
-            <span>当前摘要</span>
-            <strong>{{ discordPresenceSnapshot.currentSummary || "暂无" }}</strong>
+            <span>{{ t("overview.discord.currentSummary") }}</span>
+            <strong>{{ discordPresenceSnapshot.currentSummary || t("overview.common.none") }}</strong>
           </div>
           <div class="overview-item">
-            <span>最近同步</span>
+            <span>{{ t("overview.discord.lastSync") }}</span>
             <strong>{{ formatTime(discordPresenceSnapshot.lastSyncAt) }}</strong>
           </div>
         </div>
@@ -135,12 +165,12 @@ function formatTime(value?: string | null) {
           >
             {{
               discordPresenceSnapshot.connected
-                ? "当前客户端会根据 public feed 中属于自己的活动更新 Discord 状态。"
-                : "同步任务已启动，等待本机 Discord 桌面端可用。"
+                ? t("overview.discord.activeMessage")
+                : t("overview.discord.waitingMessage")
             }}
           </Message>
           <Message v-else severity="secondary" :closable="false">
-            你可以在“设置”页配置 Discord Application ID，并单独启动 Discord 状态同步。
+            {{ t("overview.discord.idleMessage") }}
           </Message>
         </div>
       </template>
@@ -150,49 +180,49 @@ function formatTime(value?: string | null) {
       <template #title>
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">当前状态</p>
-            <h3>后台同步</h3>
+            <p class="eyebrow">{{ t("overview.reporter.eyebrow") }}</p>
+            <h3>{{ t("overview.reporter.title") }}</h3>
           </div>
         </div>
       </template>
       <template #content>
         <div class="overview-summary">
           <div class="overview-item">
-            <span>基础配置</span>
-            <strong>{{ readiness ? "已就绪" : "待完善" }}</strong>
+            <span>{{ t("overview.reporter.baseConfig") }}</span>
+            <strong>{{ readiness ? t("overview.reporter.ready") : t("overview.reporter.incomplete") }}</strong>
           </div>
           <div class="overview-item">
-            <span>当前进程</span>
-            <strong>{{ reporterSnapshot.currentActivity?.processName || "暂无" }}</strong>
+            <span>{{ t("overview.reporter.currentProcess") }}</span>
+            <strong>{{ reporterSnapshot.currentActivity?.processName || t("overview.common.none") }}</strong>
           </div>
           <div class="overview-item">
-            <span>窗口标题</span>
-            <strong>{{ reporterSnapshot.currentActivity?.processTitle || "暂无" }}</strong>
+            <span>{{ t("overview.reporter.windowTitle") }}</span>
+            <strong>{{ reporterSnapshot.currentActivity?.processTitle || t("overview.common.none") }}</strong>
           </div>
           <div class="overview-item">
-            <span>轮询间隔</span>
+            <span>{{ t("overview.reporter.pollInterval") }}</span>
             <strong>{{ config.pollIntervalMs }} ms</strong>
           </div>
           <div class="overview-item">
-            <span>开机后自动同步</span>
-            <strong>{{ config.reporterEnabled ? "已开启" : "未开启" }}</strong>
+            <span>{{ t("overview.reporter.autoStart") }}</span>
+            <strong>{{ config.reporterEnabled ? t("overview.reporter.enabled") : t("overview.reporter.disabled") }}</strong>
           </div>
           <div class="overview-item">
-            <span>心跳间隔</span>
+            <span>{{ t("overview.reporter.heartbeatInterval") }}</span>
             <strong>{{ config.heartbeatIntervalMs }} ms</strong>
           </div>
         </div>
 
         <div class="actions-row">
           <Button
-            label="开启后台同步"
+            :label="t('overview.reporter.start')"
             icon="pi pi-play"
             :loading="reporterBusy"
             :disabled="reporterSnapshot.running || !readiness"
             @click="$emit('startReporter')"
           />
           <Button
-            label="停止后台同步"
+            :label="t('overview.reporter.stop')"
             icon="pi pi-stop"
             severity="secondary"
             outlined
@@ -211,10 +241,10 @@ function formatTime(value?: string | null) {
             severity="success"
             :closable="false"
           >
-            已启用启动后自动同步，客户端下次打开时会自动尝试开始后台同步。
+            {{ t("overview.reporter.autoStartMessage") }}
           </Message>
           <Message v-else-if="!reporterSnapshot.running" severity="secondary" :closable="false">
-            后台同步当前未开启。你可以在“设置”里手动开启，或启用启动后自动同步。
+            {{ t("overview.reporter.idleMessage") }}
           </Message>
         </div>
       </template>
@@ -224,47 +254,47 @@ function formatTime(value?: string | null) {
       <template #title>
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">当前状态</p>
-            <h3>移动端能力</h3>
+            <p class="eyebrow">{{ t("overview.mobile.eyebrow") }}</p>
+            <h3>{{ t("overview.mobile.title") }}</h3>
           </div>
         </div>
       </template>
       <template #content>
         <div class="overview-summary">
           <div class="overview-item">
-            <span>基础配置</span>
-            <strong>{{ readiness ? "已就绪" : "待完善" }}</strong>
+            <span>{{ t("overview.mobile.baseConfig") }}</span>
+            <strong>{{ readiness ? t("overview.mobile.ready") : t("overview.mobile.incomplete") }}</strong>
           </div>
           <div class="overview-item">
-            <span>后台实时上报</span>
-            <strong>已禁用</strong>
+            <span>{{ t("overview.mobile.realtimeReporter") }}</span>
+            <strong>{{ t("overview.mobile.disabled") }}</strong>
           </div>
           <div class="overview-item">
-            <span>手动活动提交</span>
-            <strong>可用</strong>
+            <span>{{ t("overview.mobile.manualActivity") }}</span>
+            <strong>{{ t("overview.mobile.available") }}</strong>
           </div>
           <div class="overview-item">
-            <span>灵感发布</span>
-            <strong>可用</strong>
+            <span>{{ t("overview.mobile.inspiration") }}</span>
+            <strong>{{ t("overview.mobile.available") }}</strong>
           </div>
           <div class="overview-item">
-            <span>连通性检查</span>
+            <span>{{ t("overview.mobile.connectivity") }}</span>
             <strong>
               {{
                 mobileConnectivity.checking
-                  ? "检测中"
+                  ? t("overview.mobile.checking")
                   : mobileConnectivity.ok === true
-                    ? "已通过"
+                    ? t("overview.mobile.passed")
                     : mobileConnectivity.checked
-                      ? "异常"
-                      : "待检测"
+                      ? t("overview.mobile.failed")
+                      : t("overview.mobile.pending")
               }}
             </strong>
           </div>
         </div>
         <div class="actions-row">
           <Button
-            label="重新测试连接"
+            :label="t('overview.mobile.retry')"
             icon="pi pi-refresh"
             severity="secondary"
             outlined
@@ -284,12 +314,12 @@ function formatTime(value?: string | null) {
             "
             :closable="false"
           >
-            <strong>{{ mobileConnectivity.summary || "移动端模式" }}</strong>
+            <strong>{{ mobileConnectivity.summary || t("overview.mobile.mobileMode") }}</strong>
             <br v-if="mobileConnectivity.detail" />
-            {{ mobileConnectivity.detail || "当前平台已关闭后台实时同步，适用于移动端前台使用场景。" }}
+            {{ mobileConnectivity.detail || t("overview.mobile.defaultDetail") }}
           </Message>
           <Message v-if="!readiness" severity="secondary" :closable="false">
-            当前平台已关闭后台实时同步，适用于移动端前台使用场景。
+            {{ t("overview.mobile.defaultDetail") }}
           </Message>
         </div>
       </template>
@@ -299,8 +329,8 @@ function formatTime(value?: string | null) {
       <template #title>
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">最近动态</p>
-            <h3>这里展示最近几次后台同步的内容摘要</h3>
+            <p class="eyebrow">{{ t("overview.logs.eyebrow") }}</p>
+            <h3>{{ t("overview.logs.title") }}</h3>
           </div>
         </div>
       </template>
@@ -308,14 +338,14 @@ function formatTime(value?: string | null) {
         <div v-if="latestLogs.length" class="log-list">
           <article v-for="log in latestLogs" :key="log.id" class="log-item">
             <div class="log-header">
-              <strong>{{ log.title }}</strong>
+              <strong>{{ logTitle(log) }}</strong>
               <small>{{ formatTime(log.timestamp) }}</small>
             </div>
-            <p class="log-detail">{{ log.detail }}</p>
+            <p class="log-detail">{{ logDetail(log) }}</p>
           </article>
         </div>
         <Message v-else severity="secondary" :closable="false">
-          开启后台同步后，最近动态会显示在这里。
+          {{ t("overview.logs.empty") }}
         </Message>
       </template>
     </Card>

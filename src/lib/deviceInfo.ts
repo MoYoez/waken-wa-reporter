@@ -1,5 +1,7 @@
 import { getBatteryInfo, getDeviceInfo } from "tauri-plugin-device-info-api";
 
+import { translate } from "../i18n";
+
 export interface BatterySnapshot {
   levelPercent: number;
   charging: boolean;
@@ -10,7 +12,7 @@ export async function readBatterySnapshot(): Promise<BatterySnapshot> {
   const level = battery.level;
 
   if (typeof level !== "number" || !Number.isFinite(level)) {
-    throw new Error("当前设备未返回可用的电量信息。");
+    throw new Error(translate("deviceInfo.batteryUnavailable"));
   }
 
   return {
@@ -26,7 +28,7 @@ export async function readDeviceName(): Promise<string> {
     .filter(Boolean);
 
   if (candidates.length === 0) {
-    throw new Error("当前设备未返回可用的设备名称。");
+    throw new Error(translate("deviceInfo.deviceNameUnavailable"));
   }
 
   return candidates[0];

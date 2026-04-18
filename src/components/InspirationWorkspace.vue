@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onErrorCaptured, onMounted, reactive, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import Button from "primevue/button";
 import Card from "primevue/card";
 import Dialog from "primevue/dialog";
@@ -29,6 +30,7 @@ import {
   renderInspirationContentHtml,
   sanitizeEntryContent as sanitizeRichTextContent,
 } from "../lib/inspirationRichText";
+import { resolveApiErrorMessage } from "../lib/localizedText";
 import { createNotifier } from "../lib/notify";
 import { useInspirationDraftStore } from "../stores/inspirationDraft";
 import type {
@@ -56,6 +58,8 @@ const SUPPORTED_IMAGE_TYPES = new Set([
   "image/webp",
   "image/gif",
 ]);
+
+const { t, locale } = useI18n();
 
 const props = defineProps<{
   config: ClientConfig;
@@ -106,6 +110,23 @@ const configIssues = computed(() => validateConfig(props.config, props.capabilit
 const selectedActivityOption = computed(() =>
   activityOptions.value.find((item) => item.value === selectedActivityKey.value) ?? null,
 );
+
+function snapshotWithDeviceAndBattery(base: string, device: string, battery: string) {
+  return t("inspiration.snapshot.withDeviceAndBattery", {
+    base,
+    device,
+    battery,
+  });
+}
+
+function snapshotWithDevice(base: string, device: string) {
+  return t("inspiration.snapshot.withDevice", { base, device });
+}
+
+function snapshotWithBattery(base: string, battery: string) {
+  return t("inspiration.snapshot.withBattery", { base, battery });
+}
+
 function buildManualSnapshot(input: string, includeDeviceInfo: boolean) {
   const base = input.trim();
   if (!base) return "";
@@ -118,13 +139,13 @@ function buildManualSnapshot(input: string, includeDeviceInfo: boolean) {
       : "";
 
   if (deviceName && batteryPart) {
-    return `${base}（${deviceName} · ${batteryPart}）`;
+    return snapshotWithDeviceAndBattery(base, deviceName, batteryPart);
   }
   if (deviceName) {
-    return `${base}（${deviceName}）`;
+    return snapshotWithDevice(base, deviceName);
   }
   if (batteryPart) {
-    return `${base}（${batteryPart}）`;
+    return snapshotWithBattery(base, batteryPart);
   }
   return base;
 }
@@ -148,7 +169,12 @@ const selectedEntryVisible = computed({
 
 const hasMoreEntries = computed(() => entryTotal.value > entries.value.length);
 const entryCountLabel = computed(() =>
-  entryTotal.value > 0 ? `${entries.value.length} / ${entryTotal.value} 条记录` : `${entries.value.length} 条记录`,
+  entryTotal.value > 0
+    ? t("inspiration.count.withTotal", {
+        current: entries.value.length,
+        total: entryTotal.value,
+      })
+    : t("inspiration.count.withoutTotal", { current: entries.value.length }),
 );
 
 onErrorCaptured((error, instance, info) => {
@@ -195,7 +221,7 @@ function toLine(item: ActivityFeedItem) {
   const processName = String(item.processName ?? "").trim();
   const processTitle = String(item.processTitle ?? "").trim();
   if (processTitle && processName) return `${processTitle} | ${processName}`;
-  return processName || processTitle || "未命名活动";
+  return processName || processTitle || t("inspiration.common.unnamedActivity");
 }
 
 function toBatteryPercent(item: ActivityFeedItem) {
@@ -215,8 +241,11 @@ function buildSnapshotText(item: ActivityFeedItem, includeDeviceInfo: boolean) {
   if (!deviceName) return base;
 
   const battery = toBatteryPercent(item);
-  const suffix = typeof battery === "number" ? `（${deviceName} · ${battery}%）` : `（${deviceName}）`;
-  return `${base} ${suffix}`.trim();
+  if (typeof battery === "number") {
+    return snapshotWithDeviceAndBattery(base, deviceName, `${battery}%`);
+  }
+
+  return snapshotWithDevice(base, deviceName);
 }
 
 function toActivityOptions(items: ActivityFeedItem[], group: "active" | "recent") {
@@ -225,7 +254,7 @@ function toActivityOptions(items: ActivityFeedItem[], group: "active" | "recent"
       const idPart = String(item.id ?? `${item.processName ?? "item"}-${index}`);
       const snapshot = buildSnapshotText(item, attachStatusIncludeDeviceInfo.value);
       const device = String(item.device ?? "").trim();
-      const prefix = group === "active" ? "当前" : "最近";
+      const prefix = t(`inspiration.activityGroup.${group}`);
       return {
         value: `${group}:${idPart}`,
         label: device ? `${prefix} · ${snapshot} · ${device}` : `${prefix} · ${snapshot}`,
@@ -241,18 +270,29 @@ function toActivityOptions(items: ActivityFeedItem[], group: "active" | "recent"
 function formatTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return value || "-";
+    return value || t("inspiration.common.unknownTime");
   }
-  return date.toLocaleString();
+  return date.toLocaleString(locale.value);
+}
+
+function translateText(key: string, params?: Record<string, unknown>) {
+  return params ? t(key, params) : t(key);
+}
+
+function apiErrorDetail(
+  error: { message?: string; code?: string | null; params?: Record<string, unknown> | null } | null | undefined,
+  fallback: string,
+) {
+  return resolveApiErrorMessage(error, translateText, fallback);
 }
 
 function validateImageFile(file: File) {
   if (!SUPPORTED_IMAGE_TYPES.has(file.type)) {
-    throw new Error("仅支持 PNG、JPEG、WebP 或 GIF 图片。");
+    throw new Error(t("inspiration.notify.invalidImageType"));
   }
 
   if (file.size > MAX_IMAGE_UPLOAD_BYTES) {
-    throw new Error(`图片过大，请选择 5 MB 以内的图片。`);
+    throw new Error(t("inspiration.notify.invalidImageSize"));
   }
 }
 
@@ -260,7 +300,7 @@ function readFileAsDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result ?? ""));
-    reader.onerror = () => reject(reader.error ?? new Error("读取图片失败。"));
+    reader.onerror = () => reject(reader.error ?? new Error(t("inspiration.notify.fileReadFailed")));
     reader.readAsDataURL(file);
   });
 }
@@ -283,7 +323,7 @@ function normalizeEntries(payload: unknown) {
 
 async function loadEntries(options?: { reset?: boolean }) {
   if (!props.config.baseUrl.trim()) {
-    loadError.value = "请先填写站点地址，再加载灵感内容列表。";
+    loadError.value = t("inspiration.notify.baseUrlRequiredForList");
     return;
   }
 
@@ -306,7 +346,7 @@ async function loadEntries(options?: { reset?: boolean }) {
   loadingMore.value = false;
 
   if (!result.success) {
-    loadError.value = result.error?.message ?? "内容列表加载失败。";
+    loadError.value = apiErrorDetail(result.error, t("inspiration.notify.listLoadFailed"));
     return;
   }
 
@@ -346,7 +386,10 @@ async function loadActivityOptions() {
   activityLoading.value = false;
 
   if (!result.success || !result.data) {
-    activityLoadError.value = result.error?.message ?? "活动列表加载失败。";
+    activityLoadError.value = apiErrorDetail(
+      result.error,
+      t("inspiration.notify.activityLoadFailed"),
+    );
     activityOptions.value = [];
     return;
   }
@@ -475,15 +518,15 @@ async function onFileSelected(event: Event) {
 
     notify({
       severity: "success",
-      summary: "头图已准备",
-      detail: "这张图片会作为本条灵感的头图一并发布。",
+      summary: t("inspiration.notify.coverReady"),
+      detail: t("inspiration.notify.coverReadyDetail"),
       life: 3000,
     });
   } catch (error) {
     notify({
       severity: "error",
-      summary: "头图读取失败",
-      detail: error instanceof Error ? error.message : "图片读取失败，请重试。",
+      summary: t("inspiration.notify.coverReadFailed"),
+      detail: error instanceof Error ? error.message : t("inspiration.notify.coverReadFailedDetail"),
       life: 4000,
     });
   } finally {
@@ -508,7 +551,7 @@ async function onBodyImageSelected(event: Event) {
     if (pendingApproval) {
       notify({
         severity: "warn",
-        summary: "设备待审核",
+        summary: t("inspiration.notify.pendingApproval"),
         detail: formatPendingApprovalDetail(pendingApproval),
         life: 6000,
       });
@@ -519,8 +562,11 @@ async function onBodyImageSelected(event: Event) {
     if (!result.success || !result.data?.url) {
       notify({
         severity: "error",
-        summary: "附图上传失败",
-        detail: result.error?.message ?? "正文附图上传失败。",
+        summary: t("inspiration.notify.inlineImageUploadFailed"),
+        detail: apiErrorDetail(
+          result.error,
+          t("inspiration.notify.inlineImageUploadFailedDetail"),
+        ),
         life: 4000,
       });
       return;
@@ -534,8 +580,8 @@ async function onBodyImageSelected(event: Event) {
 
     notify({
       severity: "success",
-      summary: "附图已插入",
-      detail: "图片已经作为正文附图插入到当前灵感中。",
+      summary: t("inspiration.notify.inlineImageInserted"),
+      detail: t("inspiration.notify.inlineImageInsertedDetail"),
       life: 3000,
     });
   } finally {
@@ -548,8 +594,8 @@ async function submitEntry() {
   if (configIssues.value.length > 0) {
     notify({
       severity: "warn",
-      summary: "请先完成连接设置",
-      detail: "发布内容前，需要先填写站点地址和 API Token。",
+      summary: t("inspiration.notify.settingsRequired"),
+      detail: t("inspiration.notify.settingsRequiredDetail"),
       life: 4000,
     });
     return;
@@ -558,8 +604,8 @@ async function submitEntry() {
   if (!compose.content.trim()) {
     notify({
       severity: "warn",
-      summary: "请填写正文内容",
-      detail: "发布内容前，正文不能为空。",
+      summary: t("inspiration.notify.contentRequired"),
+      detail: t("inspiration.notify.contentRequiredDetail"),
       life: 3000,
     });
     return;
@@ -569,8 +615,8 @@ async function submitEntry() {
     if (mobileRuntime.value && !statusSnapshotInput.value.trim()) {
       notify({
         severity: "warn",
-        summary: "请填写你正在做什么",
-        detail: "开启附带当前状态后，需要填写一段状态描述。",
+        summary: t("inspiration.notify.statusInputRequired"),
+        detail: t("inspiration.notify.statusInputRequiredDetail"),
         life: 3000,
       });
       return;
@@ -579,8 +625,8 @@ async function submitEntry() {
     if (!mobileRuntime.value && !selectedActivityOption.value) {
       notify({
         severity: "warn",
-        summary: "请选择要附带的活动",
-        detail: "开启附带当前状态后，需要选择一条活动记录。",
+        summary: t("inspiration.notify.activityRequired"),
+        detail: t("inspiration.notify.activityRequiredDetail"),
         life: 3000,
       });
       return;
@@ -626,7 +672,7 @@ async function submitEntry() {
   if (pendingApproval) {
     notify({
       severity: "warn",
-      summary: "设备待审核",
+      summary: t("inspiration.notify.pendingApproval"),
       detail: formatPendingApprovalDetail(pendingApproval),
       life: 6000,
     });
@@ -637,8 +683,10 @@ async function submitEntry() {
   if (!result.success) {
     notify({
       severity: "error",
-      summary: `发布失败（${result.status || "网络"}）`,
-      detail: result.error?.message ?? "内容保存失败。",
+      summary: t("inspiration.notify.submitFailed", {
+        status: result.status || t("inspiration.common.network"),
+      }),
+      detail: apiErrorDetail(result.error, t("inspiration.notify.submitFailedDetail")),
       life: 4500,
     });
     return;
@@ -648,8 +696,8 @@ async function submitEntry() {
 
   notify({
     severity: "success",
-    summary: "内容已发布",
-    detail: "新的内容已同步到 Waken-Wa。",
+    summary: t("inspiration.notify.submitSuccess"),
+    detail: t("inspiration.notify.submitSuccessDetail"),
     life: 3000,
   });
 
@@ -676,11 +724,11 @@ async function submitEntry() {
       <template #title>
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">灵感创作</p>
-            <h3>在这里整理想法并发布到 Waken-Wa</h3>
+            <p class="eyebrow">{{ t("inspiration.title.eyebrow") }}</p>
+            <h3>{{ t("inspiration.title.title") }}</h3>
           </div>
           <Button
-            label="刷新列表"
+            :label="t('inspiration.buttons.refresh')"
             icon="pi pi-refresh"
             severity="secondary"
             text
@@ -692,36 +740,42 @@ async function submitEntry() {
       <template #content>
         <div class="panel-grid">
           <div class="field-block field-span-2">
-            <span class="field-label">标题</span>
-            <InputText v-model="compose.title" placeholder="例如：今天突然冒出的一个想法" />
+            <span class="field-label">{{ t("inspiration.fields.title") }}</span>
+            <InputText v-model="compose.title" :placeholder="t('inspiration.placeholders.title')" />
           </div>
 
           <div class="field-block field-span-2">
-            <span class="field-label">{{ mobileRuntime ? "你正在做什么（可选）" : "关联活动（可选）" }}</span>
+            <span class="field-label">
+              {{ mobileRuntime ? t("inspiration.fields.statusMobile") : t("inspiration.fields.statusDesktop") }}
+            </span>
             <div class="activity-toggle-row">
               <ToggleSwitch v-model="attachCurrentStatus" input-id="attach-current-status" />
               <label for="attach-current-status">
-                {{ mobileRuntime ? "提交时附带“你正在做什么”快照" : "提交时附带当前状态快照" }}
+                {{
+                  mobileRuntime
+                    ? t("inspiration.toggles.attachStatusMobile")
+                    : t("inspiration.toggles.attachStatusDesktop")
+                }}
               </label>
               <ToggleSwitch
                 v-model="attachStatusIncludeDeviceInfo"
                 input-id="attach-device-info"
                 :disabled="!attachCurrentStatus"
               />
-              <label for="attach-device-info">快照包含设备与电量</label>
+              <label for="attach-device-info">{{ t("inspiration.toggles.attachDeviceInfo") }}</label>
             </div>
             <div v-if="mobileRuntime" class="activity-select-row">
               <InputText
                 v-model="statusSnapshotInput"
                 :disabled="!attachCurrentStatus"
-                placeholder="例如：正在写移动端改造方案"
+                :placeholder="t('inspiration.placeholders.statusInput')"
               />
             </div>
             <div v-if="mobileRuntime" class="activity-select-row">
               <InputText
                 v-model="statusSnapshotDeviceName"
                 :disabled="!attachCurrentStatus"
-                placeholder="设备名称（可选，留空使用默认设备名）"
+                :placeholder="t('inspiration.placeholders.deviceName')"
               />
             </div>
             <div v-else class="activity-select-row">
@@ -734,30 +788,33 @@ async function submitEntry() {
                 filter
                 :loading="activityLoading"
                 :disabled="!attachCurrentStatus"
-                placeholder="选择一条活动并附带到状态快照"
+                :placeholder="t('inspiration.placeholders.activitySelect')"
               />
               <Button
                 icon="pi pi-refresh"
                 severity="secondary"
                 text
                 :loading="activityLoading"
+                :aria-label="t('inspiration.buttons.refreshActivities')"
+                :title="t('inspiration.buttons.refreshActivities')"
                 @click="loadActivityOptions"
               />
             </div>
             <small class="field-help">
-              {{ mobileRuntime
-                ? "填写一段你当前在做的事情，可按需附带设备与电量信息。"
-                : "逻辑与 Web 端一致：可选设备活动，提交时由后端生成状态快照。"
+              {{
+                mobileRuntime
+                  ? t("inspiration.help.statusMobile")
+                  : t("inspiration.help.statusDesktop")
               }}
             </small>
             <div v-if="attachCurrentStatus && selectedSnapshotPreview" class="snapshot-preview">
-              <strong>快照预览：</strong>
+              <strong>{{ t("inspiration.help.snapshotPreview") }}</strong>
               <span>{{ selectedSnapshotPreview }}</span>
             </div>
           </div>
 
           <div class="field-block field-span-2">
-            <span class="field-label">正文</span>
+            <span class="field-label">{{ t("inspiration.fields.body") }}</span>
             <input
               ref="bodyImageInput"
               type="file"
@@ -772,7 +829,7 @@ async function submitEntry() {
                 :class="{ active: composeTab === 'edit' }"
                 @click="composeTab = 'edit'"
               >
-                编辑
+                {{ t("inspiration.tabs.edit") }}
               </button>
               <button
                 type="button"
@@ -780,36 +837,36 @@ async function submitEntry() {
                 :class="{ active: composeTab === 'preview' }"
                 @click="composeTab = 'preview'"
               >
-                预览
+                {{ t("inspiration.tabs.preview") }}
               </button>
             </div>
             <div class="editor-asset-actions">
               <Button
-                label="插入附图"
+                :label="t('inspiration.buttons.insertInlineImage')"
                 icon="pi pi-image"
                 text
                 size="small"
                 :loading="inlineUploadPending"
                 @click="bodyImageInput?.click()"
               />
-              <small>头图用于封面，附图会插入正文内容里。</small>
+              <small>{{ t("inspiration.help.inlineImage") }}</small>
             </div>
             <div v-show="composeTab === 'edit'" class="editor-tab-panel">
               <LexicalEditor
                 v-if="!editorFaulted"
                 v-model="compose.content"
                 v-model:lexical-value="compose.contentLexical"
-                placeholder="写下一段随想，支持标题、引用、列表、链接和代码。"
+                :placeholder="t('inspiration.placeholders.editor')"
               />
               <div v-else class="editor-fallback">
                 <Message severity="warn" :closable="false">
-                  编辑器暂时切换到兼容模式，已避免页面卡死。
+                  {{ t("inspiration.help.editorFallback") }}
                 </Message>
                 <Textarea
                   v-model="compose.content"
                   rows="12"
                   auto-resize
-                  placeholder="请输入正文内容"
+                  :placeholder="t('inspiration.placeholders.fallbackEditor')"
                 />
               </div>
             </div>
@@ -817,15 +874,15 @@ async function submitEntry() {
               <article class="entry-card compose-preview-card">
                 <div class="entry-header">
                   <div>
-                    <h4>{{ compose.title.trim() || "未命名条目" }}</h4>
-                    <small>尚未发布</small>
+                    <h4>{{ compose.title.trim() || t("inspiration.common.untitledEntry") }}</h4>
+                    <small>{{ t("inspiration.help.unpublished") }}</small>
                   </div>
                 </div>
 
                 <Image
                   v-if="inlineImageDataUrl.trim()"
                   :src="inlineImageDataUrl"
-                  alt="Draft cover"
+                  :alt="t('inspiration.imageAlt.draftCover')"
                   image-class="entry-detail-image"
                 />
 
@@ -839,7 +896,7 @@ async function submitEntry() {
                   severity="secondary"
                   :closable="false"
                 >
-                  这里会显示当前正文的最终效果。
+                  {{ t("inspiration.help.previewEmpty") }}
                 </Message>
               </article>
             </div>
@@ -853,10 +910,10 @@ async function submitEntry() {
               accept="image/png,image/jpeg,image/webp,image/gif"
               @change="onFileSelected"
             />
-            <span><i class="pi pi-image" /> 选择头图</span>
+            <span><i class="pi pi-image" /> {{ t("inspiration.buttons.selectCover") }}</span>
           </label>
           <Button
-            label="发布内容"
+            :label="t('inspiration.buttons.submit')"
             icon="pi pi-send"
             :loading="submitting || uploadPending"
             @click="submitEntry"
@@ -865,7 +922,7 @@ async function submitEntry() {
 
         <div class="message-stack">
           <Message v-if="configIssues.length" severity="warn" :closable="false">
-            发布内容需要有效的 Token；仅浏览列表时只需要站点地址。
+            {{ t("inspiration.help.configIssues") }}
           </Message>
           <Message v-if="loadError" severity="error" :closable="false">
             {{ loadError }}
@@ -874,19 +931,19 @@ async function submitEntry() {
             {{ activityLoadError }}
           </Message>
           <Message severity="secondary" :closable="false">
-            图片仅支持 PNG、JPEG、WebP、GIF，且大小需在 5 MB 以内。
+            {{ t("inspiration.help.uploadHint") }}
           </Message>
         </div>
 
         <div v-if="inlineImageDataUrl" class="asset-preview">
           <div>
-            <p class="field-label">当前头图</p>
-            <strong>发布时会作为灵感头图显示</strong>
-            <small>不再把图片地址写进正文内容。</small>
+            <p class="field-label">{{ t("inspiration.fields.currentCover") }}</p>
+            <strong>{{ t("inspiration.help.currentCoverTitle") }}</strong>
+            <small>{{ t("inspiration.help.currentCoverDetail") }}</small>
           </div>
           <Image
             :src="inlineImageDataUrl"
-            alt="Inspiration cover"
+            :alt="t('inspiration.imageAlt.coverPreview')"
             image-class="inline-preview-image"
           />
         </div>
@@ -897,8 +954,8 @@ async function submitEntry() {
       <template #title>
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">灵感列表</p>
-            <h3>查看最近发布到 Waken-Wa 的内容</h3>
+            <p class="eyebrow">{{ t("inspiration.list.eyebrow") }}</p>
+            <h3>{{ t("inspiration.list.title") }}</h3>
           </div>
           <Tag :value="entryCountLabel" rounded />
         </div>
@@ -913,16 +970,21 @@ async function submitEntry() {
           >
             <div class="entry-header">
               <div>
-                <h4>{{ entry.title || "未命名条目" }}</h4>
+                <h4>{{ entry.title || t("inspiration.common.untitledEntry") }}</h4>
                 <small>{{ formatTime(entry.createdAt) }}</small>
               </div>
-              <Tag v-if="entry.statusSnapshot" value="附带状态快照" severity="contrast" rounded />
+              <Tag
+                v-if="entry.statusSnapshot"
+                :value="t('inspiration.list.statusSnapshotTag')"
+                severity="contrast"
+                rounded
+              />
             </div>
 
             <Image
               v-if="extractPreviewImage(entry)"
               :src="extractPreviewImage(entry)"
-              alt="Entry attachment"
+              :alt="t('inspiration.imageAlt.entryAttachment')"
               image-class="entry-preview-image"
             />
 
@@ -936,17 +998,17 @@ async function submitEntry() {
               {{ entry.statusSnapshot }}
             </blockquote>
             <div class="entry-card-footer">
-              <span>点击查看完整内容</span>
+              <span>{{ t("inspiration.list.viewFull") }}</span>
               <i class="pi pi-angle-right" />
             </div>
           </article>
         </div>
         <Message v-else-if="!loading && !loadError" severity="secondary" :closable="false">
-          还没有加载到内容。可以先在左侧创作区发布第一条。
+          {{ t("inspiration.list.empty") }}
         </Message>
         <div v-if="entries.length && hasMoreEntries" class="entry-list-actions">
           <Button
-            label="加载更多"
+            :label="t('inspiration.list.loadMore')"
             icon="pi pi-angle-down"
             severity="secondary"
             outlined
@@ -967,8 +1029,8 @@ async function submitEntry() {
       <template #header>
         <div v-if="selectedEntry" class="panel-heading">
           <div>
-            <p class="eyebrow">灵感详情</p>
-            <h3>{{ selectedEntry.title || "未命名条目" }}</h3>
+            <p class="eyebrow">{{ t("inspiration.list.detailEyebrow") }}</p>
+            <h3>{{ selectedEntry.title || t("inspiration.common.untitledEntry") }}</h3>
           </div>
           <small>{{ formatTime(selectedEntry.createdAt) }}</small>
         </div>
@@ -978,7 +1040,7 @@ async function submitEntry() {
         <Image
           v-if="extractPreviewImage(selectedEntry)"
           :src="extractPreviewImage(selectedEntry)"
-          alt="Entry attachment"
+          :alt="t('inspiration.imageAlt.entryAttachment')"
           image-class="entry-detail-image"
         />
         <div

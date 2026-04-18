@@ -21,6 +21,7 @@ export const defaultClientConfig = (): ClientConfig => ({
   discordEnabled: false,
   discordApplicationId: "",
   discordSourceId: "",
+  launchOnStartup: false,
 });
 
 export async function loadAppState(): Promise<AppStatePayload> {
@@ -32,6 +33,7 @@ export async function loadAppState(): Promise<AppStatePayload> {
       config: defaultClientConfig(),
       recentPresets: [],
       onboardingDismissed: false,
+      locale: "",
       reporterConfigPromptHandled: false,
       verifiedGeneratedHashKey: "",
     };
@@ -42,6 +44,7 @@ export async function saveAppState(
   config: ClientConfig,
   recentPresets: RecentPreset[],
   onboardingDismissed: boolean,
+  locale: string,
   reporterConfigPromptHandled: boolean,
   verifiedGeneratedHashKey: string,
 ) {
@@ -50,6 +53,7 @@ export async function saveAppState(
       config,
       recentPresets,
       onboardingDismissed,
+      locale,
       reporterConfigPromptHandled,
       verifiedGeneratedHashKey,
     },

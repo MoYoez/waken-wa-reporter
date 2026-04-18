@@ -13,6 +13,7 @@ use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 use serde_json::{json, Map, Value};
 
 use crate::{
+    backend_locale::BackendLocale,
     http_client::build_blocking_client,
     models::{
         effective_device_name, ActivityPayload, ApiResult, ClientConfig, RealtimeReporterSnapshot,
@@ -34,6 +35,32 @@ enum PostActivityResult {
         message: String,
         approval_url: Option<String>,
     },
+}
+
+struct LogTextSpec {
+    key: Option<&'static str>,
+    params: Option<Value>,
+    fallback: String,
+}
+
+fn fallback_text(value: impl Into<String>) -> LogTextSpec {
+    LogTextSpec {
+        key: None,
+        params: None,
+        fallback: value.into(),
+    }
+}
+
+fn localized_text(
+    key: &'static str,
+    params: Option<Value>,
+    fallback: impl Into<String>,
+) -> LogTextSpec {
+    LogTextSpec {
+        key: Some(key),
+        params,
+        fallback: fallback.into(),
+    }
 }
 
 struct ReporterInner {
@@ -84,8 +111,12 @@ impl ReporterRuntime {
         snapshot_from_inner(&inner)
     }
 
-    pub fn start(&self, config: ClientConfig) -> Result<RealtimeReporterSnapshot, String> {
-        validate_reporter_config(&config)?;
+    pub fn start(
+        &self,
+        config: ClientConfig,
+        locale: BackendLocale,
+    ) -> Result<RealtimeReporterSnapshot, String> {
+        validate_reporter_config(&config, locale)?;
 
         let stop_flag = Arc::new(AtomicBool::new(false));
         let run_id = self.sequence.fetch_add(1, Ordering::SeqCst);
@@ -106,7 +137,7 @@ impl ReporterRuntime {
             if let Err(handle) = wait_for_worker_exit(handle) {
                 let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
                 inner.worker = Some(handle);
-                return Err("上一次实时上报线程仍在退出，请稍后重试。".into());
+                return Err(reporter_worker_stopping(locale));
             }
         }
 
@@ -120,13 +151,18 @@ impl ReporterRuntime {
             inner.last_pending_approval_url = None;
         }
 
-        self.push_log("info", "实时上报已启动", "后台轮询任务已经开始。", None);
+        self.push_log(
+            "info",
+            localized_text("reporterLogs.started.title", None, "实时上报已启动"),
+            localized_text("reporterLogs.started.detail", None, "后台轮询任务已经开始。"),
+            None,
+        );
 
         let state = self.inner.clone();
         let sequence_seed = self.sequence.fetch_add(1, Ordering::SeqCst);
 
         let worker = thread::spawn(move || {
-            run_reporter_loop(state, config, stop_flag, sequence_seed, run_id);
+            run_reporter_loop(state, config, stop_flag, sequence_seed, run_id, locale);
         });
 
         {
@@ -148,28 +184,54 @@ impl ReporterRuntime {
             inner.worker.take()
         };
 
-        let detail = if let Some(handle) = worker {
+        let (detail, stopped_cleanly) = if let Some(handle) = worker {
             if let Err(handle) = wait_for_worker_exit(handle) {
                 let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
                 inner.worker = Some(handle);
-                "停止信号已发送，后台线程会在当前操作完成后退出。"
+                (
+                    localized_text(
+                        "reporterLogs.stopped.pendingDetail",
+                        None,
+                        "停止信号已发送，后台线程会在当前操作完成后退出。",
+                    ),
+                    false,
+                )
             } else {
-                "后台轮询任务已停止。"
+                (
+                    localized_text(
+                        "reporterLogs.stopped.detail",
+                        None,
+                        "后台轮询任务已停止。",
+                    ),
+                    true,
+                )
             }
         } else {
-            "后台轮询任务已停止。"
+            (
+                localized_text(
+                    "reporterLogs.stopped.detail",
+                    None,
+                    "后台轮询任务已停止。",
+                ),
+                true,
+            )
         };
 
-        if matches!(detail, "后台轮询任务已停止。") {
+        if stopped_cleanly {
             let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
             inner.worker = None;
         }
 
-        self.push_log("warn", "实时上报已停止", detail, None);
+        self.push_log(
+            "warn",
+            localized_text("reporterLogs.stopped.title", None, "实时上报已停止"),
+            detail,
+            None,
+        );
         self.snapshot()
     }
 
-    fn push_log(&self, level: &str, title: &str, detail: &str, payload: Option<Value>) {
+    fn push_log(&self, level: &str, title: LogTextSpec, detail: LogTextSpec, payload: Option<Value>) {
         let id = format!(
             "{}-{}",
             now_unix_millis(),
@@ -179,8 +241,12 @@ impl ReporterRuntime {
             id,
             timestamp: now_iso_string(),
             level: level.to_string(),
-            title: title.to_string(),
-            detail: detail.to_string(),
+            title: title.fallback,
+            detail: detail.fallback,
+            title_key: title.key.map(str::to_string),
+            title_params: title.params,
+            detail_key: detail.key.map(str::to_string),
+            detail_params: detail.params,
             payload,
         };
         let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
@@ -215,16 +281,21 @@ fn run_reporter_loop(
     stop_flag: Arc<AtomicBool>,
     mut sequence_seed: u64,
     run_id: u64,
+    locale: BackendLocale,
 ) {
-    let client = match build_http_client(config.use_system_proxy) {
+    let client = match build_http_client(config.use_system_proxy, locale) {
         Ok(client) => client,
         Err(error) => {
             push_background_log(
                 &state,
                 &mut sequence_seed,
                 "error",
-                "创建实时上报客户端失败",
-                &error,
+                localized_text(
+                    "reporterLogs.clientCreateFailed.title",
+                    None,
+                    "创建实时上报客户端失败",
+                ),
+                fallback_text(error.clone()),
                 None,
             );
             mark_stopped(&state, Some(error), run_id);
@@ -232,15 +303,19 @@ fn run_reporter_loop(
         }
     };
 
-    let metadata = match parse_reporter_metadata(&config.reporter_metadata_json) {
+    let metadata = match parse_reporter_metadata(&config.reporter_metadata_json, locale) {
         Ok(value) => value,
         Err(error) => {
             push_background_log(
                 &state,
                 &mut sequence_seed,
                 "error",
-                "实时上报元数据无效",
-                &error,
+                localized_text(
+                    "reporterLogs.metadataInvalid.title",
+                    None,
+                    "实时上报元数据无效",
+                ),
+                fallback_text(error.clone()),
                 None,
             );
             mark_stopped(&state, Some(error), run_id);
@@ -294,8 +369,12 @@ fn run_reporter_loop(
                                     &state,
                                     &mut sequence_seed,
                                     "warn",
-                                    "媒体信息读取失败",
-                                    &error,
+                                    localized_text(
+                                        "reporterLogs.mediaReadFailed.title",
+                                        None,
+                                        "媒体信息读取失败",
+                                    ),
+                                    fallback_text(error.clone()),
                                     None,
                                 );
                             }
@@ -334,19 +413,28 @@ fn run_reporter_loop(
                 if should_send {
                     let is_heartbeat = same_as_last;
                     let payload = build_payload(&config, &snapshot, &media, metadata.clone());
-                    match post_activity_blocking(&client, &config, &payload) {
+                    match post_activity_blocking(&client, &config, &payload, locale) {
                         Ok(PostActivityResult::Success) => {
-                            let detail = build_log_detail(&snapshot, &media, is_heartbeat);
+                            let detail =
+                                build_log_detail(&snapshot, &media, is_heartbeat, locale);
                             push_background_log(
                                 &state,
                                 &mut sequence_seed,
                                 "success",
                                 if is_heartbeat {
-                                    "活动心跳"
+                                    localized_text(
+                                        "reporterLogs.activityHeartbeat.title",
+                                        None,
+                                        "活动心跳",
+                                    )
                                 } else {
-                                    "活动已上报"
+                                    localized_text(
+                                        "reporterLogs.activityReported.title",
+                                        None,
+                                        "活动已上报",
+                                    )
                                 },
-                                &detail,
+                                detail,
                                 serde_json::to_value(&payload).ok(),
                             );
                             update_snapshot(&state, &snapshot, None, Some(now_iso_string()));
@@ -367,8 +455,26 @@ fn run_reporter_loop(
                                 &state,
                                 &mut sequence_seed,
                                 "warn",
-                                "设备待审核",
-                                &detail,
+                                localized_text(
+                                    "reporterLogs.pendingApproval.title",
+                                    None,
+                                    "设备待审核",
+                                ),
+                                match approval_url {
+                                    Some(ref url) if !url.trim().is_empty() => localized_text(
+                                        "reporterLogs.pendingApproval.withUrl",
+                                        Some(json!({
+                                            "message": message,
+                                            "approvalUrl": url,
+                                        })),
+                                        detail,
+                                    ),
+                                    _ => localized_text(
+                                        "reporterLogs.pendingApproval.withoutUrl",
+                                        Some(json!({ "message": message })),
+                                        detail,
+                                    ),
+                                },
                                 serde_json::to_value(&payload).ok(),
                             );
                             set_pending_approval(
@@ -384,8 +490,12 @@ fn run_reporter_loop(
                                 &state,
                                 &mut sequence_seed,
                                 "error",
-                                "实时上报失败",
-                                &error,
+                                localized_text(
+                                    "reporterLogs.reportFailed.title",
+                                    None,
+                                    "实时上报失败",
+                                ),
+                                fallback_text(error.clone()),
                                 None,
                             );
                             update_snapshot(&state, &snapshot, Some(error), None);
@@ -399,8 +509,12 @@ fn run_reporter_loop(
                     &state,
                     &mut sequence_seed,
                     "error",
-                    "采集前台窗口失败",
-                    &error,
+                    localized_text(
+                        "reporterLogs.foregroundCaptureFailed.title",
+                        None,
+                        "采集前台窗口失败",
+                    ),
+                    fallback_text(error.clone()),
                     None,
                 );
                 set_last_error(&state, Some(error));
@@ -428,44 +542,80 @@ fn run_reporter_loop(
     mark_stopped(&state, None, run_id);
 }
 
-fn validate_reporter_config(config: &ClientConfig) -> Result<(), String> {
+fn validate_reporter_config(config: &ClientConfig, locale: BackendLocale) -> Result<(), String> {
     if config.base_url.trim().is_empty() {
-        return Err("缺少站点地址，无法启动实时上报。".into());
+        return Err(reporter_config_base_url_missing(locale));
     }
     if config.api_token.trim().is_empty() {
-        return Err("缺少 API Token，无法启动实时上报。".into());
+        return Err(reporter_config_api_token_missing(locale));
     }
     if config.generated_hash_key.trim().is_empty() {
-        return Err("缺少 GeneratedHashKey，无法启动实时上报。".into());
+        return Err(reporter_config_generated_hash_key_missing(locale));
     }
     Ok(())
 }
 
 pub fn config_is_ready(config: &ClientConfig) -> bool {
-    validate_reporter_config(config).is_ok()
+    validate_reporter_config(config, BackendLocale::ZhCn).is_ok()
 }
 
 fn build_log_detail(
     snapshot: &ForegroundSnapshot,
     media: &MediaInfo,
     is_heartbeat: bool,
-) -> String {
-    let action = if is_heartbeat {
-        "心跳上报"
+    locale: BackendLocale,
+) -> LogTextSpec {
+    let action = if locale.is_en() {
+        if is_heartbeat {
+            "Heartbeat"
+        } else {
+            "Report"
+        }
     } else {
-        "活动上报"
+        if is_heartbeat {
+            "心跳"
+        } else {
+            "上报"
+        }
     };
+    let base_params = json!({
+        "processName": snapshot.process_name,
+        "processTitle": snapshot.process_title,
+    });
     if media.is_empty() {
-        format!(
-            "{action}：{} / {}",
-            snapshot.process_name, snapshot.process_title
+        localized_text(
+            if is_heartbeat {
+                "reporterLogs.activityHeartbeat.detail"
+            } else {
+                "reporterLogs.activityReported.detail"
+            },
+            Some(base_params),
+            format!(
+                "{}{} / {}",
+                if locale.is_en() { format!("{action}: ") } else { format!("{action}：") },
+                snapshot.process_name, snapshot.process_title
+            ),
         )
     } else {
-        format!(
-            "{action}：{} / {} | 媒体：{}",
-            snapshot.process_name,
-            snapshot.process_title,
-            media.summary()
+        localized_text(
+            if is_heartbeat {
+                "reporterLogs.activityHeartbeat.detailWithMedia"
+            } else {
+                "reporterLogs.activityReported.detailWithMedia"
+            },
+            Some(json!({
+                "processName": snapshot.process_name,
+                "processTitle": snapshot.process_title,
+                "mediaSummary": media.summary(),
+            })),
+            format!(
+                "{}{} / {} | {}{}",
+                if locale.is_en() { format!("{action}: ") } else { format!("{action}：") },
+                snapshot.process_name,
+                snapshot.process_title,
+                if locale.is_en() { "" } else { "媒体：" },
+                media.summary()
+            ),
         )
     }
 }
@@ -526,16 +676,20 @@ fn push_background_log(
     state: &Arc<Mutex<ReporterInner>>,
     sequence: &mut u64,
     level: &str,
-    title: &str,
-    detail: &str,
+    title: LogTextSpec,
+    detail: LogTextSpec,
     payload: Option<Value>,
 ) {
     let entry = ReporterLogEntry {
         id: format!("{}-{}", now_unix_millis(), *sequence),
         timestamp: now_iso_string(),
         level: level.to_string(),
-        title: title.to_string(),
-        detail: detail.to_string(),
+        title: title.fallback,
+        detail: detail.fallback,
+        title_key: title.key.map(str::to_string),
+        title_params: title.params,
+        detail_key: detail.key.map(str::to_string),
+        detail_params: detail.params,
         payload,
     };
     *sequence += 1;
@@ -547,15 +701,16 @@ fn push_background_log(
     }
 }
 
-fn build_http_client(use_system_proxy: bool) -> Result<Client, String> {
+fn build_http_client(use_system_proxy: bool, locale: BackendLocale) -> Result<Client, String> {
     build_blocking_client(
         "waken-wa-tauri-reporter/0.1.0",
         Some(Duration::from_secs(15)),
         use_system_proxy,
+        locale,
     )
 }
 
-fn parse_reporter_metadata(input: &str) -> Result<Map<String, Value>, String> {
+fn parse_reporter_metadata(input: &str, locale: BackendLocale) -> Result<Map<String, Value>, String> {
     let trimmed = input.trim();
     if trimmed.is_empty() {
         return Ok(Map::new());
@@ -563,8 +718,17 @@ fn parse_reporter_metadata(input: &str) -> Result<Map<String, Value>, String> {
 
     match serde_json::from_str::<Value>(trimmed) {
         Ok(Value::Object(map)) => Ok(map),
-        Ok(_) => Err("实时上报元数据必须是 JSON 对象。".into()),
-        Err(error) => Err(format!("解析实时上报元数据失败：{error}")),
+        Ok(_) => Err(if locale.is_en() {
+            "Reporter metadata must be a JSON object.".into()
+        } else {
+            "实时上报元数据必须是 JSON 对象。".into()
+        }),
+        Err(error) => Err(format_error(
+            locale,
+            "解析实时上报元数据失败",
+            "Failed to parse reporter metadata",
+            error,
+        )),
     }
 }
 
@@ -618,9 +782,11 @@ fn post_activity_blocking(
     client: &Client,
     config: &ClientConfig,
     payload: &ActivityPayload,
+    locale: BackendLocale,
 ) -> Result<PostActivityResult, String> {
     let body =
-        serde_json::to_value(payload).map_err(|error| format!("序列化上报数据失败：{error}"))?;
+        serde_json::to_value(payload)
+            .map_err(|error| format_error(locale, "序列化上报数据失败", "Failed to encode report payload", error))?;
     let url = format!("{}/api/activity", config.base_url.trim_end_matches('/'));
 
     let response = client
@@ -629,16 +795,12 @@ fn post_activity_blocking(
         .header(AUTHORIZATION, format!("Bearer {}", config.api_token.trim()))
         .json(&body)
         .send()
-        .map_err(|error| format!("请求失败：{error}"))?;
+        .map_err(|error| format_error(locale, "请求失败", "Request failed", error))?;
 
     let status = response.status().as_u16();
     let text = response.text().unwrap_or_default();
     if status >= 400 {
-        return Err(if text.trim().is_empty() {
-            format!("服务端返回状态码 {status}")
-        } else {
-            format!("服务端返回状态码 {status}：{}", text.trim())
-        });
+        return Err(server_status_error(locale, status, text.trim()));
     }
 
     let parsed = serde_json::from_str::<Value>(&text).unwrap_or_else(|_| json!({ "raw": text }));
@@ -657,8 +819,8 @@ fn post_activity_blocking(
             .get("error")
             .and_then(Value::as_str)
             .or_else(|| parsed.get("message").and_then(Value::as_str))
-            .unwrap_or("设备待后台审核后可用")
-            .to_string();
+            .map(str::to_string)
+            .unwrap_or_else(|| pending_approval_default(locale));
         let approval_url = parsed
             .get("approvalUrl")
             .and_then(Value::as_str)
@@ -674,8 +836,8 @@ fn post_activity_blocking(
             .get("error")
             .and_then(Value::as_str)
             .or_else(|| parsed.get("message").and_then(Value::as_str))
-            .unwrap_or("服务端返回失败")
-            .to_string());
+            .map(str::to_string)
+            .unwrap_or_else(|| server_failure_default(locale)));
     }
 
     Ok(PostActivityResult::Success)
@@ -726,4 +888,79 @@ fn now_iso_string() -> String {
 
 pub fn snapshot_result(runtime: &ReporterRuntime) -> ApiResult<RealtimeReporterSnapshot> {
     ApiResult::success(200, runtime.snapshot())
+}
+
+fn format_error(
+    locale: BackendLocale,
+    zh_prefix: &str,
+    en_prefix: &str,
+    error: impl std::fmt::Display,
+) -> String {
+    if locale.is_en() {
+        format!("{en_prefix}: {error}")
+    } else {
+        format!("{zh_prefix}：{error}")
+    }
+}
+
+fn reporter_worker_stopping(locale: BackendLocale) -> String {
+    if locale.is_en() {
+        "Background sync is still stopping. Try again shortly.".into()
+    } else {
+        "后台同步仍在退出，请稍后重试。".into()
+    }
+}
+
+fn reporter_config_base_url_missing(locale: BackendLocale) -> String {
+    if locale.is_en() {
+        "Site URL is required before background sync can start.".into()
+    } else {
+        "缺少站点地址，无法启动后台同步。".into()
+    }
+}
+
+fn reporter_config_api_token_missing(locale: BackendLocale) -> String {
+    if locale.is_en() {
+        "API Token is required before background sync can start.".into()
+    } else {
+        "缺少 API Token，无法启动后台同步。".into()
+    }
+}
+
+fn reporter_config_generated_hash_key_missing(locale: BackendLocale) -> String {
+    if locale.is_en() {
+        "Device key is required before background sync can start.".into()
+    } else {
+        "缺少 GeneratedHashKey，无法启动后台同步。".into()
+    }
+}
+
+fn server_status_error(locale: BackendLocale, status: u16, body: &str) -> String {
+    if body.is_empty() {
+        if locale.is_en() {
+            format!("Server returned HTTP {status}")
+        } else {
+            format!("服务端返回状态码 {status}")
+        }
+    } else if locale.is_en() {
+        format!("Server returned HTTP {status}: {body}")
+    } else {
+        format!("服务端返回状态码 {status}：{body}")
+    }
+}
+
+fn pending_approval_default(locale: BackendLocale) -> String {
+    if locale.is_en() {
+        "Device is pending approval".into()
+    } else {
+        "设备待后台审核后可用".into()
+    }
+}
+
+fn server_failure_default(locale: BackendLocale) -> String {
+    if locale.is_en() {
+        "Server returned failure".into()
+    } else {
+        "服务端返回失败".into()
+    }
 }

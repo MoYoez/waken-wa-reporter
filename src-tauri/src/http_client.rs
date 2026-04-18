@@ -2,7 +2,7 @@ use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 use serde_json::{json, Value};
 use std::{sync::Mutex, time::Duration};
 
-use crate::models::ApiResult;
+use crate::{backend_locale::BackendLocale, models::ApiResult};
 
 static ASYNC_CLIENT_SYSTEM_PROXY: Mutex<Option<reqwest::Client>> = Mutex::new(None);
 static ASYNC_CLIENT_DIRECT: Mutex<Option<reqwest::Client>> = Mutex::new(None);
@@ -24,6 +24,17 @@ fn extract_message(payload: &Value) -> Option<String> {
         })
 }
 
+fn extract_code(payload: &Value) -> Option<String> {
+    payload
+        .get("code")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+}
+
+fn extract_params(payload: &Value) -> Option<Value> {
+    payload.get("params").cloned()
+}
+
 pub async fn request_json(
     base_url: &str,
     path: &str,
@@ -38,7 +49,15 @@ pub async fn request_json(
         use_system_proxy,
     ) {
         Ok(client) => client,
-        Err(error) => return ApiResult::failure(0, error, None),
+        Err(error) => {
+            return ApiResult::failure_localized(
+                0,
+                Some("backendErrors.httpClientCreateFailed".to_string()),
+                error,
+                None,
+                None,
+            )
+        }
     };
 
     let url = format!("{}{}", normalize_base_url(base_url), path);
@@ -56,13 +75,29 @@ pub async fn request_json(
 
     let response = match request.send().await {
         Ok(response) => response,
-        Err(error) => return ApiResult::failure(0, format!("请求失败：{error}"), None),
+        Err(error) => {
+            return ApiResult::failure_localized(
+                0,
+                Some("backendErrors.requestFailed".to_string()),
+                format!("请求失败：{error}"),
+                None,
+                None,
+            )
+        }
     };
 
     let status = response.status().as_u16();
     let text = match response.text().await {
         Ok(text) => text,
-        Err(error) => return ApiResult::failure(status, format!("读取响应失败：{error}"), None),
+        Err(error) => {
+            return ApiResult::failure_localized(
+                status,
+                Some("backendErrors.responseReadFailed".to_string()),
+                format!("读取响应失败：{error}"),
+                Some(json!({ "status": status })),
+                None,
+            )
+        }
     };
 
     let payload = if text.trim().is_empty() {
@@ -77,9 +112,12 @@ pub async fn request_json(
         .unwrap_or(status < 400);
 
     if status >= 400 || !payload_success {
-        return ApiResult::failure(
+        return ApiResult::failure_localized(
             status,
+            extract_code(&payload)
+                .or_else(|| Some("backendErrors.requestRejected".to_string())),
             extract_message(&payload).unwrap_or_else(|| "请求失败".into()),
+            extract_params(&payload).or_else(|| Some(json!({ "status": status }))),
             Some(payload),
         );
     }
@@ -102,7 +140,15 @@ pub async fn request_json_payload(
         use_system_proxy,
     ) {
         Ok(client) => client,
-        Err(error) => return ApiResult::failure(0, error, None),
+        Err(error) => {
+            return ApiResult::failure_localized(
+                0,
+                Some("backendErrors.httpClientCreateFailed".to_string()),
+                error,
+                None,
+                None,
+            )
+        }
     };
 
     let url = format!("{}{}", normalize_base_url(base_url), path);
@@ -120,13 +166,29 @@ pub async fn request_json_payload(
 
     let response = match request.send().await {
         Ok(response) => response,
-        Err(error) => return ApiResult::failure(0, format!("请求失败：{error}"), None),
+        Err(error) => {
+            return ApiResult::failure_localized(
+                0,
+                Some("backendErrors.requestFailed".to_string()),
+                format!("请求失败：{error}"),
+                None,
+                None,
+            )
+        }
     };
 
     let status = response.status().as_u16();
     let text = match response.text().await {
         Ok(text) => text,
-        Err(error) => return ApiResult::failure(status, format!("读取响应失败：{error}"), None),
+        Err(error) => {
+            return ApiResult::failure_localized(
+                status,
+                Some("backendErrors.responseReadFailed".to_string()),
+                format!("读取响应失败：{error}"),
+                Some(json!({ "status": status })),
+                None,
+            )
+        }
     };
 
     let payload = if text.trim().is_empty() {
@@ -141,9 +203,12 @@ pub async fn request_json_payload(
         .unwrap_or(status < 400);
 
     if status >= 400 || !payload_success {
-        return ApiResult::failure(
+        return ApiResult::failure_localized(
             status,
+            extract_code(&payload)
+                .or_else(|| Some("backendErrors.requestRejected".to_string())),
             extract_message(&payload).unwrap_or_else(|| "请求失败".into()),
+            extract_params(&payload).or_else(|| Some(json!({ "status": status }))),
             Some(payload),
         );
     }
@@ -196,6 +261,7 @@ pub fn build_blocking_client(
     user_agent: &str,
     timeout: Option<Duration>,
     use_system_proxy: bool,
+    locale: BackendLocale,
 ) -> Result<reqwest::blocking::Client, String> {
     let mut builder = reqwest::blocking::Client::builder().user_agent(user_agent);
 
@@ -209,5 +275,11 @@ pub fn build_blocking_client(
 
     builder
         .build()
-        .map_err(|error| format!("创建 HTTP 客户端失败：{error}"))
+        .map_err(|error| {
+            if locale.is_en() {
+                format!("Failed to create HTTP client: {error}")
+            } else {
+                format!("创建 HTTP 客户端失败：{error}")
+            }
+        })
 }

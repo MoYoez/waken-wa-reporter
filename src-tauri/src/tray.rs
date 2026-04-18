@@ -5,14 +5,54 @@ use tauri::{
     AppHandle, Manager,
 };
 
+use crate::state_store;
+
 const MENU_ID_SHOW: &str = "tray_show";
 const MENU_ID_HIDE: &str = "tray_hide";
 const MENU_ID_QUIT: &str = "tray_quit";
 
+enum TrayText {
+    MainWindowNotFound,
+    Show,
+    Hide,
+    Quit,
+    CreateMenuFailed,
+    LoadIconFailed,
+    CreateTrayFailed,
+}
+
+fn current_locale(app: &AppHandle) -> String {
+    state_store::load_app_state(app)
+        .map(|state| state.locale)
+        .unwrap_or_default()
+}
+
+fn tray_text(locale: &str, key: TrayText) -> &'static str {
+    let english = locale.trim().to_ascii_lowercase().starts_with("en");
+
+    match (english, key) {
+        (true, TrayText::MainWindowNotFound) => "Main window not found.",
+        (true, TrayText::Show) => "Open main window",
+        (true, TrayText::Hide) => "Hide to background",
+        (true, TrayText::Quit) => "Quit app",
+        (true, TrayText::CreateMenuFailed) => "Failed to create the tray menu",
+        (true, TrayText::LoadIconFailed) => "Failed to load the tray icon",
+        (true, TrayText::CreateTrayFailed) => "Failed to create the system tray",
+        (false, TrayText::MainWindowNotFound) => "未找到主窗口。",
+        (false, TrayText::Show) => "打开主界面",
+        (false, TrayText::Hide) => "隐藏到后台",
+        (false, TrayText::Quit) => "退出应用",
+        (false, TrayText::CreateMenuFailed) => "创建托盘菜单失败",
+        (false, TrayText::LoadIconFailed) => "加载托盘图标失败",
+        (false, TrayText::CreateTrayFailed) => "创建系统托盘失败",
+    }
+}
+
 pub fn show_main_window(app: &AppHandle) -> Result<(), String> {
+    let locale = current_locale(app);
     let window = app
         .get_webview_window("main")
-        .ok_or_else(|| "未找到主窗口。".to_string())?;
+        .ok_or_else(|| tray_text(&locale, TrayText::MainWindowNotFound).to_string())?;
 
     #[cfg(target_os = "macos")]
     {
@@ -28,9 +68,10 @@ pub fn show_main_window(app: &AppHandle) -> Result<(), String> {
 }
 
 pub fn hide_main_window(app: &AppHandle) -> Result<(), String> {
+    let locale = current_locale(app);
     let window = app
         .get_webview_window("main")
-        .ok_or_else(|| "未找到主窗口。".to_string())?;
+        .ok_or_else(|| tray_text(&locale, TrayText::MainWindowNotFound).to_string())?;
     let _ = window.hide();
     let _ = window.set_skip_taskbar(true);
 
@@ -44,17 +85,36 @@ pub fn hide_main_window(app: &AppHandle) -> Result<(), String> {
 }
 
 pub fn setup_tray(app: &AppHandle) -> Result<(), String> {
-    let show_item = MenuItem::with_id(app, MENU_ID_SHOW, "打开主界面", true, None::<&str>)
-        .map_err(|error| format!("创建托盘菜单失败：{error}"))?;
-    let hide_item = MenuItem::with_id(app, MENU_ID_HIDE, "隐藏到后台", true, None::<&str>)
-        .map_err(|error| format!("创建托盘菜单失败：{error}"))?;
-    let quit_item = MenuItem::with_id(app, MENU_ID_QUIT, "退出应用", true, None::<&str>)
-        .map_err(|error| format!("创建托盘菜单失败：{error}"))?;
+    let locale = current_locale(app);
+    let show_item = MenuItem::with_id(
+        app,
+        MENU_ID_SHOW,
+        tray_text(&locale, TrayText::Show),
+        true,
+        None::<&str>,
+    )
+    .map_err(|error| format!("{}: {error}", tray_text(&locale, TrayText::CreateMenuFailed)))?;
+    let hide_item = MenuItem::with_id(
+        app,
+        MENU_ID_HIDE,
+        tray_text(&locale, TrayText::Hide),
+        true,
+        None::<&str>,
+    )
+    .map_err(|error| format!("{}: {error}", tray_text(&locale, TrayText::CreateMenuFailed)))?;
+    let quit_item = MenuItem::with_id(
+        app,
+        MENU_ID_QUIT,
+        tray_text(&locale, TrayText::Quit),
+        true,
+        None::<&str>,
+    )
+    .map_err(|error| format!("{}: {error}", tray_text(&locale, TrayText::CreateMenuFailed)))?;
 
     let menu = Menu::with_items(app, &[&show_item, &hide_item, &quit_item])
-        .map_err(|error| format!("创建托盘菜单失败：{error}"))?;
+        .map_err(|error| format!("{}: {error}", tray_text(&locale, TrayText::CreateMenuFailed)))?;
     let icon = Image::from_bytes(include_bytes!("../icons/32x32.png"))
-        .map_err(|error| format!("加载托盘图标失败：{error}"))?;
+        .map_err(|error| format!("{}: {error}", tray_text(&locale, TrayText::LoadIconFailed)))?;
 
     TrayIconBuilder::new()
         .icon(icon)
@@ -83,7 +143,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), String> {
             }
         })
         .build(app)
-        .map_err(|error| format!("创建系统托盘失败：{error}"))?;
+        .map_err(|error| format!("{}: {error}", tray_text(&locale, TrayText::CreateTrayFailed)))?;
 
     Ok(())
 }

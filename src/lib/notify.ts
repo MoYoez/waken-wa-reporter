@@ -1,3 +1,5 @@
+import { translate } from "../i18n";
+
 interface ToastLike {
   add: (payload: {
     severity: "success" | "info" | "warn" | "error";
@@ -20,12 +22,12 @@ export function createNotifier(toast: ToastLike, useNativeNotice: () => boolean)
       if (useNativeNotice()) {
         const prefix =
           payload.severity === "success"
-            ? "[成功]"
+            ? translate("notify.successPrefix")
             : payload.severity === "error"
-              ? "[错误]"
+              ? translate("notify.errorPrefix")
               : payload.severity === "warn"
-                ? "[提示]"
-                : "[信息]";
+                ? translate("notify.warnPrefix")
+                : translate("notify.infoPrefix");
         window.alert(`${prefix} ${payload.summary}\n${payload.detail}`);
         return;
       }

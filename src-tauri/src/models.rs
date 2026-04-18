@@ -78,6 +78,7 @@ pub struct ClientCapabilities {
     pub tray: bool,
     pub platform_self_test: bool,
     pub discord_presence: bool,
+    pub autostart: bool,
 }
 
 #[cfg(desktop)]
@@ -87,6 +88,7 @@ pub fn default_client_capabilities() -> ClientCapabilities {
         tray: true,
         platform_self_test: true,
         discord_presence: true,
+        autostart: true,
     }
 }
 
@@ -97,6 +99,7 @@ pub fn default_client_capabilities() -> ClientCapabilities {
         tray: false,
         platform_self_test: false,
         discord_presence: false,
+        autostart: false,
     }
 }
 
@@ -107,6 +110,7 @@ pub fn default_client_capabilities() -> ClientCapabilities {
         tray: false,
         platform_self_test: false,
         discord_presence: false,
+        autostart: false,
     }
 }
 
@@ -149,6 +153,8 @@ pub struct ClientConfig {
     pub discord_application_id: String,
     #[serde(default = "default_discord_source_id")]
     pub discord_source_id: String,
+    #[serde(default)]
+    pub launch_on_startup: bool,
 }
 
 impl Default for ClientConfig {
@@ -172,6 +178,7 @@ impl Default for ClientConfig {
             discord_enabled: false,
             discord_application_id: default_discord_application_id(),
             discord_source_id: default_discord_source_id(),
+            launch_on_startup: false,
         }
     }
 }
@@ -195,6 +202,8 @@ pub struct AppStatePayload {
     pub recent_presets: Vec<RecentPreset>,
     #[serde(default)]
     pub onboarding_dismissed: bool,
+    #[serde(default)]
+    pub locale: String,
     #[serde(default)]
     pub reporter_config_prompt_handled: bool,
     #[serde(default)]
@@ -255,6 +264,10 @@ pub struct ImportedIntegrationConfig {
 pub struct ApiError {
     pub status: u16,
     pub message: String,
+    #[serde(default)]
+    pub code: Option<String>,
+    #[serde(default)]
+    pub params: Option<Value>,
     pub details: Option<Value>,
 }
 
@@ -277,7 +290,16 @@ impl<T> ApiResult<T> {
         }
     }
 
-    pub fn failure(status: u16, message: impl Into<String>, details: Option<Value>) -> Self {
+    pub fn failure_localized<S>(
+        status: u16,
+        code: Option<S>,
+        message: impl Into<String>,
+        params: Option<Value>,
+        details: Option<Value>,
+    ) -> Self
+    where
+        S: Into<String>,
+    {
         Self {
             success: false,
             status,
@@ -285,10 +307,22 @@ impl<T> ApiResult<T> {
             error: Some(ApiError {
                 status,
                 message: message.into(),
+                code: code.map(Into::into),
+                params,
                 details,
             }),
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalizedTextEntry {
+    pub text: String,
+    #[serde(default)]
+    pub key: Option<String>,
+    #[serde(default)]
+    pub params: Option<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -310,6 +344,14 @@ pub struct ReporterLogEntry {
     pub level: String,
     pub title: String,
     pub detail: String,
+    #[serde(default)]
+    pub title_key: Option<String>,
+    #[serde(default)]
+    pub title_params: Option<Value>,
+    #[serde(default)]
+    pub detail_key: Option<String>,
+    #[serde(default)]
+    pub detail_params: Option<Value>,
     pub payload: Option<Value>,
 }
 
@@ -355,6 +397,16 @@ pub struct PlatformProbeResult {
     pub detail: String,
     #[serde(default)]
     pub guidance: Vec<String>,
+    #[serde(default)]
+    pub summary_key: Option<String>,
+    #[serde(default)]
+    pub summary_params: Option<Value>,
+    #[serde(default)]
+    pub detail_key: Option<String>,
+    #[serde(default)]
+    pub detail_params: Option<Value>,
+    #[serde(default)]
+    pub guidance_entries: Vec<LocalizedTextEntry>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

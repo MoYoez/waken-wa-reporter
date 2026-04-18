@@ -1,5 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
+import {
+  disable as disableAutostartPlugin,
+  enable as enableAutostartPlugin,
+  isEnabled as isAutostartEnabledPlugin,
+} from "@tauri-apps/plugin-autostart";
 
+import { translate } from "../i18n";
+import { resolveApiErrorMessage } from "./localizedText";
 import type {
   ActivityFeedData,
   ActivityPayload,
@@ -35,6 +42,7 @@ const DEFAULT_CAPABILITIES: ClientCapabilities = {
   tray: true,
   platformSelfTest: true,
   discordPresence: true,
+  autostart: true,
 };
 
 export function validateConfig(
@@ -44,29 +52,29 @@ export function validateConfig(
   const issues: string[] = [];
 
   if (!config.baseUrl.trim()) {
-    issues.push("Base URL 为必填项。");
+    issues.push(translate("validation.baseUrlRequired"));
   } else {
     try {
       const url = new URL(config.baseUrl.trim());
       if (!["http:", "https:"].includes(url.protocol)) {
-        issues.push("Base URL 必须以 http:// 或 https:// 开头。");
+        issues.push(translate("validation.baseUrlProtocol"));
       }
     } catch {
-      issues.push("Base URL 格式不正确。");
+      issues.push(translate("validation.baseUrlInvalid"));
     }
   }
 
   if (!config.apiToken.trim()) {
-    issues.push("API Token 为必填项。");
+    issues.push(translate("validation.apiTokenRequired"));
   }
 
   if (capabilities.realtimeReporter) {
     if (!Number.isFinite(config.pollIntervalMs) || config.pollIntervalMs < 1000) {
-      issues.push("实时上报轮询间隔至少为 1000 毫秒。");
+      issues.push(translate("validation.pollIntervalMin"));
     }
 
     if (!Number.isFinite(config.heartbeatIntervalMs) || config.heartbeatIntervalMs < 0) {
-      issues.push("心跳间隔不能小于 0。");
+      issues.push(translate("validation.heartbeatNonNegative"));
     }
   }
 
@@ -84,20 +92,20 @@ export function validateDiscordPresenceConfig(
   const issues: string[] = [];
 
   if (!config.baseUrl.trim()) {
-    issues.push("Base URL 为必填项。");
+    issues.push(translate("validation.baseUrlRequired"));
   } else {
     try {
       const url = new URL(config.baseUrl.trim());
       if (!["http:", "https:"].includes(url.protocol)) {
-        issues.push("Base URL 必须以 http:// 或 https:// 开头。");
+        issues.push(translate("validation.baseUrlProtocol"));
       }
     } catch {
-      issues.push("Base URL 格式不正确。");
+      issues.push(translate("validation.baseUrlInvalid"));
     }
   }
 
   if (!config.discordApplicationId.trim()) {
-    issues.push("Discord Application ID 为必填项。");
+    issues.push(translate("validation.discordAppIdRequired"));
   }
 
   return issues;
@@ -143,22 +151,32 @@ export function extractPendingApprovalInfo(
   }
 
   return {
-    message: payload.message || result.error?.message || "设备待后台审核后可用",
+    message:
+      payload.message
+      || resolveApiErrorMessage(
+        result.error,
+        translate,
+        translate("errors.pendingApprovalDefault"),
+      )
+      || translate("errors.pendingApprovalDefault"),
     approvalUrl: payload.approvalUrl || null,
   };
 }
 
 export function formatPendingApprovalDetail(info: PendingApprovalInfo) {
   return info.approvalUrl
-    ? `设备待后台审核后可用，请前往设备管理完成审核：${info.approvalUrl}`
-    : "设备待后台审核后可用，请前往 Waken-Wa 后台的设备管理完成审核。";
+    ? translate("errors.pendingApprovalWithUrl", { approvalUrl: info.approvalUrl })
+    : translate("errors.pendingApprovalWithoutUrl");
 }
 
 async function invokeApi<T>(command: string, args?: Record<string, unknown>): Promise<ApiResult<T>> {
   try {
     return await invoke<ApiResult<T>>(command, args);
   } catch (error) {
-    return toInvokeError(error instanceof Error ? error.message : "Tauri 调用失败", error);
+    return toInvokeError(
+      error instanceof Error ? error.message : translate("errors.tauriInvokeFailed"),
+      error,
+    );
   }
 }
 
@@ -213,7 +231,22 @@ export async function uploadInspirationAsset(
 export async function parseImportedIntegrationConfig(
   input: string,
 ): Promise<ImportedIntegrationConfig> {
-  return invoke<ImportedIntegrationConfig>("parse_imported_integration_config", { input });
+  const result = await invokeApi<ImportedIntegrationConfig>(
+    "parse_imported_integration_config",
+    { input },
+  );
+
+  if (!result.success || !result.data) {
+    throw new Error(
+      resolveApiErrorMessage(
+        result.error,
+        translate,
+        translate("connectionPanel.notify.importFailedDetail"),
+      ),
+    );
+  }
+
+  return result.data;
 }
 
 export async function hideToTray(): Promise<void> {
@@ -258,4 +291,21 @@ export async function requestAccessibilityPermission(): Promise<ApiResult<boolea
 
 export async function discoverExistingReporterConfig(): Promise<ApiResult<ExistingReporterConfig>> {
   return invokeApi("discover_existing_reporter_config");
+}
+
+export async function restartApp(): Promise<void> {
+  await invoke("restart_app");
+}
+
+export async function isAutostartEnabled(): Promise<boolean> {
+  return isAutostartEnabledPlugin();
+}
+
+export async function setAutostartEnabled(enabled: boolean): Promise<void> {
+  if (enabled) {
+    await enableAutostartPlugin();
+    return;
+  }
+
+  await disableAutostartPlugin();
 }

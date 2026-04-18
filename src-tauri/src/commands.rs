@@ -2,6 +2,7 @@ use serde_json::{json, Map, Value};
 use tauri::{AppHandle, State};
 
 use crate::{
+    backend_locale::load_locale,
     discord_presence::DiscordPresenceRuntime,
     http_client::{request_json, request_json_payload},
     import_config::parse_import_payload,
@@ -15,6 +16,7 @@ use crate::{
 };
 
 const MAX_IMAGE_DATA_URL_BYTES: usize = 7 * 1024 * 1024;
+const MAX_IMPORT_INPUT_BYTES: usize = 512 * 1024;
 
 #[cfg(desktop)]
 use crate::realtime_reporter::{snapshot_result, ReporterRuntime};
@@ -32,10 +34,53 @@ pub fn save_app_state(app: AppHandle, payload: AppStatePayload) -> Result<(), St
 }
 
 #[tauri::command]
+pub fn restart_app(app: AppHandle) -> Result<(), String> {
+    app.request_restart();
+    Ok(())
+}
+
+#[tauri::command]
 pub fn parse_imported_integration_config(
     input: String,
-) -> Result<ImportedIntegrationConfig, String> {
-    parse_import_payload(&input)
+) -> Result<ApiResult<ImportedIntegrationConfig>, String> {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        return Ok(ApiResult::failure_localized(
+            400,
+            Some("backendErrors.importConfigEmpty".to_string()),
+            "请先粘贴 Base64 或 JSON 配置。",
+            None,
+            None,
+        ));
+    }
+
+    if trimmed.len() > MAX_IMPORT_INPUT_BYTES {
+        return Ok(ApiResult::failure_localized(
+            400,
+            Some("backendErrors.importConfigTooLarge".to_string()),
+            format!(
+                "输入内容过大（{} 字节），最大允许 {} 字节。",
+                trimmed.len(),
+                MAX_IMPORT_INPUT_BYTES
+            ),
+            Some(json!({
+                "size": trimmed.len(),
+                "maxSize": MAX_IMPORT_INPUT_BYTES,
+            })),
+            None,
+        ));
+    }
+
+    match parse_import_payload(&input) {
+        Ok(parsed) => Ok(ApiResult::success(200, parsed)),
+        Err(error) => Ok(ApiResult::failure_localized(
+            400,
+            Some("backendErrors.importConfigInvalid".to_string()),
+            error,
+            None,
+            None,
+        )),
+    }
 }
 
 #[tauri::command]
@@ -166,7 +211,20 @@ pub async fn create_inspiration_entry(
     config: ClientConfig,
     input: InspirationEntryCreateInput,
 ) -> Result<ApiResult<serde_json::Value>, String> {
-    validate_image_data_url(input.image_data_url.as_deref())?;
+    if let Err(error) = validate_image_data_url(input.image_data_url.as_deref()) {
+        let ValidationError {
+            code,
+            message,
+            params,
+        } = error;
+        return Ok(ApiResult::failure_localized(
+            400,
+            Some(code.to_string()),
+            message,
+            params,
+            None,
+        ));
+    }
 
     let body = json!({
         "title": input.title.trim(),
@@ -197,7 +255,20 @@ pub async fn upload_inspiration_asset(
     config: ClientConfig,
     image_data_url: String,
 ) -> Result<ApiResult<serde_json::Value>, String> {
-    validate_image_data_url(Some(&image_data_url))?;
+    if let Err(error) = validate_image_data_url(Some(&image_data_url)) {
+        let ValidationError {
+            code,
+            message,
+            params,
+        } = error;
+        return Ok(ApiResult::failure_localized(
+            400,
+            Some(code.to_string()),
+            message,
+            params,
+            None,
+        ));
+    }
 
     let body = json!({
         "imageDataUrl": image_data_url,
@@ -218,11 +289,20 @@ pub async fn upload_inspiration_asset(
 #[cfg(desktop)]
 #[tauri::command]
 pub fn start_realtime_reporter(
+    app: AppHandle,
     reporter: State<'_, ReporterRuntime>,
     config: ClientConfig,
 ) -> Result<ApiResult<crate::models::RealtimeReporterSnapshot>, String> {
-    let snapshot = reporter.start(config)?;
-    Ok(ApiResult::success(200, snapshot))
+    match reporter.start(config, load_locale(&app)) {
+        Ok(snapshot) => Ok(ApiResult::success(200, snapshot)),
+        Err(error) => Ok(ApiResult::failure_localized(
+            400,
+            reporter_start_error_code(&error).map(str::to_string),
+            error,
+            None,
+            None,
+        )),
+    }
 }
 
 #[cfg(desktop)]
@@ -244,11 +324,20 @@ pub fn get_realtime_reporter_snapshot(
 #[cfg(desktop)]
 #[tauri::command]
 pub fn start_discord_presence_sync(
+    app: AppHandle,
     discord_presence_runtime: State<'_, DiscordPresenceRuntime>,
     config: ClientConfig,
 ) -> Result<ApiResult<DiscordPresenceSnapshot>, String> {
-    let snapshot = discord_presence_runtime.start(config)?;
-    Ok(ApiResult::success(200, snapshot))
+    match discord_presence_runtime.start(config, load_locale(&app)) {
+        Ok(snapshot) => Ok(ApiResult::success(200, snapshot)),
+        Err(error) => Ok(ApiResult::failure_localized(
+            400,
+            discord_start_error_code(&error).map(str::to_string),
+            error,
+            None,
+            None,
+        )),
+    }
 }
 
 #[cfg(desktop)]
@@ -276,7 +365,13 @@ pub fn run_platform_self_test() -> Result<ApiResult<PlatformSelfTestResult>, Str
 pub fn request_accessibility_permission() -> Result<ApiResult<bool>, String> {
     match platform::request_accessibility_permission() {
         Ok(granted) => Ok(ApiResult::success(200, granted)),
-        Err(error) => Ok(ApiResult::failure(400, error, None)),
+        Err(error) => Ok(ApiResult::failure_localized(
+            400,
+            Some("backendErrors.accessibilityPermissionUnsupported".to_string()),
+            error,
+            None,
+            None,
+        )),
     }
 }
 
@@ -288,20 +383,68 @@ pub fn discover_existing_reporter_config(
     Ok(ApiResult::success(200, config))
 }
 
-fn validate_image_data_url(value: Option<&str>) -> Result<(), String> {
+struct ValidationError {
+    code: &'static str,
+    message: String,
+    params: Option<Value>,
+}
+
+fn validate_image_data_url(value: Option<&str>) -> Result<(), ValidationError> {
     let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) else {
         return Ok(());
     };
 
     if value.len() > MAX_IMAGE_DATA_URL_BYTES {
-        return Err("图片数据过大，请选择更小的图片。".into());
+        return Err(ValidationError {
+            code: "backendErrors.imageTooLarge",
+            message: "图片数据过大，请选择更小的图片。".into(),
+            params: Some(json!({ "maxBytes": MAX_IMAGE_DATA_URL_BYTES })),
+        });
     }
 
     if !value.starts_with("data:image/") {
-        return Err("图片格式无效，请重新选择图片。".into());
+        return Err(ValidationError {
+            code: "backendErrors.imageInvalidType",
+            message: "图片格式无效，请重新选择图片。".into(),
+            params: None,
+        });
     }
 
     Ok(())
+}
+
+fn reporter_start_error_code(error: &str) -> Option<&'static str> {
+    if error.contains("缺少站点地址") || error.contains("Site URL is required") {
+        Some("backendErrors.reporterConfigBaseUrlMissing")
+    } else if error.contains("缺少 API Token") || error.contains("API Token is required") {
+        Some("backendErrors.reporterConfigApiTokenMissing")
+    } else if error.contains("缺少 GeneratedHashKey")
+        || error.contains("Device key is required")
+    {
+        Some("backendErrors.reporterConfigGeneratedHashKeyMissing")
+    } else if error.contains("仍在退出") || error.contains("still stopping") {
+        Some("backendErrors.reporterWorkerStopping")
+    } else {
+        None
+    }
+}
+
+fn discord_start_error_code(error: &str) -> Option<&'static str> {
+    if error.contains("缺少站点地址") || error.contains("Site URL is required") {
+        Some("backendErrors.discordConfigBaseUrlMissing")
+    } else if error.contains("缺少 Discord Application ID")
+        || error.contains("Discord Application ID is required")
+    {
+        Some("backendErrors.discordConfigAppIdMissing")
+    } else if error.contains("缺少 Discord 来源标识")
+        || error.contains("Discord source ID is required")
+    {
+        Some("backendErrors.discordConfigSourceIdMissing")
+    } else if error.contains("仍在退出") || error.contains("still stopping") {
+        Some("backendErrors.discordWorkerStopping")
+    } else {
+        None
+    }
 }
 
 fn with_dc_source_metadata(metadata: Option<Value>, dc_source: &str) -> Value {

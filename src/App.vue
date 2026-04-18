@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { useI18n } from "vue-i18n";
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import Tag from "primevue/tag";
@@ -19,13 +21,22 @@ import {
   getClientCapabilities,
   getDiscordPresenceSnapshot,
   getRealtimeReporterSnapshot,
+  isAutostartEnabled,
   probeConnectivity,
+  restartApp as requestAppRestart,
+  setAutostartEnabled,
   startDiscordPresenceSync,
   startRealtimeReporter,
   stopDiscordPresenceSync,
   stopRealtimeReporter,
 } from "./lib/api";
 import { readDeviceName } from "./lib/deviceInfo";
+import {
+  normalizeLocale,
+  setI18nLocale,
+  type SupportedLocale,
+} from "./i18n";
+import { resolveApiErrorMessage } from "./lib/localizedText";
 import { createNotifier } from "./lib/notify";
 import { defaultClientConfig, loadAppState, saveAppState } from "./lib/persistence";
 import type {
@@ -50,12 +61,20 @@ interface SectionNavItem {
   requiresRealtime?: boolean;
 }
 
+interface SingleInstanceAttemptPayload {
+  args: string[];
+  cwd: string;
+}
+
 const defaultCapabilities: ClientCapabilities = {
   realtimeReporter: true,
   tray: true,
   platformSelfTest: true,
   discordPresence: true,
+  autostart: true,
 };
+
+const { t, locale } = useI18n();
 
 const toast = useToast();
 
@@ -64,6 +83,8 @@ const config = ref<ClientConfig>(defaultClientConfig());
 const persistedConfig = ref<ClientConfig>(defaultClientConfig());
 const onboardingDraftConfig = ref<ClientConfig>(defaultClientConfig());
 const recentPresets = ref<RecentPreset[]>([]);
+const currentLocale = ref<SupportedLocale>(normalizeLocale(locale.value));
+const startupLocale = ref<SupportedLocale>(normalizeLocale(locale.value));
 const activeSection = ref<AppSection>("overview");
 const hydrated = ref(false);
 const onboardingDismissed = ref(false);
@@ -77,7 +98,7 @@ const mobileConnectivity = ref<MobileConnectivityState>({
   checking: false,
   checked: false,
   ok: null,
-  summary: "待检测",
+  summary: t("app.mobileConnectivity.pending"),
   detail: "",
   checkedAt: null,
 });
@@ -102,36 +123,60 @@ const lastPendingApprovalSeen = ref("");
 const lastMobileConnectivitySignature = ref("");
 const onboardingSetupMode = ref(false);
 const viewportWidth = ref<number>(1200);
+const localeSaving = ref(false);
+const restartingApp = ref(false);
 
 let reporterPollingTimer: number | undefined;
 let reporterSnapshotRefreshInFlight = false;
 let discordPollingTimer: number | undefined;
 let discordSnapshotRefreshInFlight = false;
+let unlistenSingleInstance: UnlistenFn | undefined;
 const REPORTER_SNAPSHOT_POLL_MS = 5000;
 
-const sections: SectionNavItem[] = [
-  { key: "overview", title: "概览", kicker: "查看当前连接与同步状态", icon: "pi pi-home" },
-  { key: "inspiration", title: "灵感", kicker: "撰写并发布内容", icon: "pi pi-file-edit" },
-  { key: "activity", title: "活动同步", kicker: "手动更新当前活动状态", icon: "pi pi-pencil" },
+const sections = computed<SectionNavItem[]>(() => [
+  {
+    key: "overview",
+    title: t("app.sections.overview.title"),
+    kicker: t("app.sections.overview.kicker"),
+    icon: "pi pi-home",
+  },
+  {
+    key: "inspiration",
+    title: t("app.sections.inspiration.title"),
+    kicker: t("app.sections.inspiration.kicker"),
+    icon: "pi pi-file-edit",
+  },
+  {
+    key: "activity",
+    title: t("app.sections.activity.title"),
+    kicker: t("app.sections.activity.kicker"),
+    icon: "pi pi-pencil",
+  },
   {
     key: "realtime",
-    title: "实时同步",
-    kicker: "查看后台同步记录",
+    title: t("app.sections.realtime.title"),
+    kicker: t("app.sections.realtime.kicker"),
     icon: "pi pi-chart-line",
     requiresRealtime: true,
   },
-  { key: "settings", title: "设置", kicker: "管理连接与设备配置", icon: "pi pi-cog" },
-];
+  {
+    key: "settings",
+    title: t("app.sections.settings.title"),
+    kicker: t("app.sections.settings.kicker"),
+    icon: "pi pi-cog",
+  },
+]);
 
 const reporterSupported = computed(() => capabilities.value.realtimeReporter);
 const discordSupported = computed(() => capabilities.value.discordPresence);
 const traySupported = computed(() => capabilities.value.tray);
+const autostartSupported = computed(() => capabilities.value.autostart);
 const isPhone = computed(() => viewportWidth.value < 900);
 const isNativeNotice = computed(() => !reporterSupported.value);
 const { notify } = createNotifier(toast, () => isNativeNotice.value);
 
 const visibleSections = computed(() =>
-  sections.filter((section) => !section.requiresRealtime || reporterSupported.value),
+  sections.value.filter((section) => !section.requiresRealtime || reporterSupported.value),
 );
 
 const readiness = computed(() => {
@@ -149,6 +194,7 @@ const discordReadiness = computed(
 const shouldShowOnboarding = computed(
   () => hydrated.value && !onboardingDismissed.value && !readiness.value,
 );
+const localeRestartRequired = computed(() => currentLocale.value !== startupLocale.value);
 const hasPendingSettingsChanges = computed(() => {
   const current = JSON.stringify(normalizeConfigByCapabilities(config.value));
   const persisted = JSON.stringify(normalizeConfigByCapabilities(persistedConfig.value));
@@ -167,9 +213,15 @@ function inferMobileDeviceType(): DeviceType {
 
 function normalizeConfigByCapabilities(raw: ClientConfig): ClientConfig {
   const normalizedDevice = raw.device.trim();
+  const launchOnStartup = autostartSupported.value ? raw.launchOnStartup : false;
 
   if (reporterSupported.value) {
-    return { ...raw, device: normalizedDevice, deviceType: "desktop" };
+    return {
+      ...raw,
+      device: normalizedDevice,
+      deviceType: "desktop",
+      launchOnStartup,
+    };
   }
 
   return {
@@ -179,7 +231,21 @@ function normalizeConfigByCapabilities(raw: ClientConfig): ClientConfig {
     pushMode: "active",
     reporterEnabled: false,
     discordEnabled: false,
+    launchOnStartup: false,
   };
+}
+
+async function resolveAutostartConfig(raw: ClientConfig) {
+  if (!autostartSupported.value) {
+    return { ...raw, launchOnStartup: false };
+  }
+
+  try {
+    const enabled = await isAutostartEnabled();
+    return { ...raw, launchOnStartup: enabled };
+  } catch {
+    return raw;
+  }
 }
 
 function syncDeviceTypeByViewport() {
@@ -220,10 +286,42 @@ function handlePresetSaved(preset: RecentPreset) {
   void persistAppState();
 }
 
+async function applyLocale(nextLocale: string, persist = false) {
+  const normalized = setI18nLocale(nextLocale);
+  currentLocale.value = normalized;
+
+  if (persist && hydrated.value) {
+    localeSaving.value = true;
+    try {
+      await persistAppState();
+    } catch (error) {
+      notify({
+        severity: "error",
+        summary: t("app.notify.settingsSaveFailed"),
+        detail: error instanceof Error ? error.message : t("app.notify.settingsSaveFailedDetail"),
+        life: 4000,
+      });
+    } finally {
+      localeSaving.value = false;
+    }
+  }
+}
+
+function translateText(key: string, params?: Record<string, unknown>) {
+  return params ? t(key, params) : t(key);
+}
+
+function apiErrorDetail(
+  error: { message?: string; code?: string | null; params?: Record<string, unknown> | null } | null | undefined,
+  fallback: string,
+) {
+  return resolveApiErrorMessage(error, translateText, fallback);
+}
+
 function notifyImport(message: string) {
   notify({
     severity: "success",
-    summary: "已导入接入配置",
+    summary: t("app.notify.importedConfig"),
     detail: message,
     life: 3000,
   });
@@ -245,7 +343,7 @@ function handlePendingApproval(info: PendingApprovalInfo) {
   pendingApprovalDialogVisible.value = true;
 }
 
-function resetMobileConnectivity(summary = "待检测", detail = "") {
+function resetMobileConnectivity(summary = t("app.mobileConnectivity.pending"), detail = "") {
   mobileConnectivity.value = {
     checking: false,
     checked: false,
@@ -265,8 +363,8 @@ async function runMobileConnectivityProbe(force = false) {
   if (!readiness.value) {
     lastMobileConnectivitySignature.value = "";
     resetMobileConnectivity(
-      "等待配置",
-      "填写站点地址、API Token 和设备 Key 后，移动端会自动检测 token 是否可用以及设备是否已经审核。",
+      t("app.mobileConnectivity.waitingConfig"),
+      t("app.mobileConnectivity.waitingConfigDetail"),
     );
     return;
   }
@@ -286,8 +384,8 @@ async function runMobileConnectivityProbe(force = false) {
     checking: true,
     checked: false,
     ok: null,
-    summary: "检测中",
-    detail: "正在校验当前 API Token 是否可用，以及这台设备是否已经通过审核。",
+    summary: t("app.mobileConnectivity.checking"),
+    detail: t("app.mobileConnectivity.checkingDetail"),
     checkedAt: null,
   };
 
@@ -300,7 +398,7 @@ async function runMobileConnectivityProbe(force = false) {
       checking: false,
       checked: true,
       ok: false,
-      summary: "设备待审核",
+      summary: t("app.mobileConnectivity.pendingApproval"),
       detail: formatPendingApprovalDetail(pendingApproval),
       checkedAt,
     };
@@ -314,28 +412,28 @@ async function runMobileConnectivityProbe(force = false) {
       checking: false,
       checked: true,
       ok: true,
-      summary: "检测通过",
-      detail: "已确认当前 API Token 可用，并且这台设备已经通过审核。这个检查不会写入活动或灵感内容。",
+      summary: t("app.mobileConnectivity.passed"),
+      detail: t("app.mobileConnectivity.passedDetail"),
       checkedAt,
     };
     return;
   }
 
-  let summary = "检测失败";
-  let detail = result.error?.message ?? "暂时无法确认当前移动端配置是否可用。";
+  let summary = t("app.mobileConnectivity.failed");
+  let detail = apiErrorDetail(result.error, t("app.mobileConnectivity.failedDetail"));
 
   if (result.status === 401) {
-    summary = "Token 不可用";
-    detail = "当前 API Token 无效或已停用，请回到设置页检查并重新导入。";
+    summary = t("app.mobileConnectivity.tokenUnavailable");
+    detail = t("app.mobileConnectivity.tokenUnavailableDetail");
   } else if (result.status === 403) {
-    summary = "设备不可用";
-    detail = result.error?.message ?? "当前设备已被停用，或没有权限继续使用这个 Key。";
+    summary = t("app.mobileConnectivity.deviceUnavailable");
+    detail = apiErrorDetail(result.error, t("app.mobileConnectivity.deviceUnavailableDetail"));
   } else if (result.status === 400) {
-    summary = "配置不完整";
-    detail = result.error?.message ?? "缺少必要配置，暂时无法校验当前设备。";
+    summary = t("app.mobileConnectivity.configIncomplete");
+    detail = apiErrorDetail(result.error, t("app.mobileConnectivity.configIncompleteDetail"));
   } else if (result.status === 0) {
-    summary = "无法连接站点";
-    detail = result.error?.message ?? "请检查站点地址、网络连通性和服务是否已启动。";
+    summary = t("app.mobileConnectivity.siteUnreachable");
+    detail = apiErrorDetail(result.error, t("app.mobileConnectivity.siteUnreachableDetail"));
   }
 
   mobileConnectivity.value = {
@@ -375,8 +473,8 @@ async function useExistingReporterConfig() {
   importingReporterConfig.value = false;
   notify({
     severity: "success",
-    summary: "已导入现有配置",
-    detail: "连接信息和同步参数已同步到当前客户端。",
+    summary: t("app.notify.importedExistingConfig"),
+    detail: t("app.notify.importedExistingConfigDetail"),
     life: 3500,
   });
   onboardingSetupMode.value = true;
@@ -387,9 +485,32 @@ async function persistAppState(configOverride?: ClientConfig) {
     normalizeConfigByCapabilities(configOverride ?? persistedConfig.value),
     recentPresets.value,
     onboardingDismissed.value,
+    currentLocale.value,
     reporterConfigPromptHandled.value,
     verifiedGeneratedHashKey.value,
   );
+}
+
+async function handleRestartApp() {
+  if (restartingApp.value) {
+    return;
+  }
+
+  restartingApp.value = true;
+  try {
+    if (localeSaving.value || localeRestartRequired.value) {
+      await persistAppState();
+    }
+    await requestAppRestart();
+  } catch (error) {
+    restartingApp.value = false;
+    notify({
+      severity: "error",
+      summary: t("app.notify.restartFailed"),
+      detail: error instanceof Error ? error.message : t("app.notify.restartFailedDetail"),
+      life: 4000,
+    });
+  }
 }
 
 async function hydrateDeviceNameFromSystem() {
@@ -418,20 +539,26 @@ async function hydrateDeviceNameFromSystem() {
 
 async function applySettingsChanges() {
   try {
-    config.value = normalizeConfigByCapabilities({ ...config.value });
-    await persistAppState(config.value);
-    persistedConfig.value = { ...config.value };
+    const nextConfig = normalizeConfigByCapabilities({ ...config.value });
+
+    if (autostartSupported.value) {
+      await setAutostartEnabled(nextConfig.launchOnStartup);
+    }
+
+    config.value = nextConfig;
+    await persistAppState(nextConfig);
+    persistedConfig.value = { ...nextConfig };
     notify({
       severity: "success",
-      summary: "设置已保存",
-      detail: "当前配置已写入本地。",
+      summary: t("app.notify.settingsSaved"),
+      detail: t("app.notify.settingsSavedDetail"),
       life: 2500,
     });
   } catch (error) {
     notify({
       severity: "error",
-      summary: "保存失败",
-      detail: error instanceof Error ? error.message : "设置写入本地失败。",
+      summary: t("app.notify.settingsSaveFailed"),
+      detail: error instanceof Error ? error.message : t("app.notify.settingsSaveFailedDetail"),
       life: 4000,
     });
   }
@@ -441,8 +568,8 @@ function revertPendingSettings() {
   config.value = normalizeConfigByCapabilities({ ...persistedConfig.value });
   notify({
     severity: "info",
-    summary: "已撤销更改",
-    detail: "界面已恢复到上一次已保存的配置。",
+    summary: t("app.notify.reverted"),
+    detail: t("app.notify.revertedDetail"),
     life: 2500,
   });
 }
@@ -455,8 +582,8 @@ async function completeOnboardingSetup() {
   persistedConfig.value = { ...config.value };
   notify({
     severity: "success",
-    summary: "设置已完成",
-    detail: "欢迎开始使用客户端。",
+    summary: t("app.notify.onboardingDone"),
+    detail: t("app.notify.onboardingDoneDetail"),
     life: 2500,
   });
 }
@@ -579,8 +706,8 @@ async function handleStartReporter() {
   if (!result.success || !result.data) {
     notify({
       severity: "error",
-      summary: "启动失败",
-      detail: result.error?.message ?? "后台同步启动失败。",
+      summary: t("app.notify.reporterStartFailed"),
+      detail: apiErrorDetail(result.error, t("app.notify.reporterStartFailedDetail")),
       life: 4000,
     });
     return;
@@ -589,8 +716,8 @@ async function handleStartReporter() {
   Object.assign(reporterSnapshot.value, result.data);
   notify({
     severity: "success",
-    summary: "后台同步已开启",
-    detail: "客户端已开始持续同步当前活动状态。",
+    summary: t("app.notify.reporterStarted"),
+    detail: t("app.notify.reporterStartedDetail"),
     life: 3000,
   });
 }
@@ -607,8 +734,8 @@ async function handleStopReporter() {
   if (!result.success || !result.data) {
     notify({
       severity: "error",
-      summary: "停止失败",
-      detail: result.error?.message ?? "后台同步停止失败。",
+      summary: t("app.notify.reporterStopFailed"),
+      detail: apiErrorDetail(result.error, t("app.notify.reporterStopFailedDetail")),
       life: 4000,
     });
     return;
@@ -617,8 +744,8 @@ async function handleStopReporter() {
   Object.assign(reporterSnapshot.value, result.data);
   notify({
     severity: "success",
-    summary: "后台同步已停止",
-    detail: "客户端已停止自动同步当前状态。",
+    summary: t("app.notify.reporterStopped"),
+    detail: t("app.notify.reporterStoppedDetail"),
     life: 3000,
   });
 }
@@ -635,8 +762,8 @@ async function handleStartDiscordPresence() {
   if (!result.success || !result.data) {
     notify({
       severity: "error",
-      summary: "Discord 同步启动失败",
-      detail: result.error?.message ?? "Discord 状态同步启动失败。",
+      summary: t("app.notify.discordStartFailed"),
+      detail: apiErrorDetail(result.error, t("app.notify.discordStartFailedDetail")),
       life: 4000,
     });
     return;
@@ -645,8 +772,8 @@ async function handleStartDiscordPresence() {
   Object.assign(discordPresenceSnapshot.value, result.data);
   notify({
     severity: "success",
-    summary: "Discord 同步已开启",
-    detail: "客户端会定时拉取 public feed 并更新 Discord 状态。",
+    summary: t("app.notify.discordStarted"),
+    detail: t("app.notify.discordStartedDetail"),
     life: 3000,
   });
 }
@@ -663,8 +790,8 @@ async function handleStopDiscordPresence() {
   if (!result.success || !result.data) {
     notify({
       severity: "error",
-      summary: "Discord 同步停止失败",
-      detail: result.error?.message ?? "Discord 状态同步停止失败。",
+      summary: t("app.notify.discordStopFailed"),
+      detail: apiErrorDetail(result.error, t("app.notify.discordStopFailedDetail")),
       life: 4000,
     });
     return;
@@ -673,8 +800,8 @@ async function handleStopDiscordPresence() {
   Object.assign(discordPresenceSnapshot.value, result.data);
   notify({
     severity: "success",
-    summary: "Discord 同步已停止",
-    detail: "客户端已停止更新 Discord 状态。",
+    summary: t("app.notify.discordStopped"),
+    detail: t("app.notify.discordStoppedDetail"),
     life: 3000,
   });
 }
@@ -743,6 +870,16 @@ watch(
 );
 
 watch(
+  () => locale.value,
+  () => {
+    currentLocale.value = normalizeLocale(locale.value);
+    if (hydrated.value) {
+      void runMobileConnectivityProbe(true);
+    }
+  },
+);
+
+watch(
   () => [
     hydrated.value,
     reporterSupported.value,
@@ -765,13 +902,33 @@ onMounted(async () => {
   window.addEventListener("resize", onViewportResize);
   document.addEventListener("visibilitychange", onVisibilityChange);
 
+  try {
+    unlistenSingleInstance = await listen<SingleInstanceAttemptPayload>(
+      "single-instance-attempted",
+      () => {
+        notify({
+          severity: "warn",
+          summary: t("app.notify.singleInstanceDetected"),
+          detail: t("app.notify.singleInstanceDetectedDetail"),
+          life: 3500,
+        });
+      },
+    );
+  } catch {
+    // Ignore event-listener setup failures outside the Tauri runtime.
+  }
+
   const capabilitiesResult = await getClientCapabilities();
   if (capabilitiesResult.success && capabilitiesResult.data) {
     capabilities.value = capabilitiesResult.data;
   }
 
   const state = await loadAppState();
-  const normalized = normalizeConfigByCapabilities(state.config);
+  applyLocale(state.locale || locale.value);
+  startupLocale.value = currentLocale.value;
+  const normalized = await resolveAutostartConfig(
+    normalizeConfigByCapabilities(state.config),
+  );
   config.value = normalized;
   persistedConfig.value = { ...normalized };
   onboardingDraftConfig.value = { ...normalized };
@@ -782,6 +939,10 @@ onMounted(async () => {
     ? (state.reporterConfigPromptHandled ?? false)
     : true;
   hydrated.value = true;
+
+  if (normalized.launchOnStartup !== Boolean(state.config.launchOnStartup)) {
+    void persistAppState(normalized);
+  }
 
   await hydrateDeviceNameFromSystem();
 
@@ -817,6 +978,8 @@ onBeforeUnmount(() => {
   document.removeEventListener("visibilitychange", onVisibilityChange);
   stopReporterPolling();
   stopDiscordPresencePolling();
+  unlistenSingleInstance?.();
+  unlistenSingleInstance = undefined;
 });
 </script>
 
@@ -834,27 +997,27 @@ onBeforeUnmount(() => {
       <template #container>
         <div class="onboarding-panel">
           <template v-if="!onboardingSetupMode">
-            <p class="eyebrow">首次引导</p>
-            <h3>先完成连接设置，再开始使用客户端</h3>
+            <p class="eyebrow">{{ t("app.onboarding.eyebrow") }}</p>
+            <h3>{{ t("app.onboarding.welcomeTitle") }}</h3>
             <p class="onboarding-copy">
-              首次使用时，你可以导入本机已有配置，或手动完成连接设置。准备完成后，就可以开始使用手动活动同步与灵感发布。
+              {{ t("app.onboarding.welcomeCopy") }}
             </p>
             <div
               v-if="reporterSupported && existingReporterConfig?.found && !reporterConfigPromptHandled"
               class="onboarding-step onboarding-highlight"
             >
-              <strong>发现可用的本机配置</strong>
-              <span>已在本机找到 `waken-wa-reporter` 配置文件，可直接导入站点地址、Token、设备标识和同步参数。</span>
+              <strong>{{ t("app.onboarding.foundConfigTitle") }}</strong>
+              <span>{{ t("app.onboarding.foundConfigDetail") }}</span>
               <small v-if="existingReporterConfig.path">{{ existingReporterConfig.path }}</small>
               <div class="actions-row">
                 <Button
-                  label="使用现有配置"
+                  :label="t('app.onboarding.useExistingConfig')"
                   icon="pi pi-download"
                   :loading="importingReporterConfig"
                   @click="useExistingReporterConfig"
                 />
                 <Button
-                  label="暂不导入"
+                  :label="t('app.onboarding.skipImport')"
                   severity="secondary"
                   text
                   @click="skipExistingReporterConfig"
@@ -863,29 +1026,29 @@ onBeforeUnmount(() => {
             </div>
             <div class="onboarding-steps">
               <div class="onboarding-step">
-                <strong>1. 完成连接</strong>
-                <span>优先粘贴 Base64 接入配置；需要时再展开附加配置微调连接参数，并可选填写设备名称。</span>
+                <strong>{{ t("app.onboarding.step1Title") }}</strong>
+                <span>{{ t("app.onboarding.step1Detail") }}</span>
               </div>
               <div class="onboarding-step">
-                <strong>2. 活动同步</strong>
-                <span>通过“活动同步”页面手动提交当前活动状态。</span>
+                <strong>{{ t("app.onboarding.step2Title") }}</strong>
+                <span>{{ t("app.onboarding.step2Detail") }}</span>
               </div>
               <div class="onboarding-step">
-                <strong>3. 内容发布</strong>
-                <span>使用“灵感”页面发布内容并附带状态快照。</span>
+                <strong>{{ t("app.onboarding.step3Title") }}</strong>
+                <span>{{ t("app.onboarding.step3Detail") }}</span>
               </div>
             </div>
             <div class="actions-row">
-              <Button label="前往设置" icon="pi pi-arrow-right" @click="startSetup" />
-              <Button label="稍后再说" severity="secondary" text @click="closeOnboarding" />
+              <Button :label="t('app.onboarding.goToSettings')" icon="pi pi-arrow-right" @click="startSetup" />
+              <Button :label="t('app.onboarding.later')" severity="secondary" text @click="closeOnboarding" />
             </div>
           </template>
 
           <template v-else>
-            <p class="eyebrow">首次引导</p>
-            <h3>在这里完成连接设置</h3>
+            <p class="eyebrow">{{ t("app.onboarding.eyebrow") }}</p>
+            <h3>{{ t("app.onboarding.setupTitle") }}</h3>
             <p class="onboarding-copy">
-              填好接入配置后，就可以开始使用客户端；你也可以先导入现有配置，再按需要微调。
+              {{ t("app.onboarding.setupCopy") }}
             </p>
             <ConnectionPanel
               :model-value="onboardingDraftConfig"
@@ -897,7 +1060,7 @@ onBeforeUnmount(() => {
             />
             <div class="actions-row">
               <Button
-                label="完成并开始使用"
+                :label="t('app.onboarding.complete')"
                 icon="pi pi-check"
                 :disabled="!(
                   onboardingDraftConfig.baseUrl.trim() &&
@@ -907,7 +1070,7 @@ onBeforeUnmount(() => {
                 @click="completeOnboardingSetup"
               />
               <Button
-                label="返回上一步"
+                :label="t('app.onboarding.back')"
                 severity="secondary"
                 text
                 @click="onboardingSetupMode = false"
@@ -923,24 +1086,24 @@ onBeforeUnmount(() => {
       modal
       dismissable-mask
       :draggable="false"
-      header="设备待审核"
+      :header="t('app.pendingApproval.header')"
       style="width: min(560px, calc(100vw - 24px))"
     >
       <div class="onboarding-steps">
         <div class="onboarding-step">
-          <strong>{{ reporterSnapshot.lastPendingApprovalMessage || "设备待后台审核后可用" }}</strong>
-          <span>客户端已经识别到当前设备尚未通过审核，请前往 Waken-Wa 后台的设备管理完成审核。</span>
+          <strong>{{ reporterSnapshot.lastPendingApprovalMessage || t("app.pendingApproval.defaultMessage") }}</strong>
+          <span>{{ t("app.pendingApproval.detail") }}</span>
         </div>
         <div
           v-if="reporterSnapshot.lastPendingApprovalUrl"
           class="onboarding-step onboarding-highlight"
         >
-          <strong>审核地址</strong>
+          <strong>{{ t("app.pendingApproval.approvalUrl") }}</strong>
           <span>{{ reporterSnapshot.lastPendingApprovalUrl }}</span>
         </div>
       </div>
       <div class="actions-row">
-        <Button label="我知道了" icon="pi pi-check" @click="closePendingApprovalDialog" />
+        <Button :label="t('app.pendingApproval.confirm')" icon="pi pi-check" @click="closePendingApprovalDialog" />
       </div>
     </Dialog>
 
@@ -951,19 +1114,19 @@ onBeforeUnmount(() => {
         aria-live="polite"
       >
         <div class="pending-save-float-copy">
-          <p class="eyebrow">设置保存</p>
-          <strong>有待保存的更改</strong>
-          <span>当前修改还没有写入本地。你可以现在应用，或者直接撤销恢复到上一次保存状态。</span>
+          <p class="eyebrow">{{ t("app.pendingSave.eyebrow") }}</p>
+          <strong>{{ t("app.pendingSave.title") }}</strong>
+          <span>{{ t("app.pendingSave.detail") }}</span>
         </div>
         <div class="pending-save-float-actions">
           <Button
-            label="应用"
+            :label="t('app.pendingSave.apply')"
             icon="pi pi-check"
             size="small"
             @click="applySettingsChanges"
           />
           <Button
-            label="撤回"
+            :label="t('app.pendingSave.revert')"
             icon="pi pi-undo"
             severity="secondary"
             outlined
@@ -978,7 +1141,7 @@ onBeforeUnmount(() => {
       <aside v-if="!isPhone" class="app-sidebar">
         <div class="brand-block">
           <p class="eyebrow">Waken-Wa</p>
-          <h1>客户端</h1>
+          <h1>{{ t("app.brand.client") }}</h1>
         </div>
 
         <nav class="nav-stack">
@@ -999,21 +1162,21 @@ onBeforeUnmount(() => {
         </nav>
 
         <div class="sidebar-footer">
-          <Tag :value="readiness ? '连接配置已就绪' : '需要先完成连接设置'" :severity="readiness ? 'success' : 'warn'" rounded />
+          <Tag :value="readiness ? t('app.sidebar.readinessReady') : t('app.sidebar.readinessPending')" :severity="readiness ? 'success' : 'warn'" rounded />
           <Tag
             v-if="reporterSupported"
-            :value="reporterSnapshot.running ? '后台同步运行中' : '后台同步未开启'"
+            :value="reporterSnapshot.running ? t('app.sidebar.reporterRunning') : t('app.sidebar.reporterStopped')"
             :severity="reporterSnapshot.running ? 'success' : 'secondary'"
             rounded
           />
           <Tag
             v-if="discordSupported"
-            :value="discordPresenceSnapshot.running ? (discordPresenceSnapshot.connected ? 'Discord 同步运行中' : 'Discord 等待连接') : 'Discord 同步未开启'"
+            :value="discordPresenceSnapshot.running ? (discordPresenceSnapshot.connected ? t('app.sidebar.discordRunning') : t('app.sidebar.discordWaiting')) : t('app.sidebar.discordStopped')"
             :severity="discordPresenceSnapshot.running ? (discordPresenceSnapshot.connected ? 'success' : 'warn') : 'secondary'"
             rounded
           />
-          <small v-if="traySupported">关闭主窗口后会最小化到系统托盘，可在后台继续驻留。</small>
-          <small v-else>当前平台使用移动端模式，已关闭后台实时同步与托盘能力。</small>
+          <small v-if="traySupported">{{ t("app.sidebar.traySupported") }}</small>
+          <small v-else>{{ t("app.sidebar.trayUnsupported") }}</small>
         </div>
       </aside>
 
@@ -1041,7 +1204,12 @@ onBeforeUnmount(() => {
           :reporter-busy="reporterBusy"
           :discord-busy="discordBusy"
           :verified-generated-hash-key="verifiedGeneratedHashKey"
+          :locale="currentLocale"
+          :locale-restart-required="localeRestartRequired"
+          :restarting="restartingApp || localeSaving"
           @update:model-value="config = normalizeConfigByCapabilities($event)"
+          @update:locale="applyLocale($event, true)"
+          @restart-app="handleRestartApp"
           @imported="notifyImport"
           @start-reporter="handleStartReporter"
           @stop-reporter="handleStopReporter"

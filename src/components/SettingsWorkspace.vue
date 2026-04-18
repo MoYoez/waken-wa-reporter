@@ -1,27 +1,41 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import Button from "primevue/button";
 import Card from "primevue/card";
 import InputText from "primevue/inputtext";
 import Message from "primevue/message";
+import Select from "primevue/select";
 import Tag from "primevue/tag";
 import ToggleSwitch from "primevue/toggleswitch";
 import { useToast } from "primevue/usetoast";
 
 import ConnectionPanel from "./ConnectionPanel.vue";
 import {
+  localeOptions,
+  type SupportedLocale,
+} from "../i18n";
+import {
   requestAccessibilityPermission,
   runPlatformSelfTest,
   validateDiscordPresenceConfig,
 } from "../lib/api";
+import {
+  resolveApiErrorMessage,
+  resolveLocalizedEntry,
+  resolveLocalizedText,
+} from "../lib/localizedText";
 import { createNotifier } from "../lib/notify";
 import type {
   ClientCapabilities,
   ClientConfig,
   DiscordPresenceSnapshot,
+  PlatformProbeResult,
   PlatformSelfTestResult,
   RealtimeReporterSnapshot,
 } from "../types";
+
+const { t, locale } = useI18n();
 
 const toast = useToast();
 const selfTestLoading = ref(false);
@@ -30,12 +44,15 @@ const selfTestResult = ref<PlatformSelfTestResult | null>(null);
 
 const props = defineProps<{
   modelValue: ClientConfig;
+  locale: SupportedLocale;
   capabilities: ClientCapabilities;
   reporterSnapshot: RealtimeReporterSnapshot;
   discordPresenceSnapshot: DiscordPresenceSnapshot;
   reporterBusy: boolean;
   discordBusy: boolean;
   verifiedGeneratedHashKey: string;
+  localeRestartRequired: boolean;
+  restarting: boolean;
 }>();
 
 const configReady = computed(
@@ -44,6 +61,7 @@ const configReady = computed(
 const reporterSupported = computed(() => props.capabilities.realtimeReporter);
 const discordSupported = computed(() => props.capabilities.discordPresence);
 const selfTestSupported = computed(() => props.capabilities.platformSelfTest);
+const autostartSupported = computed(() => props.capabilities.autostart);
 const isNativeNotice = computed(() => !props.capabilities.realtimeReporter);
 const canRequestAccessibilityPermission = computed(() => {
   if (typeof navigator === "undefined") return false;
@@ -57,11 +75,13 @@ const discordConfigReady = computed(() => discordConfigIssues.value.length === 0
 
 const emit = defineEmits<{
   "update:modelValue": [value: ClientConfig];
+  "update:locale": [value: SupportedLocale];
   imported: [message: string];
   startReporter: [];
   stopReporter: [];
   startDiscordPresence: [];
   stopDiscordPresence: [];
+  restartApp: [];
 }>();
 
 function updateField<K extends keyof ClientConfig>(key: K, value: ClientConfig[K]) {
@@ -73,65 +93,83 @@ function updateField<K extends keyof ClientConfig>(key: K, value: ClientConfig[K
 }
 
 function formatTime(value?: string | null) {
-  if (!value) return "暂无";
-  return new Date(value).toLocaleString();
+  if (!value) return t("settings.notify.none");
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString(locale.value);
 }
 
-function firstGuidance(items?: string[] | null) {
-  return items?.find((item) => item.trim()) ?? "";
+function translateText(key: string, params?: Record<string, unknown>) {
+  return params ? t(key, params) : t(key);
+}
+
+function apiErrorDetail(
+  error: { message?: string; code?: string | null; params?: Record<string, unknown> | null } | null | undefined,
+  fallback: string,
+) {
+  return resolveApiErrorMessage(error, translateText, fallback);
+}
+
+function firstGuidance(probe?: PlatformProbeResult | null) {
+  const localized = probe?.guidanceEntries
+    ?.map((entry) => resolveLocalizedEntry(entry, translateText))
+    .find((item) => item.trim());
+  if (localized) {
+    return localized;
+  }
+
+  return probe?.guidance?.find((item) => item.trim()) ?? "";
+}
+
+function probeSummary(probe: PlatformProbeResult) {
+  return resolveLocalizedText(
+    translateText,
+    probe.summaryKey,
+    probe.summaryParams,
+    probe.summary,
+  );
+}
+
+function probeDetail(probe: PlatformProbeResult) {
+  return resolveLocalizedText(
+    translateText,
+    probe.detailKey,
+    probe.detailParams,
+    probe.detail,
+  );
 }
 
 function compactDetail(value?: string | null) {
   const text = (value ?? "").trim();
-  if (!text) return "暂无结果。";
+  if (!text) return t("settings.notify.noneResult");
 
   const normalized = text.replace(/\s+/g, " ");
   if (normalized.length <= 88) {
     return normalized;
   }
 
-  const firstChunk = normalized.split("；")[0]?.trim() || normalized;
+  const firstChunk = normalized.split(/[；;]/)[0]?.trim() || normalized;
   if (firstChunk.length <= 88) {
-    return `${firstChunk}。`;
+    return firstChunk;
   }
 
   return `${firstChunk.slice(0, 84).trimEnd()}...`;
 }
 
-function summarizeProbeDetail(
-  platform: string,
-  probe: "foreground" | "windowTitle" | "media",
-  success: boolean,
-  detail?: string | null,
-) {
-  if (success) {
-    return compactDetail(detail);
+function primaryProbeText(probe: PlatformProbeResult) {
+  return probe.success ? compactDetail(probeDetail(probe)) : probeSummary(probe);
+}
+
+function secondaryProbeText(probe: PlatformProbeResult) {
+  if (probe.success) {
+    return "";
   }
 
-  const lower = (detail ?? "").toLowerCase();
-  if (platform === "linux") {
-    if (probe === "foreground" || probe === "windowTitle") {
-      if (lower.includes("focused window d-bus") || lower.includes("gdbus")) {
-        return "缺少 GNOME 前台窗口支持。";
-      }
-      if (lower.includes("kdotool")) {
-        return "缺少 KDE 前台窗口支持。";
-      }
-      if (lower.includes("xprop")) {
-        return "缺少 xprop。";
-      }
-      return "未读取到前台窗口信息。";
-    }
-
-    if (probe === "media") {
-      if (lower.includes("playerctl")) {
-        return "缺少 playerctl。";
-      }
-      return "未读取到媒体信息。";
-    }
-  }
-
-  return compactDetail(detail);
+  return firstGuidance(probe) || probeDetail(probe);
 }
 
 async function handleSelfTest() {
@@ -142,8 +180,8 @@ async function handleSelfTest() {
   if (!result.success || !result.data) {
     notify({
       severity: "error",
-      summary: "检查未完成",
-      detail: result.error?.message ?? "平台能力检查执行失败。",
+      summary: t("settings.notify.selfTestFailed"),
+      detail: apiErrorDetail(result.error, t("settings.notify.selfTestFailedDetail")),
       life: 4000,
     });
     return;
@@ -152,8 +190,8 @@ async function handleSelfTest() {
   selfTestResult.value = result.data;
   notify({
     severity: result.data.foreground.success && result.data.media.success ? "success" : "warn",
-    summary: "检查已完成",
-    detail: `当前平台：${result.data.platform}`,
+    summary: t("settings.notify.selfTestDone"),
+    detail: t("settings.selfTest.platformDetail", { platform: result.data.platform }),
     life: 3000,
   });
 }
@@ -166,8 +204,8 @@ async function handleRequestAccessibilityPermission() {
   if (!result.success) {
     notify({
       severity: "error",
-      summary: "权限申请未完成",
-      detail: result.error?.message ?? "辅助功能权限申请失败。",
+      summary: t("settings.notify.permissionFailed"),
+      detail: apiErrorDetail(result.error, t("settings.notify.permissionFailedDetail")),
       life: 4000,
     });
     return;
@@ -175,14 +213,20 @@ async function handleRequestAccessibilityPermission() {
 
   notify({
     severity: result.data ? "success" : "info",
-    summary: result.data ? "辅助功能权限已可用" : "已请求辅助功能权限",
+    summary: result.data
+      ? t("settings.notify.permissionGranted")
+      : t("settings.notify.permissionRequested"),
     detail: result.data
-      ? "系统已允许读取窗口标题。"
-      : "系统权限面板应该已经打开，请在“系统设置 -> 隐私与安全性 -> 辅助功能”中允许当前应用。",
+      ? t("settings.notify.permissionGrantedDetail")
+      : t("settings.notify.permissionRequestedDetail"),
     life: 5000,
   });
 
   await handleSelfTest();
+}
+
+async function handleRestartApp() {
+  emit("restartApp");
 }
 </script>
 
@@ -190,18 +234,98 @@ async function handleRequestAccessibilityPermission() {
   <div class="workspace-grid">
     <header class="hero-panel">
       <div>
-        <p class="eyebrow">设置</p>
-        <h2>设置</h2>
-        <p class="hero-copy">管理连接、设备身份和客户端功能。</p>
+        <p class="eyebrow">{{ t("settings.hero.eyebrow") }}</p>
+        <h2>{{ t("settings.hero.title") }}</h2>
+        <p class="hero-copy">{{ t("settings.hero.description") }}</p>
       </div>
       <div class="hero-actions">
         <Tag
-          :value="reporterSupported ? (reporterSnapshot.running ? '运行中' : '未启动') : '移动端模式'"
+          :value="reporterSupported ? (reporterSnapshot.running ? t('settings.tags.running') : t('settings.tags.notStarted')) : t('settings.tags.mobileMode')"
           :severity="reporterSupported ? (reporterSnapshot.running ? 'success' : 'warn') : 'info'"
           rounded
         />
       </div>
     </header>
+
+    <Card class="glass-card">
+      <template #title>
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">{{ t("settings.language.eyebrow") }}</p>
+            <h3>{{ t("settings.language.title") }}</h3>
+          </div>
+        </div>
+      </template>
+      <template #content>
+        <div class="panel-grid">
+          <label class="field-block field-span-2">
+            <span class="field-label">{{ t("settings.language.field") }}</span>
+            <Select
+              :model-value="props.locale"
+              :options="localeOptions"
+              option-label="label"
+              option-value="value"
+              @update:model-value="(value) => value && emit('update:locale', value)"
+            />
+          </label>
+        </div>
+        <div class="message-stack">
+          <Message severity="secondary" :closable="false">
+            {{ t("settings.language.description") }}
+          </Message>
+          <Message
+            v-if="localeRestartRequired"
+            severity="warn"
+            :closable="false"
+          >
+            <div class="inline-message-action">
+              <span>{{ t("settings.language.restartHint") }}</span>
+              <Button
+                :label="t('settings.language.restartNow')"
+                icon="pi pi-refresh"
+                size="small"
+                :loading="restarting"
+                @click="handleRestartApp"
+              />
+            </div>
+          </Message>
+        </div>
+      </template>
+    </Card>
+
+    <Card v-if="autostartSupported" class="glass-card">
+      <template #title>
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">{{ t("settings.startup.eyebrow") }}</p>
+            <h3>{{ t("settings.startup.title") }}</h3>
+          </div>
+        </div>
+      </template>
+      <template #content>
+        <div class="panel-grid">
+          <div class="reporter-enabled-card field-span-2">
+            <div class="reporter-enabled-copy">
+              <span class="field-label">{{ t("settings.startup.toggle") }}</span>
+              <strong>{{ modelValue.launchOnStartup ? t("settings.tags.enabled") : t("settings.tags.disabled") }}</strong>
+              <span>
+                {{ t("settings.startup.description") }}
+              </span>
+            </div>
+            <ToggleSwitch
+              :model-value="modelValue.launchOnStartup"
+              input-id="settings-launch-on-startup"
+              @update:model-value="updateField('launchOnStartup', Boolean($event))"
+            />
+          </div>
+        </div>
+        <div class="message-stack">
+          <Message severity="secondary" :closable="false">
+            {{ t("settings.startup.hint") }}
+          </Message>
+        </div>
+      </template>
+    </Card>
 
     <ConnectionPanel
       :model-value="modelValue"
@@ -215,41 +339,41 @@ async function handleRequestAccessibilityPermission() {
       <template #title>
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">后台同步</p>
-            <h3>管理同步状态</h3>
+            <p class="eyebrow">{{ t("settings.reporter.eyebrow") }}</p>
+            <h3>{{ t("settings.reporter.title") }}</h3>
           </div>
         </div>
       </template>
       <template #content>
         <div class="overview-summary">
           <div class="overview-item">
-            <span>运行状态</span>
-            <strong>{{ reporterSnapshot.running ? "运行中" : "未启动" }}</strong>
+            <span>{{ t("settings.reporter.runtimeStatus") }}</span>
+            <strong>{{ reporterSnapshot.running ? t("settings.tags.running") : t("settings.tags.notStarted") }}</strong>
           </div>
           <div class="overview-item">
-            <span>当前进程</span>
-            <strong>{{ reporterSnapshot.currentActivity?.processName || "暂无" }}</strong>
+            <span>{{ t("settings.reporter.currentProcess") }}</span>
+            <strong>{{ reporterSnapshot.currentActivity?.processName || t("settings.notify.none") }}</strong>
           </div>
           <div class="overview-item">
-            <span>最近心跳</span>
+            <span>{{ t("settings.reporter.lastHeartbeat") }}</span>
             <strong>{{ formatTime(reporterSnapshot.lastHeartbeatAt) }}</strong>
           </div>
           <div class="overview-item">
-            <span>最近错误</span>
-            <strong>{{ reporterSnapshot.lastError || "暂无" }}</strong>
+            <span>{{ t("settings.reporter.lastError") }}</span>
+            <strong>{{ reporterSnapshot.lastError || t("settings.notify.none") }}</strong>
           </div>
         </div>
 
         <div class="actions-row">
           <Button
-            label="开启后台同步"
+            :label="t('settings.reporter.start')"
             icon="pi pi-play"
             :loading="reporterBusy"
             :disabled="reporterSnapshot.running || !configReady"
             @click="$emit('startReporter')"
           />
           <Button
-            label="停止后台同步"
+            :label="t('settings.reporter.stop')"
             icon="pi pi-stop"
             severity="secondary"
             outlined
@@ -258,17 +382,17 @@ async function handleRequestAccessibilityPermission() {
             @click="$emit('stopReporter')"
           />
           <Button
-            label="检查平台能力"
+            v-if="selfTestSupported"
+            :label="t('settings.reporter.selfTest')"
             icon="pi pi-search"
             severity="secondary"
             text
             :loading="selfTestLoading"
-            v-if="selfTestSupported"
             @click="handleSelfTest"
           />
           <Button
             v-if="canRequestAccessibilityPermission"
-            label="授权辅助功能权限"
+            :label="t('settings.reporter.accessibility')"
             icon="pi pi-shield"
             severity="secondary"
             outlined
@@ -279,13 +403,13 @@ async function handleRequestAccessibilityPermission() {
 
         <div class="message-stack">
           <Message v-if="!configReady" severity="warn" :closable="false">
-            开启后台同步前，请先填写好接入配置。
+            {{ t("settings.reporter.configRequired") }}
           </Message>
           <Message v-if="reporterSnapshot.lastError" severity="error" :closable="false">
             {{ reporterSnapshot.lastError }}
           </Message>
           <Message v-else severity="secondary" :closable="false">
-            如果启用了“启动后自动开启后台同步”，应用下次打开时会自动开始同步。
+            {{ t("settings.reporter.autoStartHint") }}
           </Message>
         </div>
       </template>
@@ -295,15 +419,15 @@ async function handleRequestAccessibilityPermission() {
       <template #title>
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">移动端模式</p>
-            <h3>后台同步已关闭</h3>
+            <p class="eyebrow">{{ t("settings.mobile.eyebrow") }}</p>
+            <h3>{{ t("settings.mobile.title") }}</h3>
           </div>
         </div>
       </template>
       <template #content>
         <div class="message-stack">
           <Message severity="secondary" :closable="false">
-            当前客户端不提供后台实时同步与系统托盘能力。你仍可手动提交活动并发布灵感内容。
+            {{ t("settings.mobile.description") }}
           </Message>
         </div>
       </template>
@@ -313,11 +437,11 @@ async function handleRequestAccessibilityPermission() {
       <template #title>
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">Discord 状态</p>
-            <h3>管理 Discord Rich Presence 同步</h3>
+            <p class="eyebrow">{{ t("settings.discord.eyebrow") }}</p>
+            <h3>{{ t("settings.discord.title") }}</h3>
           </div>
           <Tag
-            :value="discordPresenceSnapshot.running ? (discordPresenceSnapshot.connected ? '运行中' : '等待 Discord') : '未启动'"
+            :value="discordPresenceSnapshot.running ? (discordPresenceSnapshot.connected ? t('settings.tags.running') : t('settings.tags.waitingDiscord')) : t('settings.tags.notStarted')"
             :severity="discordPresenceSnapshot.running ? (discordPresenceSnapshot.connected ? 'success' : 'warn') : 'secondary'"
             rounded
           />
@@ -326,20 +450,20 @@ async function handleRequestAccessibilityPermission() {
       <template #content>
         <div class="panel-grid">
           <label class="field-block field-span-2">
-            <span class="field-label">Discord Application ID</span>
+            <span class="field-label">{{ t("settings.discord.appId") }}</span>
             <InputText
               :model-value="modelValue.discordApplicationId"
-              placeholder="填入 Discord Developer Portal 里的 Application ID"
+              :placeholder="t('settings.discord.appIdPlaceholder')"
               @update:model-value="updateField('discordApplicationId', $event ?? '')"
             />
           </label>
 
           <div class="reporter-enabled-card discord-autostart-card field-span-2">
             <div class="reporter-enabled-copy">
-              <span class="field-label">启动后自动开启 Discord 同步</span>
-              <strong>{{ modelValue.discordEnabled ? "已开启" : "未开启" }}</strong>
+              <span class="field-label">{{ t("settings.discord.autoStart") }}</span>
+              <strong>{{ modelValue.discordEnabled ? t("settings.tags.enabled") : t("settings.tags.disabled") }}</strong>
               <span>
-                开启后，这台客户端在下次启动时会自动拉取 public feed，并更新 Discord 状态。
+                {{ t("settings.discord.autoStartDetail") }}
               </span>
             </div>
             <ToggleSwitch
@@ -352,33 +476,33 @@ async function handleRequestAccessibilityPermission() {
 
         <div class="overview-summary discord-presence-summary">
           <div class="overview-item">
-            <span>运行状态</span>
-            <strong>{{ discordPresenceSnapshot.running ? "运行中" : "未启动" }}</strong>
+            <span>{{ t("settings.reporter.runtimeStatus") }}</span>
+            <strong>{{ discordPresenceSnapshot.running ? t("settings.tags.running") : t("settings.tags.notStarted") }}</strong>
           </div>
           <div class="overview-item">
-            <span>Discord 连接</span>
-            <strong>{{ discordPresenceSnapshot.connected ? "已连接" : "未连接" }}</strong>
+            <span>{{ t("settings.discord.connection") }}</span>
+            <strong>{{ discordPresenceSnapshot.connected ? t("settings.tags.connected") : t("settings.tags.notConnected") }}</strong>
           </div>
           <div class="overview-item">
-            <span>当前摘要</span>
-            <strong>{{ discordPresenceSnapshot.currentSummary || "暂无" }}</strong>
+            <span>{{ t("settings.discord.currentSummary") }}</span>
+            <strong>{{ discordPresenceSnapshot.currentSummary || t("settings.notify.none") }}</strong>
           </div>
           <div class="overview-item">
-            <span>最近同步</span>
+            <span>{{ t("settings.discord.lastSync") }}</span>
             <strong>{{ formatTime(discordPresenceSnapshot.lastSyncAt) }}</strong>
           </div>
         </div>
 
         <div class="actions-row discord-presence-actions">
           <Button
-            label="开启 Discord 同步"
+            :label="t('settings.discord.start')"
             icon="pi pi-desktop"
             :loading="discordBusy"
             :disabled="discordPresenceSnapshot.running || !discordConfigReady"
             @click="$emit('startDiscordPresence')"
           />
           <Button
-            label="停止 Discord 同步"
+            :label="t('settings.discord.stop')"
             icon="pi pi-stop"
             severity="secondary"
             outlined
@@ -405,10 +529,10 @@ async function handleRequestAccessibilityPermission() {
             severity="secondary"
             :closable="false"
           >
-            已启用启动后自动同步，客户端下次打开时会自动尝试连接 Discord。
+            {{ t("settings.discord.autoStartHint") }}
           </Message>
           <Message v-else severity="secondary" :closable="false">
-            Discord 同步只会读取 public feed 中属于当前客户端自己的活动，不会干涉其他机器。
+            {{ t("settings.discord.idleHint") }}
           </Message>
         </div>
       </template>
@@ -418,8 +542,8 @@ async function handleRequestAccessibilityPermission() {
       <template #title>
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">平台能力检查</p>
-            <h3>前台应用、窗口标题和媒体读取</h3>
+            <p class="eyebrow">{{ t("settings.selfTest.eyebrow") }}</p>
+            <h3>{{ t("settings.selfTest.title") }}</h3>
           </div>
           <Tag :value="selfTestResult.platform" severity="contrast" rounded />
         </div>
@@ -428,31 +552,42 @@ async function handleRequestAccessibilityPermission() {
         <div class="self-test-grid">
           <article class="self-test-card">
             <div class="self-test-head">
-              <strong>前台应用</strong>
-              <Tag :value="selfTestResult.foreground.success ? '可用' : '异常'" :severity="selfTestResult.foreground.success ? 'success' : 'danger'" rounded />
+              <strong>{{ t("settings.selfTest.foreground") }}</strong>
+              <Tag
+                :value="selfTestResult.foreground.success ? t('settings.selfTest.usable') : t('settings.selfTest.abnormal')"
+                :severity="selfTestResult.foreground.success ? 'success' : 'danger'"
+                rounded
+              />
             </div>
             <p class="self-test-detail">
-              {{ summarizeProbeDetail(selfTestResult.platform, "foreground", selfTestResult.foreground.success, selfTestResult.foreground.detail) }}
+              {{ primaryProbeText(selfTestResult.foreground) }}
             </p>
-            <p v-if="firstGuidance(selfTestResult.foreground.guidance)" class="self-test-summary">
-              {{ firstGuidance(selfTestResult.foreground.guidance) }}
+            <p v-if="secondaryProbeText(selfTestResult.foreground)" class="self-test-summary">
+              {{ secondaryProbeText(selfTestResult.foreground) }}
             </p>
           </article>
 
           <article class="self-test-card">
             <div class="self-test-head">
-              <strong>窗口标题</strong>
-              <Tag :value="selfTestResult.windowTitle.success ? '可用' : '异常'" :severity="selfTestResult.windowTitle.success ? 'success' : 'danger'" rounded />
+              <strong>{{ t("settings.selfTest.windowTitle") }}</strong>
+              <Tag
+                :value="selfTestResult.windowTitle.success ? t('settings.selfTest.usable') : t('settings.selfTest.abnormal')"
+                :severity="selfTestResult.windowTitle.success ? 'success' : 'danger'"
+                rounded
+              />
             </div>
             <p class="self-test-detail">
-              {{ summarizeProbeDetail(selfTestResult.platform, "windowTitle", selfTestResult.windowTitle.success, selfTestResult.windowTitle.detail) }}
+              {{ primaryProbeText(selfTestResult.windowTitle) }}
             </p>
-            <p v-if="firstGuidance(selfTestResult.windowTitle.guidance)" class="self-test-summary">
-              {{ firstGuidance(selfTestResult.windowTitle.guidance) }}
+            <p v-if="secondaryProbeText(selfTestResult.windowTitle)" class="self-test-summary">
+              {{ secondaryProbeText(selfTestResult.windowTitle) }}
             </p>
-            <div v-if="selfTestResult.platform === 'macos' && !selfTestResult.windowTitle.success" class="actions-row">
+            <div
+              v-if="selfTestResult.platform === 'macos' && !selfTestResult.windowTitle.success"
+              class="actions-row"
+            >
               <Button
-                label="授权辅助功能权限"
+                :label="t('settings.reporter.accessibility')"
                 icon="pi pi-shield"
                 severity="secondary"
                 outlined
@@ -464,14 +599,18 @@ async function handleRequestAccessibilityPermission() {
 
           <article class="self-test-card">
             <div class="self-test-head">
-              <strong>媒体采集</strong>
-              <Tag :value="selfTestResult.media.success ? '可用' : '异常'" :severity="selfTestResult.media.success ? 'success' : 'danger'" rounded />
+              <strong>{{ t("settings.selfTest.media") }}</strong>
+              <Tag
+                :value="selfTestResult.media.success ? t('settings.selfTest.usable') : t('settings.selfTest.abnormal')"
+                :severity="selfTestResult.media.success ? 'success' : 'danger'"
+                rounded
+              />
             </div>
             <p class="self-test-detail">
-              {{ summarizeProbeDetail(selfTestResult.platform, "media", selfTestResult.media.success, selfTestResult.media.detail) }}
+              {{ primaryProbeText(selfTestResult.media) }}
             </p>
-            <p v-if="firstGuidance(selfTestResult.media.guidance)" class="self-test-summary">
-              {{ firstGuidance(selfTestResult.media.guidance) }}
+            <p v-if="secondaryProbeText(selfTestResult.media)" class="self-test-summary">
+              {{ secondaryProbeText(selfTestResult.media) }}
             </p>
           </article>
         </div>
@@ -482,14 +621,14 @@ async function handleRequestAccessibilityPermission() {
             severity="secondary"
             :closable="false"
           >
-            macOS 上窗口标题和部分媒体读取能力可能依赖“辅助功能”或“自动化”授权；如果某项异常，请先按上面的提示检查权限。
+            {{ t("settings.selfTest.macosHint") }}
           </Message>
           <Message
             v-if="selfTestResult.platform === 'linux'"
             severity="secondary"
             :closable="false"
           >
-            Linux：X11 使用 xprop；Wayland 支持 GNOME 的 Focused Window D-Bus 和 KDE 的 kdotool；媒体采集依赖 playerctl。
+            {{ t("settings.selfTest.linuxHint") }}
           </Message>
         </div>
       </template>

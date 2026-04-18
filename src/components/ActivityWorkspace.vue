@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import Button from "primevue/button";
 import Card from "primevue/card";
 import InputNumber from "primevue/inputnumber";
@@ -15,6 +16,7 @@ import {
   validateConfig,
 } from "../lib/api";
 import { readBatterySnapshot } from "../lib/deviceInfo";
+import { resolveApiErrorMessage } from "../lib/localizedText";
 import { createNotifier } from "../lib/notify";
 import type {
   ActivityPayload,
@@ -30,6 +32,8 @@ interface ActivityFormState {
   includeBattery: boolean;
   persistMinutes: number;
 }
+
+const { t, locale } = useI18n();
 
 const props = defineProps<{
   config: ClientConfig;
@@ -64,6 +68,25 @@ function applyPreset(preset: RecentPreset) {
   form.processTitle = preset.process_title ?? "";
 }
 
+function formatTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleString(locale.value);
+}
+
+function translateText(key: string, params?: Record<string, unknown>) {
+  return params ? t(key, params) : t(key);
+}
+
+function apiErrorDetail(
+  error: { message?: string; code?: string | null; params?: Record<string, unknown> | null } | null | undefined,
+  fallback: string,
+) {
+  return resolveApiErrorMessage(error, translateText, fallback);
+}
+
 async function buildRequestPayload(): Promise<ActivityPayload> {
   let batteryLevel: number | null = null;
   let isCharging = false;
@@ -78,8 +101,8 @@ async function buildRequestPayload(): Promise<ActivityPayload> {
       if (form.includeBattery) {
         notify({
           severity: "warn",
-          summary: "无法获取电池信息",
-          detail: error instanceof Error ? error.message : "当前运行环境不支持读取电量。",
+          summary: t("activity.notify.batteryUnavailable"),
+          detail: error instanceof Error ? error.message : t("activity.notify.batteryUnavailableDetail"),
           life: 3500,
         });
       }
@@ -102,8 +125,8 @@ async function submitReport() {
   if (configIssues.value.length > 0) {
     notify({
       severity: "warn",
-      summary: "请先完成连接设置",
-      detail: "请先填写站点地址和 API Token。",
+      summary: t("activity.notify.settingsRequired"),
+      detail: t("activity.notify.settingsRequiredDetail"),
       life: 3500,
     });
     return;
@@ -112,8 +135,8 @@ async function submitReport() {
   if (!form.processName.trim()) {
     notify({
       severity: "warn",
-      summary: "请填写名称",
-      detail: "添加活动前，需要提供名称。",
+      summary: t("activity.notify.nameRequired"),
+      detail: t("activity.notify.nameRequiredDetail"),
       life: 3000,
     });
     return;
@@ -127,7 +150,7 @@ async function submitReport() {
   if (pendingApproval) {
     notify({
       severity: "warn",
-      summary: "设备待审核",
+      summary: t("activity.notify.pendingApproval"),
       detail: formatPendingApprovalDetail(pendingApproval),
       life: 6000,
     });
@@ -138,8 +161,10 @@ async function submitReport() {
   if (!result.success) {
     notify({
       severity: "error",
-      summary: `添加失败（${result.status || "网络"}）`,
-      detail: result.error?.message ?? "请求未成功完成。",
+      summary: t("activity.notify.submitFailed", {
+        status: result.status || t("activity.common.network"),
+      }),
+      detail: apiErrorDetail(result.error, t("activity.notify.submitFailedDetail")),
       life: 4500,
     });
     return;
@@ -154,8 +179,8 @@ async function submitReport() {
 
   notify({
     severity: "success",
-    summary: "活动已添加",
-    detail: "Waken-Wa 已成功接收这条活动记录。",
+    summary: t("activity.notify.submitSuccess"),
+    detail: t("activity.notify.submitSuccessDetail"),
     life: 3000,
   });
 }
@@ -167,8 +192,8 @@ async function submitReport() {
       <template #title>
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">活动同步</p>
-            <h3>快速添加活动</h3>
+            <p class="eyebrow">{{ t("activity.title.eyebrow") }}</p>
+            <h3>{{ t("activity.title.title") }}</h3>
           </div>
         </div>
       </template>
@@ -176,22 +201,22 @@ async function submitReport() {
         <div class="activity-form-stack">
           <div class="panel-grid">
             <label class="field-block">
-              <span class="field-label">名称</span>
-              <InputText v-model="form.processName" placeholder="例如：VS Code" />
+              <span class="field-label">{{ t("activity.fields.name") }}</span>
+              <InputText v-model="form.processName" :placeholder="t('activity.placeholders.name')" />
             </label>
           </div>
 
           <label class="field-block field-span-2">
-            <span class="field-label">标题（可选）</span>
-            <InputText v-model="form.processTitle" placeholder="例如：编辑 index.tsx" />
+            <span class="field-label">{{ t("activity.fields.title") }}</span>
+            <InputText v-model="form.processTitle" :placeholder="t('activity.placeholders.title')" />
           </label>
 
           <div v-if="!mobileRuntime" class="panel-grid">
             <div class="reporter-enabled-card field-span-2">
               <div class="reporter-enabled-copy">
-                <span class="field-label">附带设备电量</span>
-                <strong>{{ form.includeBattery ? "已开启" : "已关闭" }}</strong>
-                <span>开启后，提交时会自动读取当前设备电量与充电状态并一起上报。</span>
+                <span class="field-label">{{ t("activity.fields.includeBattery") }}</span>
+                <strong>{{ form.includeBattery ? t("activity.common.enabled") : t("activity.common.disabled") }}</strong>
+                <span>{{ t("activity.help.includeBattery") }}</span>
               </div>
               <ToggleSwitch
                 v-model="form.includeBattery"
@@ -201,16 +226,16 @@ async function submitReport() {
           </div>
 
           <label class="field-block field-span-2">
-            <span class="field-label">常驻时长（分钟）</span>
+            <span class="field-label">{{ t("activity.fields.persistMinutes") }}</span>
             <InputNumber v-model="form.persistMinutes" :min="1" :max="1440" fluid />
             <small class="field-help">
-              无客户端上报时，超过该时间后活动会从首页「当前状态」自动结束（1-1440 分钟）。
+              {{ t("activity.help.persistMinutes") }}
             </small>
           </label>
 
           <div class="actions-row">
             <Button
-              label="添加活动"
+              :label="t('activity.buttons.submit')"
               icon="pi pi-plus"
               :loading="submitting"
               @click="submitReport"
@@ -220,7 +245,7 @@ async function submitReport() {
 
         <div class="message-stack">
           <Message v-if="configIssues.length" severity="warn" :closable="false">
-            请先到“设置”里补齐站点地址和 API Token。
+            {{ t("activity.help.settingsWarning") }}
           </Message>
         </div>
       </template>
@@ -230,8 +255,8 @@ async function submitReport() {
       <template #title>
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">最近使用</p>
-            <h3>快速填入最近同步过的常用活动信息</h3>
+            <p class="eyebrow">{{ t("activity.recent.eyebrow") }}</p>
+            <h3>{{ t("activity.recent.title") }}</h3>
           </div>
         </div>
       </template>
@@ -245,12 +270,12 @@ async function submitReport() {
             @click="applyPreset(preset)"
           >
             <strong>{{ preset.process_name }}</strong>
-            <span>{{ preset.process_title || "未填写窗口标题" }}</span>
-            <small>{{ new Date(preset.lastUsedAt).toLocaleString() }}</small>
+            <span>{{ preset.process_title || t("activity.common.windowTitleFallback") }}</span>
+            <small>{{ formatTime(preset.lastUsedAt) }}</small>
           </button>
         </div>
         <Message v-else severity="secondary" :closable="false">
-          首次同步成功后，最近使用的活动信息会出现在这里。
+          {{ t("activity.recent.empty") }}
         </Message>
       </template>
     </Card>

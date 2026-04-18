@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import Card from "primevue/card";
 import Dialog from "primevue/dialog";
 import Message from "primevue/message";
 import Paginator from "primevue/paginator";
 import Tag from "primevue/tag";
 
+import { resolveReporterLogDetail, resolveReporterLogTitle } from "../lib/reporterLogText";
 import type { ReporterLogEntry, RealtimeReporterSnapshot } from "../types";
+
+const { t, locale } = useI18n();
 
 const props = defineProps<{
   snapshot: RealtimeReporterSnapshot;
@@ -24,15 +28,21 @@ const selectedLogPayloadText = computed(() => {
 });
 
 function formatTime(value?: string | null) {
-  if (!value) return "暂无";
-  return new Date(value).toLocaleString();
+  if (!value) return t("realtime.summary.none");
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString(locale.value);
 }
 
 function levelLabel(level: ReporterLogEntry["level"]) {
-  if (level === "success") return "成功";
-  if (level === "error") return "错误";
-  if (level === "warn") return "警告";
-  return "信息";
+  if (level === "success") return t("realtime.levels.success");
+  if (level === "error") return t("realtime.levels.error");
+  if (level === "warn") return t("realtime.levels.warn");
+  return t("realtime.levels.info");
 }
 
 function levelSeverity(level: ReporterLogEntry["level"]) {
@@ -48,6 +58,18 @@ function openLog(log: ReporterLogEntry) {
 
 function closeLogDialog() {
   selectedLog.value = null;
+}
+
+function translateLogText(key: string, params?: Record<string, unknown> | null) {
+  return params ? t(key, params) : t(key);
+}
+
+function logTitle(log: ReporterLogEntry) {
+  return resolveReporterLogTitle(log, translateLogText);
+}
+
+function logDetail(log: ReporterLogEntry) {
+  return resolveReporterLogDetail(log, translateLogText);
 }
 
 watch(
@@ -66,11 +88,11 @@ watch(
       <template #title>
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">实时同步</p>
-            <h3>查看后台同步状态和最近记录</h3>
+            <p class="eyebrow">{{ t("realtime.title.eyebrow") }}</p>
+            <h3>{{ t("realtime.title.title") }}</h3>
           </div>
           <Tag
-            :value="snapshot.running ? '运行中' : '未启动'"
+            :value="snapshot.running ? t('realtime.status.running') : t('realtime.status.notStarted')"
             :severity="snapshot.running ? 'success' : 'warn'"
             rounded
           />
@@ -79,19 +101,19 @@ watch(
       <template #content>
         <div class="overview-summary">
           <div class="overview-item">
-            <span>当前进程</span>
-            <strong>{{ snapshot.currentActivity?.processName || "暂无" }}</strong>
+            <span>{{ t("realtime.summary.currentProcess") }}</span>
+            <strong>{{ snapshot.currentActivity?.processName || t("realtime.summary.none") }}</strong>
           </div>
           <div class="overview-item">
-            <span>窗口标题</span>
-            <strong>{{ snapshot.currentActivity?.processTitle || "暂无" }}</strong>
+            <span>{{ t("realtime.summary.windowTitle") }}</span>
+            <strong>{{ snapshot.currentActivity?.processTitle || t("realtime.summary.none") }}</strong>
           </div>
           <div class="overview-item">
-            <span>最近心跳</span>
+            <span>{{ t("realtime.summary.lastHeartbeat") }}</span>
             <strong>{{ formatTime(snapshot.lastHeartbeatAt) }}</strong>
           </div>
           <div class="overview-item">
-            <span>日志总数</span>
+            <span>{{ t("realtime.summary.logTotal") }}</span>
             <strong>{{ snapshot.logs.length }}</strong>
           </div>
         </div>
@@ -102,8 +124,8 @@ watch(
       <template #title>
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">同步记录</p>
-            <h3>按时间查看每一条同步结果</h3>
+            <p class="eyebrow">{{ t("realtime.list.eyebrow") }}</p>
+            <h3>{{ t("realtime.list.title") }}</h3>
           </div>
         </div>
       </template>
@@ -118,24 +140,24 @@ watch(
           >
             <div class="log-header">
               <div class="log-title-row">
-                <strong>{{ log.title }}</strong>
+                <strong>{{ logTitle(log) }}</strong>
                 <Tag :value="levelLabel(log.level)" :severity="levelSeverity(log.level)" rounded />
               </div>
               <small>{{ formatTime(log.timestamp) }}</small>
             </div>
-            <p class="log-detail">{{ log.detail }}</p>
+            <p class="log-detail">{{ logDetail(log) }}</p>
           </button>
           <Paginator
             :first="first"
             :rows="rows"
             :total-records="snapshot.logs.length"
             template="PrevPageLink CurrentPageReport NextPageLink"
-            current-page-report-template="{first} - {last} / {totalRecords}"
+            :current-page-report-template="t('realtime.pagination.report')"
             @page="first = $event.first"
           />
         </div>
         <Message v-else severity="secondary" :closable="false">
-          暂无同步记录。你可以先到“设置”里开启后台同步。
+          {{ t("realtime.list.empty") }}
         </Message>
       </template>
     </Card>
@@ -145,7 +167,7 @@ watch(
       modal
       dismissable-mask
       :draggable="false"
-      :header="selectedLog?.title || '同步详情'"
+      :header="selectedLog ? logTitle(selectedLog) : t('realtime.dialog.defaultHeader')"
       style="width: min(760px, calc(100vw - 24px))"
       @update:visible="(value) => !value && closeLogDialog()"
     >
@@ -158,7 +180,7 @@ watch(
           />
           <small>{{ formatTime(selectedLog.timestamp) }}</small>
         </div>
-        <p class="log-detail">{{ selectedLog.detail }}</p>
+        <p class="log-detail">{{ logDetail(selectedLog) }}</p>
         <pre v-if="selectedLog.payload" class="payload-preview">{{ selectedLogPayloadText }}</pre>
       </div>
     </Dialog>

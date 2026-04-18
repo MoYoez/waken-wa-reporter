@@ -19,6 +19,7 @@
     "@lexical/utils": "^0.38.1",
     "@primevue/themes": "^4.5.4",
     "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-autostart": "^2.5.1",
     "@tauri-apps/plugin-opener": "^2",
     "lexical": "^0.38.1",
     "lexical-vue": "^0.14.1",
@@ -26,7 +27,8 @@
     "primeicons": "^7.0.0",
     "primevue": "^4.5.4",
     "tauri-plugin-device-info-api": "^1.0.1",
-    "vue": "^3.5.13"
+    "vue": "^3.5.13",
+    "vue-i18n": "^11.3.2"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",

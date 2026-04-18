@@ -4,8 +4,12 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use serde::Deserialize;
+use serde_json::json;
 
-use super::{build_self_test_result, make_probe, ForegroundSnapshot, MediaInfo};
+use super::{
+    build_self_test_result, localized_text, make_probe, ForegroundSnapshot, MediaInfo,
+    ProbeTextSpec,
+};
 use crate::models::PlatformSelfTestResult;
 
 const COMMAND_TIMEOUT: Duration = Duration::from_millis(1500);
@@ -251,36 +255,68 @@ pub fn get_now_playing() -> Result<MediaInfo, String> {
     Ok(media)
 }
 
-fn macos_guidance(error: &str, probe: &str) -> Vec<String> {
+fn macos_guidance(error: &str, probe: &str) -> Vec<ProbeTextSpec> {
     let lower = error.to_lowercase();
     let mut guidance = Vec::new();
 
     if probe == "foreground" {
-        guidance.push("当前版本的 macOS 前台应用采集只走原生桥接，不再使用 osascript。".into());
-        guidance.push("如果仍然失败，请检查系统版本或是否存在窗口列表访问限制。".into());
+        guidance.push(localized_text(
+            "platformSelfTest.guidance.macosForegroundBridge",
+            None,
+            "当前版本的 macOS 前台应用采集只走原生桥接，不再使用 osascript。",
+        ));
+        guidance.push(localized_text(
+            "platformSelfTest.guidance.macosCheckSystemVersion",
+            None,
+            "如果仍然失败，请检查系统版本或是否存在窗口列表访问限制。",
+        ));
     }
 
     if probe == "window" {
         if accessibility_permission_granted() {
-            guidance.push(
-                "已检测到“辅助功能”权限；如果仍然没有标题，通常是当前应用本身未暴露稳定标题。"
-                    .into(),
-            );
+            guidance.push(localized_text(
+                "platformSelfTest.guidance.macosWindowPermissionGrantedButNoTitle",
+                None,
+                "已检测到“辅助功能”权限；如果仍然没有标题，通常是当前应用本身未暴露稳定标题。",
+            ));
         } else {
-            guidance.push("macOS 窗口标题采集依赖“辅助功能”授权。".into());
-            guidance.push("可以在设置页点“申请辅助功能权限”，或前往“系统设置 -> 隐私与安全性 -> 辅助功能”手动开启。".into());
+            guidance.push(localized_text(
+                "platformSelfTest.guidance.macosWindowPermissionRequired",
+                None,
+                "macOS 窗口标题采集依赖“辅助功能”授权。",
+            ));
+            guidance.push(localized_text(
+                "platformSelfTest.guidance.macosWindowPermissionSettings",
+                None,
+                "可以在设置页点“申请辅助功能权限”，或前往“系统设置 -> 隐私与安全性 -> 辅助功能”手动开启。",
+            ));
         }
-        guidance.push("部分应用即使已授权，也可能不会返回稳定的窗口标题。".into());
+        guidance.push(localized_text(
+            "platformSelfTest.guidance.macosWindowTitleUnstable",
+            None,
+            "部分应用即使已授权，也可能不会返回稳定的窗口标题。",
+        ));
     }
 
     if probe == "media" || lower.contains("nowplaying-cli") {
-        guidance.push("请先安装 nowplaying-cli：`brew install nowplaying-cli`。".into());
-        guidance
-            .push("如果当前没有正在播放的媒体，客户端现在会直接返回空结果，不再记为失败。".into());
+        guidance.push(localized_text(
+            "platformSelfTest.guidance.macosInstallNowPlayingCli",
+            None,
+            "请先安装 nowplaying-cli：`brew install nowplaying-cli`。",
+        ));
+        guidance.push(localized_text(
+            "platformSelfTest.guidance.macosMediaEmpty",
+            None,
+            "如果当前没有正在播放的媒体，客户端现在会直接返回空结果，不再记为失败。",
+        ));
     }
 
     if guidance.is_empty() {
-        guidance.push("如果这是权限问题，请先检查 macOS 的“辅助功能”和“自动化”授权。".into());
+        guidance.push(localized_text(
+            "platformSelfTest.guidance.macosCheckPermissions",
+            None,
+            "如果这是权限问题，请先检查 macOS 的“辅助功能”和“自动化”授权。",
+        ));
     }
 
     guidance
@@ -290,14 +326,30 @@ pub fn run_self_test() -> PlatformSelfTestResult {
     let foreground = match get_foreground_snapshot() {
         Ok(snapshot) => make_probe(
             true,
-            "前台应用采集正常",
-            format!("当前前台应用：{}", snapshot.process_name),
+            localized_text(
+                "platformSelfTest.summary.foregroundOk",
+                None,
+                "前台应用采集正常",
+            ),
+            localized_text(
+                "platformSelfTest.detail.foregroundCurrent",
+                Some(json!({ "processName": snapshot.process_name.clone() })),
+                format!("当前前台应用：{}", snapshot.process_name),
+            ),
             Vec::new(),
         ),
         Err(error) => make_probe(
             false,
-            "前台应用采集失败",
-            error.clone(),
+            localized_text(
+                "platformSelfTest.summary.foregroundFailed",
+                None,
+                "前台应用采集失败",
+            ),
+            localized_text(
+                "platformSelfTest.detail.foregroundReadFailed",
+                None,
+                error.clone(),
+            ),
             macos_guidance(&error, "foreground"),
         ),
     };
@@ -306,43 +358,96 @@ pub fn run_self_test() -> PlatformSelfTestResult {
         Ok(snapshot) => make_probe(
             !snapshot.process_title.trim().is_empty(),
             if snapshot.process_title.trim().is_empty() {
-                "窗口标题为空"
+                localized_text(
+                    "platformSelfTest.summary.windowTitleEmpty",
+                    None,
+                    "窗口标题为空",
+                )
             } else {
-                "窗口标题采集正常"
+                localized_text(
+                    "platformSelfTest.summary.windowTitleOk",
+                    None,
+                    "窗口标题采集正常",
+                )
             },
             if snapshot.process_title.trim().is_empty() {
                 if accessibility_permission_granted() {
-                    "当前前台窗口没有可用标题。".to_string()
+                    localized_text(
+                        "platformSelfTest.detail.windowTitleEmpty",
+                        None,
+                        "当前前台窗口没有可用标题。",
+                    )
                 } else {
-                    "当前前台窗口没有可用标题，且尚未授予辅助功能权限。".to_string()
+                    localized_text(
+                        "platformSelfTest.detail.windowTitleEmptyPermissionMissing",
+                        None,
+                        "当前前台窗口没有可用标题，且尚未授予辅助功能权限。",
+                    )
                 }
             } else {
-                snapshot.process_title
+                localized_text(
+                    "platformSelfTest.detail.windowTitleCurrent",
+                    Some(json!({ "processTitle": snapshot.process_title.clone() })),
+                    snapshot.process_title,
+                )
             },
             macos_guidance("", "window"),
         ),
         Err(error) => make_probe(
             false,
-            "窗口标题采集失败",
-            error.clone(),
+            localized_text(
+                "platformSelfTest.summary.windowTitleFailed",
+                None,
+                "窗口标题采集失败",
+            ),
+            localized_text(
+                "platformSelfTest.detail.windowTitleReadFailed",
+                None,
+                error.clone(),
+            ),
             macos_guidance(&error, "window"),
         ),
     };
 
     let media = match get_now_playing() {
         Ok(info) if !info.is_empty() => {
-            make_probe(true, "媒体采集正常", info.summary(), Vec::new())
+            make_probe(
+                true,
+                localized_text("platformSelfTest.summary.mediaOk", None, "媒体采集正常"),
+                localized_text(
+                    "platformSelfTest.detail.mediaCurrent",
+                    Some(json!({ "mediaSummary": info.summary() })),
+                    info.summary(),
+                ),
+                Vec::new(),
+            )
         }
         Ok(_) => make_probe(
             true,
-            "当前没有播放中的媒体",
-            "系统当前没有可用的正在播放信息。".to_string(),
-            vec!["如果你正在测试媒体采集，请先播放一段音乐后再运行自检。".into()],
+            localized_text(
+                "platformSelfTest.summary.mediaNone",
+                None,
+                "当前没有播放中的媒体",
+            ),
+            localized_text(
+                "platformSelfTest.detail.mediaNone",
+                None,
+                "系统当前没有可用的正在播放信息。",
+            ),
+            vec![localized_text(
+                "platformSelfTest.guidance.playMediaThenRetry",
+                None,
+                "如果你正在测试媒体采集，请先播放一段音乐后再运行自检。",
+            )],
         ),
         Err(error) => make_probe(
             false,
-            "媒体采集失败",
-            error.clone(),
+            localized_text("platformSelfTest.summary.mediaFailed", None, "媒体采集失败"),
+            localized_text(
+                "platformSelfTest.detail.mediaReadFailed",
+                None,
+                error.clone(),
+            ),
             macos_guidance(&error, "media"),
         ),
     };

@@ -94,6 +94,7 @@ pub fn discover_existing_reporter_config(
             discord_enabled: false,
             discord_application_id: crate::models::default_discord_application_id(),
             discord_source_id: crate::models::default_discord_source_id(),
+            launch_on_startup: false,
         }),
     })
 }

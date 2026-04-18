@@ -9,7 +9,7 @@ mod windows;
 
 use serde_json::{Map, Value};
 
-use crate::models::{PlatformProbeResult, PlatformSelfTestResult};
+use crate::models::{LocalizedTextEntry, PlatformProbeResult, PlatformSelfTestResult};
 
 #[derive(Clone, Debug, Default)]
 pub struct ForegroundSnapshot {
@@ -133,15 +133,38 @@ pub fn platform_name() -> &'static str {
 
 pub fn make_probe(
     success: bool,
-    summary: impl Into<String>,
-    detail: impl Into<String>,
-    guidance: Vec<String>,
+    summary: ProbeTextSpec,
+    detail: ProbeTextSpec,
+    guidance: Vec<ProbeTextSpec>,
 ) -> PlatformProbeResult {
+    let ProbeTextSpec {
+        key: summary_key,
+        params: summary_params,
+        fallback: summary_fallback,
+    } = summary;
+    let ProbeTextSpec {
+        key: detail_key,
+        params: detail_params,
+        fallback: detail_fallback,
+    } = detail;
+
     PlatformProbeResult {
         success,
-        summary: summary.into(),
-        detail: detail.into(),
-        guidance,
+        summary: summary_fallback,
+        detail: detail_fallback,
+        guidance: guidance.iter().map(|entry| entry.fallback.clone()).collect(),
+        summary_key: summary_key.map(str::to_string),
+        summary_params,
+        detail_key: detail_key.map(str::to_string),
+        detail_params,
+        guidance_entries: guidance
+            .into_iter()
+            .map(|entry| LocalizedTextEntry {
+                text: entry.fallback,
+                key: entry.key.map(str::to_string),
+                params: entry.params,
+            })
+            .collect(),
     }
 }
 
@@ -155,5 +178,23 @@ pub fn build_self_test_result(
         foreground,
         window_title,
         media,
+    }
+}
+
+pub struct ProbeTextSpec {
+    key: Option<&'static str>,
+    params: Option<Value>,
+    fallback: String,
+}
+
+pub fn localized_text(
+    key: &'static str,
+    params: Option<Value>,
+    fallback: impl Into<String>,
+) -> ProbeTextSpec {
+    ProbeTextSpec {
+        key: Some(key),
+        params,
+        fallback: fallback.into(),
     }
 }

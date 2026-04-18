@@ -15,6 +15,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::{
+    backend_locale::BackendLocale,
     http_client::build_blocking_client,
     models::{ClientConfig, DiscordPresenceSnapshot},
 };
@@ -54,8 +55,12 @@ impl DiscordPresenceRuntime {
         snapshot_from_inner(&inner)
     }
 
-    pub fn start(&self, config: ClientConfig) -> Result<DiscordPresenceSnapshot, String> {
-        validate_discord_presence_config(&config)?;
+    pub fn start(
+        &self,
+        config: ClientConfig,
+        locale: BackendLocale,
+    ) -> Result<DiscordPresenceSnapshot, String> {
+        validate_discord_presence_config(&config, locale)?;
 
         let stop_flag = Arc::new(AtomicBool::new(false));
         let run_id = self.sequence.fetch_add(1, Ordering::SeqCst);
@@ -76,7 +81,7 @@ impl DiscordPresenceRuntime {
             if let Err(handle) = wait_for_worker_exit(handle) {
                 let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
                 inner.worker = Some(handle);
-                return Err("上一次 Discord 同步线程仍在退出，请稍后重试。".into());
+                return Err(discord_worker_stopping(locale));
             }
         }
 
@@ -91,7 +96,7 @@ impl DiscordPresenceRuntime {
 
         let state = self.inner.clone();
         let worker = thread::spawn(move || {
-            run_discord_presence_loop(state, config, stop_flag, run_id);
+            run_discord_presence_loop(state, config, stop_flag, run_id, locale);
         });
 
         {
@@ -181,8 +186,9 @@ fn run_discord_presence_loop(
     config: ClientConfig,
     stop_flag: Arc<AtomicBool>,
     run_id: u64,
+    locale: BackendLocale,
 ) {
-    let http_client = match build_http_client(config.use_system_proxy) {
+    let http_client = match build_http_client(config.use_system_proxy, locale) {
         Ok(client) => client,
         Err(error) => {
             set_discord_error(&state, Some(error), false, run_id);
@@ -196,7 +202,7 @@ fn run_discord_presence_loop(
     let mut consecutive_errors = 0u32;
 
     while !stop_flag.load(Ordering::SeqCst) {
-        match fetch_public_activity_feed_blocking(&http_client, &config.base_url) {
+        match fetch_public_activity_feed_blocking(&http_client, &config.base_url, locale) {
             Ok(feed) => {
                 let target_activity =
                     select_dc_source_activity(&feed.active_statuses, &target_dc_source);
@@ -207,10 +213,15 @@ fn run_discord_presence_loop(
                         &mut discord_client,
                         &config.discord_application_id,
                         &payload,
+                        locale,
                     )
                     .map(|()| PresenceUpdate::Set(payload.summary))
                 } else {
-                    clear_discord_presence(&mut discord_client, &config.discord_application_id)
+                    clear_discord_presence(
+                        &mut discord_client,
+                        &config.discord_application_id,
+                        locale,
+                    )
                         .map(|()| PresenceUpdate::Cleared)
                 };
 
@@ -241,7 +252,7 @@ fn run_discord_presence_loop(
         }
     }
 
-    let _ = clear_discord_presence(&mut discord_client, &config.discord_application_id);
+    let _ = clear_discord_presence(&mut discord_client, &config.discord_application_id, locale);
     mark_stopped(&state, run_id);
 }
 
@@ -253,22 +264,19 @@ enum PresenceUpdate {
 fn fetch_public_activity_feed_blocking(
     client: &Client,
     base_url: &str,
+    locale: BackendLocale,
 ) -> Result<PublicActivityFeed, String> {
     let url = format!("{}/api/activity?public=1", base_url.trim_end_matches('/'));
     let response = client
         .get(url)
         .header(CONTENT_TYPE, "application/json")
         .send()
-        .map_err(|error| format!("拉取公开活动失败：{error}"))?;
+        .map_err(|error| format_error(locale, "拉取公开活动失败", "Failed to fetch public activity", error))?;
 
     let status = response.status().as_u16();
     let text = response.text().unwrap_or_default();
     if status >= 400 {
-        return Err(if text.trim().is_empty() {
-            format!("公开活动接口返回状态码 {status}")
-        } else {
-            format!("公开活动接口返回状态码 {status}：{}", text.trim())
-        });
+        return Err(public_feed_status_error(locale, status, text.trim()));
     }
 
     let payload = if text.trim().is_empty() {
@@ -287,13 +295,13 @@ fn fetch_public_activity_feed_blocking(
             .get("error")
             .and_then(Value::as_str)
             .or_else(|| payload.get("message").and_then(Value::as_str))
-            .unwrap_or("公开活动接口返回失败")
-            .to_string());
+            .map(str::to_string)
+            .unwrap_or_else(|| default_public_feed_failure(locale)));
     }
 
     let data = payload.get("data").cloned().unwrap_or(payload);
     serde_json::from_value::<PublicActivityFeed>(data)
-        .map_err(|error| format!("解析公开活动失败：{error}"))
+        .map_err(|error| format_error(locale, "解析公开活动失败", "Failed to parse public activity", error))
 }
 
 fn select_dc_source_activity<'a>(
@@ -364,8 +372,9 @@ fn apply_discord_presence(
     client_slot: &mut Option<DiscordIpcClient>,
     application_id: &str,
     payload: &DiscordPresencePayload,
+    locale: BackendLocale,
 ) -> Result<(), String> {
-    with_discord_client(client_slot, application_id, |client| {
+    with_discord_client(client_slot, application_id, locale, |client| {
         let mut activity_payload = activity::Activity::new().details(payload.details.clone());
         if let Some(state) = payload.state.as_deref() {
             activity_payload = activity_payload.state(state.to_string());
@@ -376,24 +385,26 @@ fn apply_discord_presence(
         }
         client
             .set_activity(activity_payload)
-            .map_err(|error| format!("更新 Discord 状态失败：{error}"))
+            .map_err(|error| format_error(locale, "更新 Discord 状态失败", "Failed to update Discord presence", error))
     })
 }
 
 fn clear_discord_presence(
     client_slot: &mut Option<DiscordIpcClient>,
     application_id: &str,
+    locale: BackendLocale,
 ) -> Result<(), String> {
-    with_discord_client(client_slot, application_id, |client| {
+    with_discord_client(client_slot, application_id, locale, |client| {
         client
             .clear_activity()
-            .map_err(|error| format!("清空 Discord 状态失败：{error}"))
+            .map_err(|error| format_error(locale, "清空 Discord 状态失败", "Failed to clear Discord presence", error))
     })
 }
 
 fn with_discord_client<F>(
     client_slot: &mut Option<DiscordIpcClient>,
     application_id: &str,
+    locale: BackendLocale,
     mut action: F,
 ) -> Result<(), String>
 where
@@ -404,7 +415,7 @@ where
             let mut client = DiscordIpcClient::new(application_id);
             client
                 .connect()
-                .map_err(|error| format!("连接 Discord IPC 失败：{error}"))?;
+                .map_err(|error| format_error(locale, "连接 Discord IPC 失败", "Failed to connect to Discord IPC", error))?;
             *client_slot = Some(client);
         }
 
@@ -420,24 +431,27 @@ where
         }
     }
 
-    Err("Discord IPC 当前不可用，请确认桌面端 Discord 已运行。".into())
+    Err(discord_ipc_unavailable(locale))
 }
 
-fn validate_discord_presence_config(config: &ClientConfig) -> Result<(), String> {
+fn validate_discord_presence_config(
+    config: &ClientConfig,
+    locale: BackendLocale,
+) -> Result<(), String> {
     if config.base_url.trim().is_empty() {
-        return Err("缺少站点地址，无法启动 Discord 状态同步。".into());
+        return Err(discord_config_base_url_missing(locale));
     }
     if config.discord_application_id.trim().is_empty() {
-        return Err("缺少 Discord Application ID，无法启动 Discord 状态同步。".into());
+        return Err(discord_config_app_id_missing(locale));
     }
     if config.discord_source_id.trim().is_empty() {
-        return Err("缺少 Discord 来源标识，无法筛选当前客户端的 Discord 状态来源。".into());
+        return Err(discord_config_source_id_missing(locale));
     }
     Ok(())
 }
 
 pub fn config_is_ready(config: &ClientConfig) -> bool {
-    validate_discord_presence_config(config).is_ok()
+    validate_discord_presence_config(config, BackendLocale::ZhCn).is_ok()
 }
 
 fn normalize_presence_line(value: &str) -> String {
@@ -518,12 +532,88 @@ fn mark_stopped(state: &Arc<Mutex<DiscordPresenceInner>>, run_id: u64) {
     inner.stop_flag = None;
 }
 
-fn build_http_client(use_system_proxy: bool) -> Result<Client, String> {
+fn build_http_client(use_system_proxy: bool, locale: BackendLocale) -> Result<Client, String> {
     build_blocking_client(
         "waken-wa-tauri-discord-presence/0.1.0",
         Some(Duration::from_secs(15)),
         use_system_proxy,
+        locale,
     )
+}
+
+fn format_error(
+    locale: BackendLocale,
+    zh_prefix: &str,
+    en_prefix: &str,
+    error: impl std::fmt::Display,
+) -> String {
+    if locale.is_en() {
+        format!("{en_prefix}: {error}")
+    } else {
+        format!("{zh_prefix}：{error}")
+    }
+}
+
+fn public_feed_status_error(locale: BackendLocale, status: u16, body: &str) -> String {
+    if body.is_empty() {
+        if locale.is_en() {
+            format!("Public activity returned HTTP {status}")
+        } else {
+            format!("公开活动接口返回状态码 {status}")
+        }
+    } else if locale.is_en() {
+        format!("Public activity returned HTTP {status}: {body}")
+    } else {
+        format!("公开活动接口返回状态码 {status}：{body}")
+    }
+}
+
+fn default_public_feed_failure(locale: BackendLocale) -> String {
+    if locale.is_en() {
+        "Public activity returned failure".into()
+    } else {
+        "公开活动接口返回失败".into()
+    }
+}
+
+fn discord_worker_stopping(locale: BackendLocale) -> String {
+    if locale.is_en() {
+        "Discord sync is still stopping. Try again shortly.".into()
+    } else {
+        "Discord 同步仍在退出，请稍后重试。".into()
+    }
+}
+
+fn discord_ipc_unavailable(locale: BackendLocale) -> String {
+    if locale.is_en() {
+        "Discord IPC is unavailable. Make sure Discord Desktop is running.".into()
+    } else {
+        "Discord IPC 不可用，请确认桌面端 Discord 已运行。".into()
+    }
+}
+
+fn discord_config_base_url_missing(locale: BackendLocale) -> String {
+    if locale.is_en() {
+        "Site URL is required before Discord sync can start.".into()
+    } else {
+        "缺少站点地址，无法启动 Discord 同步。".into()
+    }
+}
+
+fn discord_config_app_id_missing(locale: BackendLocale) -> String {
+    if locale.is_en() {
+        "Discord Application ID is required before Discord sync can start.".into()
+    } else {
+        "缺少 Discord Application ID，无法启动 Discord 同步。".into()
+    }
+}
+
+fn discord_config_source_id_missing(locale: BackendLocale) -> String {
+    if locale.is_en() {
+        "Discord source ID is required before Discord sync can start.".into()
+    } else {
+        "缺少 Discord 来源标识，无法启动 Discord 同步。".into()
+    }
 }
 
 fn sleep_with_stop(duration: Duration, stop_flag: &Arc<AtomicBool>) {

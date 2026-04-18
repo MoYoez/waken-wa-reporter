@@ -6,6 +6,7 @@
   "permissions": [
     "core:default",
     "opener:default",
-    "device-info:default"
+    "device-info:default",
+    "autostart:default"
   ]
 }

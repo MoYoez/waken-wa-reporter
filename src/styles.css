@@ -888,6 +888,19 @@ select {
   gap: 10px;
 }
 
+.inline-message-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.inline-message-action > span {
+  flex: 1 1 240px;
+}
+
 .workspace-grid {
   display: grid;
   gap: 22px;
