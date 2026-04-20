@@ -51,12 +51,6 @@ pub fn run() {
         .plugin(tauri_plugin_device_info::init());
 
     #[cfg(desktop)]
-    let builder = builder.plugin(tauri_plugin_autostart::init(
-        MacosLauncher::LaunchAgent,
-        None::<Vec<&str>>,
-    ));
-
-    #[cfg(desktop)]
     let builder = builder
         .manage(ReporterRuntime::new())
         .manage(DiscordPresenceRuntime::new());
@@ -65,6 +59,13 @@ pub fn run() {
         .setup(|app| {
             #[cfg(desktop)]
             {
+                app.handle()
+                    .plugin(tauri_plugin_autostart::init(
+                        MacosLauncher::LaunchAgent,
+                        None::<Vec<&str>>,
+                    ))
+                    .map_err(|error| -> Box<dyn std::error::Error> { error.into() })?;
+
                 tray::setup_tray(&app.handle())
                     .map_err(|error| -> Box<dyn std::error::Error> { error.into() })?;
 
