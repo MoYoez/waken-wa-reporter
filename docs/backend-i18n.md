@@ -1,3 +1,8 @@
+<div align="right">
+  <span>[<a href="./backend-i18n.en.md">English</a>]</span>
+  <span>[<a href="./backend-i18n.md">简体中文</a>]</span>
+</div>
+
 # Backend i18n Scheme
 
 后端不直接承担完整多语言渲染，建议只负责返回稳定的业务语义，前端基于 `vue-i18n` 做最终文案展示。

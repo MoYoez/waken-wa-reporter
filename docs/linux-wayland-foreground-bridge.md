@@ -1,10 +1,15 @@
+<div align="right">
+  <span>[<a href="./linux-wayland-foreground-bridge.en.md">English</a>]</span>
+  <span>[<a href="./linux-wayland-foreground-bridge.md">简体中文</a>]</span>
+</div>
+
 # Linux Wayland 前台窗口桥接
 
 在 Wayland 下，普通桌面应用无法直接读取全局前台窗口。  
-Waken-Wa Web Client 当前采用两层内建策略读取前台窗口信息：
+Waken-Wa Reporter Client 当前采用两层内建策略读取前台窗口信息：
 
-1. GNOME: 直接调用 `Focused Window D-Bus`
-2. KDE Plasma: 直接调用 `kdotool`
+1. GNOME：直接调用 `Focused Window D-Bus`
+2. KDE Plasma：直接调用 `kdotool`
 
 ## 内建 Wayland 适配
 
