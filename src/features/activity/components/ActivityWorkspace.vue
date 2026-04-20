@@ -14,17 +14,17 @@ import {
   formatPendingApprovalDetail,
   submitActivityReport,
   validateConfig,
-} from "../lib/api";
-import { readBatterySnapshot } from "../lib/deviceInfo";
-import { resolveApiErrorMessage } from "../lib/localizedText";
-import { createNotifier } from "../lib/notify";
+} from "@/lib/api";
+import { readBatterySnapshot } from "@/lib/deviceInfo";
+import { resolveApiErrorMessage } from "@/lib/localizedText";
+import { createNotifier } from "@/lib/notify";
 import type {
   ActivityPayload,
   ClientCapabilities,
   ClientConfig,
   PendingApprovalInfo,
   RecentPreset,
-} from "../types";
+} from "@/types";
 
 interface ActivityFormState {
   processName: string;
@@ -281,3 +281,4 @@ async function submitReport() {
     </Card>
   </div>
 </template>
+

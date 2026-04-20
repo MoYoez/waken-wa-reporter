@@ -32,7 +32,7 @@ import { ListPlugin } from "lexical-vue/LexicalListPlugin";
 import { OnChangePlugin } from "lexical-vue/LexicalOnChangePlugin";
 import { RichTextPlugin } from "lexical-vue/LexicalRichTextPlugin";
 
-import { lexicalTextContent } from "../lib/inspirationRichText";
+import { lexicalTextContent } from "@/lib/inspirationRichText";
 
 const { t } = useI18n();
 
@@ -308,3 +308,4 @@ onBeforeUnmount(() => {
     </div>
   </div>
 </template>
+

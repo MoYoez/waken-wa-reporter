@@ -7,8 +7,8 @@ import Message from "primevue/message";
 import Paginator from "primevue/paginator";
 import Tag from "primevue/tag";
 
-import { resolveReporterLogDetail, resolveReporterLogTitle } from "../lib/reporterLogText";
-import type { ReporterLogEntry, RealtimeReporterSnapshot } from "../types";
+import { resolveReporterLogDetail, resolveReporterLogTitle } from "@/lib/reporterLogText";
+import type { ReporterLogEntry, RealtimeReporterSnapshot } from "@/types";
 
 const { t, locale } = useI18n();
 
@@ -186,3 +186,4 @@ watch(
     </Dialog>
   </div>
 </template>
+

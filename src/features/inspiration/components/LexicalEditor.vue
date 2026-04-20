@@ -62,3 +62,4 @@ const initialConfig = computed(() => ({
     />
   </LexicalComposer>
 </template>
+

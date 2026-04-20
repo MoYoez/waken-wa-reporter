@@ -6,14 +6,14 @@ import Card from "primevue/card";
 import Message from "primevue/message";
 import Tag from "primevue/tag";
 
-import { resolveReporterLogDetail, resolveReporterLogTitle } from "../lib/reporterLogText";
+import { resolveReporterLogDetail, resolveReporterLogTitle } from "@/lib/reporterLogText";
 import type {
   ClientCapabilities,
   ClientConfig,
   DiscordPresenceSnapshot,
   MobileConnectivityState,
   RealtimeReporterSnapshot,
-} from "../types";
+} from "@/types";
 
 const { t, locale } = useI18n();
 
@@ -351,3 +351,4 @@ function logDetail(log: RealtimeReporterSnapshot["logs"][number]) {
     </Card>
   </div>
 </template>
+
