@@ -24,3 +24,4 @@ dist-ssr
 *.sw?
 src-tauri/gen/apple/waken-wa-preview-ui.xcodeproj/project.pbxproj
 src-tauri/gen/apple/waken-wa-preview-ui.xcodeproj/xcshareddata/xcschemes/waken-wa-preview-ui_iOS.xcscheme
+src-tauri/gen/apple/waken-wa-Reporter.xcodeproj/project.pbxproj
