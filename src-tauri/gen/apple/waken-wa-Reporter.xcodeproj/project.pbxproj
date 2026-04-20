@@ -24,36 +24,36 @@
 /* Begin PBXFileReference section */
 		113EB02CA83F17F5B76D5C78 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
 		12AE5DEC8B6EC378D54BDE1A /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
-		17C0B11F44E14BE30AA45A24 /* macos.rs */ = {isa = PBXFileReference; path = macos.rs; sourceTree = "<group>"; };
+		17C0B11F44E14BE30AA45A24 /* macos.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = macos.rs; sourceTree = "<group>"; };
 		1923854B63E6F85DE4FED11E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		1B34049A368762B0A96F577E /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 		207923B90E2989FABE286074 /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
-		26F10AD3BDCA7DED69B68CA2 /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
+		26F10AD3BDCA7DED69B68CA2 /* main.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = main.rs; sourceTree = "<group>"; };
 		27FFA86C08EF4710E9A146B6 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
-		30957FD9E3E0E53DAF23CE7F /* models.rs */ = {isa = PBXFileReference; path = models.rs; sourceTree = "<group>"; };
-		399D72B4E492E3D417312AE9 /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
-		552DC03FD2AF1AA13A8412AE /* reporter_config.rs */ = {isa = PBXFileReference; path = reporter_config.rs; sourceTree = "<group>"; };
+		30957FD9E3E0E53DAF23CE7F /* models.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = models.rs; sourceTree = "<group>"; };
+		399D72B4E492E3D417312AE9 /* lib.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = lib.rs; sourceTree = "<group>"; };
+		552DC03FD2AF1AA13A8412AE /* reporter_config.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = reporter_config.rs; sourceTree = "<group>"; };
 		57B1E17516ADDAAF4D376169 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
-		70C18904223D49056ED47027 /* stub.rs */ = {isa = PBXFileReference; path = stub.rs; sourceTree = "<group>"; };
+		70C18904223D49056ED47027 /* stub.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = stub.rs; sourceTree = "<group>"; };
 		75908514258AD6188B1ECBA0 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		78037072800217A75CFC7491 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		7C552F0B404465A4FB12F359 /* waken-wa-preview-ui_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "waken-wa-preview-ui_iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		7C552F0B404465A4FB12F359 /* Waken-Wa-Reporter Client.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Waken-Wa-Reporter Client.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		81CF7F96EAFAA637B8BB2199 /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
-		8A4810BEF6B49DB045D680B0 /* linux.rs */ = {isa = PBXFileReference; path = linux.rs; sourceTree = "<group>"; };
+		8A4810BEF6B49DB045D680B0 /* linux.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = linux.rs; sourceTree = "<group>"; };
 		8D82B48D4CAC404FD9B93A8C /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
-		8F5A8BACFBDCA0233DBABA6B /* tray.rs */ = {isa = PBXFileReference; path = tray.rs; sourceTree = "<group>"; };
+		8F5A8BACFBDCA0233DBABA6B /* tray.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = tray.rs; sourceTree = "<group>"; };
 		A4E4E3DB2A9C35158CAE2096 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
-		B27D2DE1E9B100C21A5BF61F /* commands.rs */ = {isa = PBXFileReference; path = commands.rs; sourceTree = "<group>"; };
-		B333BF3091DDDF1636F21976 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
-		BBD9828F43DE051DE268C470 /* import_config.rs */ = {isa = PBXFileReference; path = import_config.rs; sourceTree = "<group>"; };
-		BED271A51FF1B2B8545C2337 /* realtime_reporter.rs */ = {isa = PBXFileReference; path = realtime_reporter.rs; sourceTree = "<group>"; };
+		B27D2DE1E9B100C21A5BF61F /* commands.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = commands.rs; sourceTree = "<group>"; };
+		B333BF3091DDDF1636F21976 /* mod.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = mod.rs; sourceTree = "<group>"; };
+		BBD9828F43DE051DE268C470 /* import_config.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = import_config.rs; sourceTree = "<group>"; };
+		BED271A51FF1B2B8545C2337 /* realtime_reporter.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = realtime_reporter.rs; sourceTree = "<group>"; };
 		C53CFD8ECC63445A9C3FA667 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
-		DBC2A0182CFBE90007C8A436 /* state_store.rs */ = {isa = PBXFileReference; path = state_store.rs; sourceTree = "<group>"; };
-		E2CAE8E9E0A8917ED2EA9DD7 /* http_client.rs */ = {isa = PBXFileReference; path = http_client.rs; sourceTree = "<group>"; };
+		DBC2A0182CFBE90007C8A436 /* state_store.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = state_store.rs; sourceTree = "<group>"; };
+		E2CAE8E9E0A8917ED2EA9DD7 /* http_client.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = http_client.rs; sourceTree = "<group>"; };
 		E4F5947699108CF333057A03 /* macos_bridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = macos_bridge.m; sourceTree = "<group>"; };
 		E4FAB17637395C4E40B0FF9A /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
-		FA441BF6E2F6BA4321377C2D /* windows.rs */ = {isa = PBXFileReference; path = windows.rs; sourceTree = "<group>"; };
-		FC4719A5D0CDEF082AE9D3C1 /* waken-wa-preview-ui_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "waken-wa-preview-ui_iOS.entitlements"; sourceTree = "<group>"; };
+		FA441BF6E2F6BA4321377C2D /* windows.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = windows.rs; sourceTree = "<group>"; };
+		FC4719A5D0CDEF082AE9D3C1 /* waken-wa-Reporter_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "waken-wa-Reporter_iOS.entitlements"; sourceTree = "<group>"; };
 		FD8CA7CFAEFF5BE9D0236C0F /* macos_bridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = macos_bridge.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -102,7 +102,7 @@
 		6A8EF17FF8F2914A5EA76C83 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				7C552F0B404465A4FB12F359 /* waken-wa-preview-ui_iOS.app */,
+				7C552F0B404465A4FB12F359 /* Waken-Wa-Reporter Client.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -132,7 +132,7 @@
 				7348FCF5E1E47208FC53214D /* Externals */,
 				4E0CFBF49359E2B795944F07 /* Sources */,
 				BFB2E7593D629BE10FDFB9DF /* src */,
-				CAFA0B2651147892E6398E3E /* waken-wa-preview-ui_iOS */,
+				CAFA0B2651147892E6398E3E /* waken-wa-Reporter_iOS */,
 				588B9AE05288101B6B8E2073 /* Frameworks */,
 				6A8EF17FF8F2914A5EA76C83 /* Products */,
 			);
@@ -179,21 +179,21 @@
 			path = ../../src;
 			sourceTree = "<group>";
 		};
-		CAFA0B2651147892E6398E3E /* waken-wa-preview-ui_iOS */ = {
+		CAFA0B2651147892E6398E3E /* waken-wa-Reporter_iOS */ = {
 			isa = PBXGroup;
 			children = (
 				1923854B63E6F85DE4FED11E /* Info.plist */,
-				FC4719A5D0CDEF082AE9D3C1 /* waken-wa-preview-ui_iOS.entitlements */,
+				FC4719A5D0CDEF082AE9D3C1 /* waken-wa-Reporter_iOS.entitlements */,
 			);
-			path = "waken-wa-preview-ui_iOS";
+			path = "waken-wa-Reporter_iOS";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		CF940CB03A1110AEB903AE38 /* waken-wa-preview-ui_iOS */ = {
+		CF940CB03A1110AEB903AE38 /* waken-wa-Reporter_iOS */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 1918DA13DDE2DECC2760EC9D /* Build configuration list for PBXNativeTarget "waken-wa-preview-ui_iOS" */;
+			buildConfigurationList = 1918DA13DDE2DECC2760EC9D /* Build configuration list for PBXNativeTarget "waken-wa-Reporter_iOS" */;
 			buildPhases = (
 				3E67CA856C0C4150C70F2B80 /* Build Rust Code */,
 				0F87AF0CE75EA15CAAB3CD82 /* Sources */,
@@ -204,11 +204,11 @@
 			);
 			dependencies = (
 			);
-			name = "waken-wa-preview-ui_iOS";
+			name = "waken-wa-Reporter_iOS";
 			packageProductDependencies = (
 			);
-			productName = "waken-wa-preview-ui_iOS";
-			productReference = 7C552F0B404465A4FB12F359 /* waken-wa-preview-ui_iOS.app */;
+			productName = "waken-wa-Reporter_iOS";
+			productReference = 7C552F0B404465A4FB12F359 /* Waken-Wa-Reporter Client.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -219,10 +219,8 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
-				TargetAttributes = {
-				};
 			};
-			buildConfigurationList = DC065665F68C5DE506B11C16 /* Build configuration list for PBXProject "waken-wa-preview-ui" */;
+			buildConfigurationList = DC065665F68C5DE506B11C16 /* Build configuration list for PBXProject "waken-wa-Reporter" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -236,7 +234,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				CF940CB03A1110AEB903AE38 /* waken-wa-preview-ui_iOS */,
+				CF940CB03A1110AEB903AE38 /* waken-wa-Reporter_iOS */,
 			);
 		};
 /* End PBXProject section */
@@ -413,25 +411,36 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
-				ARCHS = (
-					arm64,
-				);
+				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = "waken-wa-preview-ui_iOS/waken-wa-preview-ui_iOS.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "waken-wa-Reporter_iOS/waken-wa-Reporter_iOS.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = "";
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"\".\"",
 				);
-				INFOPLIST_FILE = "waken-wa-preview-ui_iOS/Info.plist";
+				INFOPLIST_FILE = "waken-wa-Reporter_iOS/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION)",
+					"$(SDKROOT)/usr/lib/swift",
+					"$(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
+					"$(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION)",
+					"$(SDKROOT)/usr/lib/swift",
+					"$(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
+					"$(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.waken-wa-reporter-rustc.app";
 				PRODUCT_NAME = "Waken-Wa-Reporter Client";
 				SDKROOT = iphoneos;
@@ -444,25 +453,36 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
-				ARCHS = (
-					arm64,
-				);
+				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = "waken-wa-preview-ui_iOS/waken-wa-preview-ui_iOS.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "waken-wa-Reporter_iOS/waken-wa-Reporter_iOS.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = "";
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"\".\"",
 				);
-				INFOPLIST_FILE = "waken-wa-preview-ui_iOS/Info.plist";
+				INFOPLIST_FILE = "waken-wa-Reporter_iOS/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION)",
+					"$(SDKROOT)/usr/lib/swift",
+					"$(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
+					"$(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION)",
+					"$(SDKROOT)/usr/lib/swift",
+					"$(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
+					"$(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.waken-wa-reporter-rustc.app";
 				PRODUCT_NAME = "Waken-Wa-Reporter Client";
 				SDKROOT = iphoneos;
@@ -474,7 +494,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		1918DA13DDE2DECC2760EC9D /* Build configuration list for PBXNativeTarget "waken-wa-preview-ui_iOS" */ = {
+		1918DA13DDE2DECC2760EC9D /* Build configuration list for PBXNativeTarget "waken-wa-Reporter_iOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				CB8001A8D03FAA920BCFE9D1 /* debug */,
@@ -483,7 +503,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = debug;
 		};
-		DC065665F68C5DE506B11C16 /* Build configuration list for PBXProject "waken-wa-preview-ui" */ = {
+		DC065665F68C5DE506B11C16 /* Build configuration list for PBXProject "waken-wa-Reporter" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				2BC5F617ABD6C7278D5B9225 /* debug */,
