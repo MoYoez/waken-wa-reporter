@@ -42,7 +42,11 @@ impl MediaInfo {
         include_play_source: bool,
     ) -> String {
         let title = if include_media { self.title.trim() } else { "" };
-        let artist = if include_media { self.artist.trim() } else { "" };
+        let artist = if include_media {
+            self.artist.trim()
+        } else {
+            ""
+        };
         let album = if include_media { self.album.trim() } else { "" };
         let source_app_id = if include_play_source {
             self.source_app_id.trim()
@@ -50,22 +54,14 @@ impl MediaInfo {
             ""
         };
 
-        if title.is_empty()
-            && artist.is_empty()
-            && album.is_empty()
-            && source_app_id.is_empty()
-        {
+        if title.is_empty() && artist.is_empty() && album.is_empty() && source_app_id.is_empty() {
             return String::new();
         }
 
         format!("{title}\u{1e}{artist}\u{1e}{album}\u{1e}{source_app_id}")
     }
 
-    pub fn into_reporting_subset(
-        mut self,
-        include_media: bool,
-        include_play_source: bool,
-    ) -> Self {
+    pub fn into_reporting_subset(mut self, include_media: bool, include_play_source: bool) -> Self {
         if !include_media {
             self.title.clear();
             self.artist.clear();
@@ -124,16 +120,24 @@ impl MediaInfo {
 
 #[allow(unused_imports)]
 #[cfg(target_os = "linux")]
-pub use linux::{get_foreground_snapshot_for_reporting, get_now_playing, get_now_playing_for_reporting};
+pub use linux::{
+    get_foreground_snapshot_for_reporting, get_now_playing, get_now_playing_for_reporting,
+};
 #[allow(unused_imports)]
 #[cfg(target_os = "macos")]
-pub use macos::{get_foreground_snapshot_for_reporting, get_now_playing, get_now_playing_for_reporting};
+pub use macos::{
+    get_foreground_snapshot_for_reporting, get_now_playing, get_now_playing_for_reporting,
+};
 #[allow(unused_imports)]
 #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-pub use stub::{get_foreground_snapshot_for_reporting, get_now_playing, get_now_playing_for_reporting};
+pub use stub::{
+    get_foreground_snapshot_for_reporting, get_now_playing, get_now_playing_for_reporting,
+};
 #[allow(unused_imports)]
 #[cfg(target_os = "windows")]
-pub use windows::{get_foreground_snapshot_for_reporting, get_now_playing, get_now_playing_for_reporting};
+pub use windows::{
+    get_foreground_snapshot_for_reporting, get_now_playing, get_now_playing_for_reporting,
+};
 
 #[cfg(target_os = "linux")]
 pub use linux::run_self_test;

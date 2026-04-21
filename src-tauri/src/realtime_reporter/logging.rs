@@ -38,7 +38,11 @@ pub(super) fn build_log_detail(
     locale: BackendLocale,
 ) -> LogTextSpec {
     let action = if locale.is_en() {
-        if is_heartbeat { "Heartbeat" } else { "Report" }
+        if is_heartbeat {
+            "Heartbeat"
+        } else {
+            "Report"
+        }
     } else if is_heartbeat {
         "心跳"
     } else {

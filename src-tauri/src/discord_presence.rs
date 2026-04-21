@@ -23,9 +23,7 @@ use crate::{
     runtime_utils::{now_iso_string, sleep_with_stop, wait_for_worker_exit},
 };
 
-use feed::{
-    fetch_public_activity_feed_blocking, select_dc_source_activity,
-};
+use feed::{fetch_public_activity_feed_blocking, select_dc_source_activity};
 use ipc::{apply_discord_presence, clear_discord_presence, map_activity_to_presence};
 use messages::{
     discord_config_app_id_missing, discord_config_base_url_missing,

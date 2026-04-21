@@ -12,14 +12,10 @@ mod x11;
 use crate::models::PlatformSelfTestResult;
 use crate::platform::{ForegroundSnapshot, MediaInfo};
 
-use super::{
-    build_self_test_result, localized_text, make_probe, ProbeTextSpec,
-};
+use super::{build_self_test_result, localized_text, make_probe, ProbeTextSpec};
 use command::has_env;
 use media::get_now_playing as read_now_playing;
-use wayland::{
-    get_foreground_snapshot_wayland, get_foreground_snapshot_wayland_for_reporting,
-};
+use wayland::{get_foreground_snapshot_wayland, get_foreground_snapshot_wayland_for_reporting};
 use x11::{get_foreground_snapshot_x11, get_foreground_snapshot_x11_for_reporting};
 
 pub fn get_foreground_snapshot() -> Result<ForegroundSnapshot, String> {

@@ -5,8 +5,10 @@ use crate::platform::MediaInfo;
 use super::command::{command_output_with_timeout, CommandError};
 
 const NOWPLAYING_CLI: &str = "nowplaying-cli";
-const NOWPLAYING_CLI_FALLBACK_PATHS: [&str; 2] =
-    ["/opt/homebrew/bin/nowplaying-cli", "/usr/local/bin/nowplaying-cli"];
+const NOWPLAYING_CLI_FALLBACK_PATHS: [&str; 2] = [
+    "/opt/homebrew/bin/nowplaying-cli",
+    "/usr/local/bin/nowplaying-cli",
+];
 
 enum NowPlayingCliError {
     NotFound {
@@ -76,9 +78,7 @@ fn get_now_playing_via_nowplaying_cli() -> Result<MediaInfo, NowPlayingCliError>
                 }
                 Err(CommandError::NotFound) => {}
                 Err(CommandError::TimedOut) => return Err(NowPlayingCliError::TimedOut),
-                Err(CommandError::Other(detail)) => {
-                    return Err(NowPlayingCliError::Failed(detail))
-                }
+                Err(CommandError::Other(detail)) => return Err(NowPlayingCliError::Failed(detail)),
             }
         }
         resolved

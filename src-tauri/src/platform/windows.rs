@@ -171,7 +171,8 @@ fn init_com_for_media() -> Result<ComInitGuard, String> {
 }
 
 #[cfg(target_os = "windows")]
-fn get_cached_media_session_manager() -> Result<GlobalSystemMediaTransportControlsSessionManager, String> {
+fn get_cached_media_session_manager(
+) -> Result<GlobalSystemMediaTransportControlsSessionManager, String> {
     MEDIA_SESSION_MANAGER.with(|cache| {
         if let Some(manager) = cache.borrow().as_ref().cloned() {
             return Ok(manager);

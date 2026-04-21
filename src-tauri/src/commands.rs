@@ -16,10 +16,7 @@ use crate::models::{
     InspirationEntryCreateInput, PlatformSelfTestResult, RealtimeReporterSnapshot,
 };
 #[cfg(desktop)]
-use crate::{
-    discord_presence::DiscordPresenceRuntime,
-    realtime_reporter::ReporterRuntime,
-};
+use crate::{discord_presence::DiscordPresenceRuntime, realtime_reporter::ReporterRuntime};
 
 #[tauri::command]
 pub fn load_app_state(app: AppHandle) -> Result<AppStatePayload, String> {
@@ -63,9 +60,7 @@ pub async fn submit_activity_report(
 }
 
 #[tauri::command]
-pub async fn get_public_activity_feed(
-    config: ClientConfig,
-) -> Result<ApiResult<Value>, String> {
+pub async fn get_public_activity_feed(config: ClientConfig) -> Result<ApiResult<Value>, String> {
     http::get_public_activity_feed(config).await
 }
 

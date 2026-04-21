@@ -12,10 +12,7 @@ pub(super) struct ValidationError {
     pub(super) params: Option<Value>,
 }
 
-pub(super) fn build_activity_report_body(
-    config: &ClientConfig,
-    payload: ActivityPayload,
-) -> Value {
+pub(super) fn build_activity_report_body(config: &ClientConfig, payload: ActivityPayload) -> Value {
     let generated_hash_key = if payload.generated_hash_key.trim().is_empty() {
         config.generated_hash_key.trim().to_string()
     } else {
@@ -67,10 +64,7 @@ pub(super) fn build_inspiration_entry_body(input: InspirationEntryCreateInput) -
     })
 }
 
-pub(super) fn build_inspiration_asset_body(
-    config: &ClientConfig,
-    image_data_url: String,
-) -> Value {
+pub(super) fn build_inspiration_asset_body(config: &ClientConfig, image_data_url: String) -> Value {
     json!({
         "imageDataUrl": image_data_url,
         "generatedHashKey": config.generated_hash_key.trim(),
