@@ -5,7 +5,6 @@ import SettingsHeroPanel from "@/features/settings/components/SettingsHeroPanel.
 import SettingsLanguageCard from "@/features/settings/components/SettingsLanguageCard.vue";
 import SettingsMobileCard from "@/features/settings/components/SettingsMobileCard.vue";
 import SettingsReporterCard from "@/features/settings/components/SettingsReporterCard.vue";
-import SettingsSelfTestCard from "@/features/settings/components/SettingsSelfTestCard.vue";
 import SettingsStartupCard from "@/features/settings/components/SettingsStartupCard.vue";
 import { useSettingsWorkspace } from "@/features/settings/composables/useSettingsWorkspace";
 import type { SupportedLocale } from "@/i18n";
@@ -102,6 +101,9 @@ const {
       :can-request-accessibility-permission="canRequestAccessibilityPermission"
       :self-test-loading="selfTestLoading"
       :accessibility-permission-loading="accessibilityPermissionLoading"
+      :self-test-platform="selfTestResult?.platform || ''"
+      :self-test-cards="selfTestCards"
+      :self-test-hint-key="selfTestPlatformHintKey"
       @start="$emit('startReporter')"
       @stop="$emit('stopReporter')"
       @self-test="handleSelfTest"
@@ -122,15 +124,6 @@ const {
       @update-enabled="updateField('discordEnabled', $event)"
       @start="$emit('startDiscordPresence')"
       @stop="$emit('stopDiscordPresence')"
-    />
-
-    <SettingsSelfTestCard
-      v-if="selfTestSupported && selfTestResult"
-      :platform="selfTestResult.platform"
-      :cards="selfTestCards"
-      :hint-key="selfTestPlatformHintKey"
-      :accessibility-permission-loading="accessibilityPermissionLoading"
-      @request-accessibility-permission="handleRequestAccessibilityPermission"
     />
   </div>
 </template>

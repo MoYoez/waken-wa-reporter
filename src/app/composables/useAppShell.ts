@@ -1,118 +1,83 @@
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "primevue/usetoast";
 
 import { useAppShellBootstrap } from "@/app/composables/useAppShellBootstrap";
+import { useAppShellDerivedState } from "@/app/composables/useAppShellDerivedState";
 import { useAppShellLifecycle } from "@/app/composables/useAppShellLifecycle";
 import { useAppShellNavigation } from "@/app/composables/useAppShellNavigation";
 import { useAppShellPersistence } from "@/app/composables/useAppShellPersistence";
+import { useAppShellRecentPresets } from "@/app/composables/useAppShellRecentPresets";
+import { useAppShellState } from "@/app/composables/useAppShellState";
 import { useAppShellRuntime } from "@/app/composables/useAppShellRuntime";
 import { useAppShellViewport } from "@/app/composables/useAppShellViewport";
 import { useAppShellWatchers } from "@/app/composables/useAppShellWatchers";
-import { normalizeLocale, type SupportedLocale } from "@/i18n";
 import { resolveApiErrorMessage } from "@/lib/localizedText";
 import { createNotifier } from "@/lib/notify";
-import { defaultClientConfig } from "@/lib/persistence";
-import type {
-  ClientCapabilities,
-  ClientConfig,
-  DiscordPresenceSnapshot,
-  ExistingReporterConfig,
-  MobileConnectivityState,
-  RealtimeReporterSnapshot,
-  RecentPreset,
-} from "@/types";
-
-const defaultCapabilities: ClientCapabilities = {
-  realtimeReporter: true,
-  tray: true,
-  platformSelfTest: true,
-  discordPresence: true,
-  autostart: true,
-};
 
 export function useAppShell() {
   const { t, locale } = useI18n();
   const toast = useToast();
 
-  const capabilities = ref<ClientCapabilities>(defaultCapabilities);
-  const config = ref<ClientConfig>(defaultClientConfig());
-  const persistedConfig = ref<ClientConfig>(defaultClientConfig());
-  const onboardingDraftConfig = ref<ClientConfig>(defaultClientConfig());
-  const recentPresets = ref<RecentPreset[]>([]);
-  const currentLocale = ref<SupportedLocale>(normalizeLocale(locale.value));
-  const startupLocale = ref<SupportedLocale>(normalizeLocale(locale.value));
-  const hydrated = ref(false);
-  const onboardingDismissed = ref(false);
-  const reporterConfigPromptHandled = ref(false);
-  const reporterBusy = ref(false);
-  const discordBusy = ref(false);
-  const importingReporterConfig = ref(false);
-  const existingReporterConfig = ref<ExistingReporterConfig | null>(null);
-  const verifiedGeneratedHashKey = ref("");
-  const mobileConnectivity = ref<MobileConnectivityState>({
-    checking: false,
-    checked: false,
-    ok: null,
-    summary: t("app.mobileConnectivity.pending"),
-    detail: "",
-    checkedAt: null,
-  });
-  const reporterSnapshot = ref<RealtimeReporterSnapshot>({
-    running: false,
-    logs: [],
-    currentActivity: null,
-    lastHeartbeatAt: null,
-    lastError: null,
-    lastPendingApprovalMessage: null,
-    lastPendingApprovalUrl: null,
-  });
-  const discordPresenceSnapshot = ref<DiscordPresenceSnapshot>({
-    running: false,
-    connected: false,
-    lastSyncAt: null,
-    lastError: null,
-    currentSummary: null,
-  });
-  const pendingApprovalDialogVisible = ref(false);
-  const lastPendingApprovalSeen = ref("");
-  const lastMobileConnectivitySignature = ref("");
-  const onboardingSetupMode = ref(false);
-  const localeSaving = ref(false);
-  const restartingApp = ref(false);
+  const {
+    capabilities,
+    config,
+    currentLocale,
+    discordBusy,
+    discordPresenceSnapshot,
+    existingReporterConfig,
+    hydrated,
+    importingReporterConfig,
+    lastMobileConnectivitySignature,
+    lastPendingApprovalSeen,
+    localeSaving,
+    mobileConnectivity,
+    onboardingDismissed,
+    onboardingDraftConfig,
+    onboardingSetupMode,
+    pendingApprovalDialogVisible,
+    persistedConfig,
+    recentPresets,
+    reporterBusy,
+    reporterConfigPromptHandled,
+    reporterSnapshot,
+    restartingApp,
+    startupLocale,
+    verifiedGeneratedHashKey,
+  } = useAppShellState(locale.value, t("app.mobileConnectivity.pending"));
 
-  const reporterSupported = computed(() => capabilities.value.realtimeReporter);
-  const discordSupported = computed(() => capabilities.value.discordPresence);
-  const traySupported = computed(() => capabilities.value.tray);
-  const autostartSupported = computed(() => capabilities.value.autostart);
-  const isNativeNotice = computed(() => !reporterSupported.value);
+  const {
+    autostartSupported,
+    discordReadiness,
+    discordSupported,
+    isNativeNotice,
+    localeRestartRequired,
+    readiness,
+    reporterSupported,
+    settingsRestarting,
+    shouldShowOnboarding,
+    traySupported,
+  } = useAppShellDerivedState({
+    capabilities,
+    config,
+    currentLocale,
+    hydrated,
+    localeSaving,
+    onboardingDismissed,
+    restartingApp,
+    startupLocale,
+  });
   const { notify } = createNotifier(toast, () => isNativeNotice.value);
 
   const { activeSection, visibleSections, ensureVisibleSection, selectSection } = useAppShellNavigation({
     t: translateText,
     reporterSupported,
   });
-  const readiness = computed(() => {
-    const required = [
-      config.value.baseUrl.trim(),
-      config.value.apiToken.trim(),
-      config.value.generatedHashKey.trim(),
-    ];
-    return required.every(Boolean);
-  });
-  const discordReadiness = computed(
-    () => !!config.value.baseUrl.trim() && !!config.value.discordApplicationId.trim(),
-  );
-  const shouldShowOnboarding = computed(
-    () => hydrated.value && !onboardingDismissed.value && !readiness.value,
-  );
-  const localeRestartRequired = computed(() => currentLocale.value !== startupLocale.value);
   const hasPendingSettingsChanges = computed(() => {
     const current = JSON.stringify(normalizeConfigByCapabilities(config.value));
     const persisted = JSON.stringify(normalizeConfigByCapabilities(persistedConfig.value));
     return current !== persisted;
   });
-  const settingsRestarting = computed(() => restartingApp.value || localeSaving.value);
 
   function translateText(key: string, params?: Record<string, unknown>) {
     return params ? t(key, params) : t(key);
@@ -242,15 +207,10 @@ export function useAppShell() {
     handleStartDiscordPresence,
   });
 
-  function handlePresetSaved(preset: RecentPreset) {
-    const deduped = recentPresets.value.filter(
-      (item) =>
-        item.process_name !== preset.process_name
-        || item.process_title !== preset.process_title,
-    );
-    recentPresets.value = [preset, ...deduped].slice(0, 6);
-    void persistAppState();
-  }
+  const { handlePresetSaved } = useAppShellRecentPresets({
+    persistAppState,
+    recentPresets,
+  });
 
   useAppShellWatchers({
     locale,

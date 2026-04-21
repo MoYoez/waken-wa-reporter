@@ -1,14 +1,10 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
-import { getPublicActivityFeed } from "@/lib/api";
 import { readBatterySnapshot } from "@/lib/deviceInfo";
-import type { ActivityFeedItem, ClientCapabilities, ClientConfig } from "@/types";
-import type { ActivitySelectOption } from "@/features/inspiration/types";
-import {
-  activityBatteryPercent,
-  activityLineText,
-} from "@/features/inspiration/composables/inspirationWorkspaceShared";
+import type { ClientCapabilities, ClientConfig } from "@/types";
+import { useInspirationActivityOptions } from "@/features/inspiration/composables/useInspirationActivityOptions";
+import { useInspirationStatusSnapshot } from "@/features/inspiration/composables/inspirationStatusSnapshot";
 
 interface InspirationStatusOptions {
   config: ClientConfig;
@@ -36,14 +32,31 @@ export function useInspirationStatus(options: InspirationStatusOptions) {
   const attachCurrentStatus = ref(options.draftStore.attachCurrentStatus);
   const attachStatusIncludeDeviceInfo = ref(options.draftStore.attachStatusIncludeDeviceInfo);
   const statusBatteryPercent = ref<number | null>(null);
-  const activityOptions = ref<ActivitySelectOption[]>([]);
-  const activityLoading = ref(false);
-  const activityLoadError = ref("");
 
   const mobileRuntime = computed(() => !options.capabilities.realtimeReporter);
-  const selectedActivityOption = computed(() =>
-    activityOptions.value.find((item) => item.value === selectedActivityKey.value) ?? null,
-  );
+  const { buildManualSnapshot, buildSnapshotText } = useInspirationStatusSnapshot({
+    config: options.config,
+    statusBatteryPercent,
+    statusSnapshotDeviceName,
+    t,
+  });
+  const {
+    activityLoadError,
+    activityLoading,
+    activityOptions,
+    loadActivityOptions,
+    pickDefaultActivity,
+    selectedActivityOption,
+  } = useInspirationActivityOptions({
+    apiErrorDetail: options.apiErrorDetail,
+    attachCurrentStatus,
+    attachStatusIncludeDeviceInfo,
+    buildSnapshotText,
+    config: options.config,
+    mobileRuntime,
+    selectedActivityKey,
+    t,
+  });
   const selectedSnapshotPreview = computed(() => {
     if (!attachCurrentStatus.value) {
       return "";
@@ -53,146 +66,6 @@ export function useInspirationStatus(options: InspirationStatusOptions) {
     }
     return selectedActivityOption.value?.snapshot ?? "";
   });
-
-  function snapshotWithDeviceAndBattery(base: string, device: string, battery: string) {
-    return t("inspiration.snapshot.withDeviceAndBattery", {
-      base,
-      device,
-      battery,
-    });
-  }
-
-  function snapshotWithDevice(base: string, device: string) {
-    return t("inspiration.snapshot.withDevice", { base, device });
-  }
-
-  function snapshotWithBattery(base: string, battery: string) {
-    return t("inspiration.snapshot.withBattery", { base, battery });
-  }
-
-  function buildManualSnapshot(input: string, includeDeviceInfo: boolean) {
-    const base = input.trim();
-    if (!base) {
-      return "";
-    }
-    if (!includeDeviceInfo) {
-      return base;
-    }
-
-    const deviceName = statusSnapshotDeviceName.value.trim() || options.config.device.trim();
-    const batteryPart =
-      typeof statusBatteryPercent.value === "number"
-        ? `${statusBatteryPercent.value}%`
-        : "";
-
-    if (deviceName && batteryPart) {
-      return snapshotWithDeviceAndBattery(base, deviceName, batteryPart);
-    }
-    if (deviceName) {
-      return snapshotWithDevice(base, deviceName);
-    }
-    if (batteryPart) {
-      return snapshotWithBattery(base, batteryPart);
-    }
-    return base;
-  }
-
-  function buildSnapshotText(item: ActivityFeedItem, includeDeviceInfo: boolean) {
-    const base = activityLineText(item, t("inspiration.common.unnamedActivity")).trim();
-    if (!base) {
-      return "";
-    }
-    if (!includeDeviceInfo) {
-      return base;
-    }
-
-    const deviceName = String(item.device ?? "").trim();
-    if (!deviceName) {
-      return base;
-    }
-
-    const battery = activityBatteryPercent(item);
-    if (typeof battery === "number") {
-      return snapshotWithDeviceAndBattery(base, deviceName, `${battery}%`);
-    }
-
-    return snapshotWithDevice(base, deviceName);
-  }
-
-  function toActivityOptions(items: ActivityFeedItem[], group: "active" | "recent") {
-    return items
-      .map((item, index) => {
-        const idPart = String(item.id ?? `${item.processName ?? "item"}-${index}`);
-        const snapshot = buildSnapshotText(item, attachStatusIncludeDeviceInfo.value);
-        const device = String(item.device ?? "").trim();
-        const prefix = t(`inspiration.activityGroup.${group}`);
-        return {
-          value: `${group}:${idPart}`,
-          label: device ? `${prefix} · ${snapshot} · ${device}` : `${prefix} · ${snapshot}`,
-          snapshot,
-          group,
-          item,
-          deviceName: device,
-        } satisfies ActivitySelectOption;
-      })
-      .filter((item) => item.snapshot.trim().length > 0);
-  }
-
-  async function loadActivityOptions() {
-    if (!options.config.baseUrl.trim()) {
-      activityOptions.value = [];
-      activityLoadError.value = "";
-      return;
-    }
-
-    activityLoading.value = true;
-    activityLoadError.value = "";
-
-    const result = await getPublicActivityFeed(options.config);
-    activityLoading.value = false;
-
-    if (!result.success || !result.data) {
-      activityLoadError.value = options.apiErrorDetail(
-        result.error,
-        t("inspiration.notify.activityLoadFailed"),
-      );
-      activityOptions.value = [];
-      return;
-    }
-
-    const activeStatuses = Array.isArray(result.data.activeStatuses)
-      ? result.data.activeStatuses
-      : [];
-    const recentActivities = Array.isArray(result.data.recentActivities)
-      ? result.data.recentActivities
-      : [];
-
-    const optionsList = [
-      ...toActivityOptions(activeStatuses as ActivityFeedItem[], "active"),
-      ...toActivityOptions((recentActivities as ActivityFeedItem[]).slice(0, 20), "recent"),
-    ];
-
-    activityOptions.value = optionsList.filter(
-      (item, index, all) => index === all.findIndex((candidate) => candidate.value === item.value),
-    );
-
-    if (
-      selectedActivityKey.value
-      && !activityOptions.value.some((item) => item.value === selectedActivityKey.value)
-    ) {
-      selectedActivityKey.value = "";
-    }
-    pickDefaultActivity();
-  }
-
-  function pickDefaultActivity() {
-    if (!attachCurrentStatus.value || selectedActivityKey.value || !activityOptions.value.length) {
-      return;
-    }
-
-    const preferred = activityOptions.value.find((item) => item.group === "active") ?? activityOptions.value[0];
-    selectedActivityKey.value = preferred?.value ?? "";
-  }
 
   async function ensureBatteryPercentLoaded() {
     if (

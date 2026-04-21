@@ -7,6 +7,7 @@ mod models;
 mod platform;
 mod realtime_reporter;
 mod reporter_config;
+mod runtime_utils;
 mod state_store;
 #[cfg(desktop)]
 mod tray;

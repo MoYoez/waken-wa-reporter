@@ -1,23 +1,35 @@
+#[path = "discord_presence/feed.rs"]
+mod feed;
+#[path = "discord_presence/ipc.rs"]
+mod ipc;
+#[path = "discord_presence/messages.rs"]
+mod messages;
+
 use std::{
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex,
     },
     thread::{self, JoinHandle},
-    time::{Duration, Instant},
+    time::Duration,
 };
 
-use chrono::{DateTime, Utc};
-use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
 use reqwest::blocking::Client;
-use reqwest::header::CONTENT_TYPE;
-use serde::Deserialize;
-use serde_json::{json, Value};
 
 use crate::{
     backend_locale::BackendLocale,
     http_client::build_blocking_client,
     models::{ClientConfig, DiscordPresenceSnapshot},
+    runtime_utils::{now_iso_string, sleep_with_stop, wait_for_worker_exit},
+};
+
+use feed::{
+    fetch_public_activity_feed_blocking, select_dc_source_activity,
+};
+use ipc::{apply_discord_presence, clear_discord_presence, map_activity_to_presence};
+use messages::{
+    discord_config_app_id_missing, discord_config_base_url_missing,
+    discord_config_source_id_missing, discord_worker_stopping,
 };
 
 const SYNC_INTERVAL: Duration = Duration::from_secs(15);
@@ -78,7 +90,9 @@ impl DiscordPresenceRuntime {
         };
 
         if let Some(handle) = previous_worker {
-            if let Err(handle) = wait_for_worker_exit(handle) {
+            if let Err(handle) =
+                wait_for_worker_exit(handle, WORKER_JOIN_WAIT_TIMEOUT, WORKER_JOIN_POLL_STEP)
+            {
                 let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
                 inner.worker = Some(handle);
                 return Err(discord_worker_stopping(locale));
@@ -120,7 +134,9 @@ impl DiscordPresenceRuntime {
         };
 
         if let Some(handle) = worker {
-            if let Err(handle) = wait_for_worker_exit(handle) {
+            if let Err(handle) =
+                wait_for_worker_exit(handle, WORKER_JOIN_WAIT_TIMEOUT, WORKER_JOIN_POLL_STEP)
+            {
                 let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
                 inner.worker = Some(handle);
             } else {
@@ -139,36 +155,10 @@ impl Drop for DiscordPresenceRuntime {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-struct PublicActivityFeed {
-    #[serde(default)]
-    active_statuses: Vec<PublicActivityItem>,
-}
-
-#[derive(Debug, Clone, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-struct PublicActivityItem {
-    #[serde(default)]
-    device: Option<String>,
-    #[serde(default)]
-    metadata: Option<Value>,
-    #[serde(default)]
-    process_name: Option<String>,
-    #[serde(default)]
-    process_title: Option<String>,
-    #[serde(default)]
-    status_text: Option<String>,
-    #[serde(default)]
-    started_at: Option<String>,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct DiscordPresencePayload {
-    details: String,
-    state: Option<String>,
-    started_at_millis: Option<i64>,
-    summary: String,
+enum PresenceUpdate {
+    Set(String),
+    Cleared,
 }
 
 fn snapshot_from_inner(inner: &DiscordPresenceInner) -> DiscordPresenceSnapshot {
@@ -198,7 +188,7 @@ fn run_discord_presence_loop(
     };
 
     let target_dc_source = config.discord_source_id.trim().to_string();
-    let mut discord_client: Option<DiscordIpcClient> = None;
+    let mut discord_client = None;
     let mut consecutive_errors = 0u32;
 
     while !stop_flag.load(Ordering::SeqCst) {
@@ -256,212 +246,6 @@ fn run_discord_presence_loop(
     mark_stopped(&state, run_id);
 }
 
-enum PresenceUpdate {
-    Set(String),
-    Cleared,
-}
-
-fn fetch_public_activity_feed_blocking(
-    client: &Client,
-    base_url: &str,
-    locale: BackendLocale,
-) -> Result<PublicActivityFeed, String> {
-    let url = format!("{}/api/activity?public=1", base_url.trim_end_matches('/'));
-    let response = client
-        .get(url)
-        .header(CONTENT_TYPE, "application/json")
-        .send()
-        .map_err(|error| {
-            format_error(
-                locale,
-                "拉取公开活动失败",
-                "Failed to fetch public activity",
-                error,
-            )
-        })?;
-
-    let status = response.status().as_u16();
-    let text = response.text().unwrap_or_default();
-    if status >= 400 {
-        return Err(public_feed_status_error(locale, status, text.trim()));
-    }
-
-    let payload = if text.trim().is_empty() {
-        json!({})
-    } else {
-        serde_json::from_str::<Value>(&text).unwrap_or_else(|_| json!({ "raw": text }))
-    };
-
-    let success = payload
-        .get("success")
-        .and_then(Value::as_bool)
-        .unwrap_or(true);
-
-    if !success {
-        return Err(payload
-            .get("error")
-            .and_then(Value::as_str)
-            .or_else(|| payload.get("message").and_then(Value::as_str))
-            .map(str::to_string)
-            .unwrap_or_else(|| default_public_feed_failure(locale)));
-    }
-
-    let data = payload.get("data").cloned().unwrap_or(payload);
-    serde_json::from_value::<PublicActivityFeed>(data).map_err(|error| {
-        format_error(
-            locale,
-            "解析公开活动失败",
-            "Failed to parse public activity",
-            error,
-        )
-    })
-}
-
-fn select_dc_source_activity<'a>(
-    active_statuses: &'a [PublicActivityItem],
-    target_dc_source: &str,
-) -> Option<&'a PublicActivityItem> {
-    let normalized_target = target_dc_source.trim();
-    if normalized_target.is_empty() {
-        return None;
-    }
-
-    active_statuses
-        .iter()
-        .find(|item| item_dc_source(item) == Some(normalized_target))
-}
-
-fn map_activity_to_presence(item: &PublicActivityItem) -> DiscordPresencePayload {
-    let details_source = item
-        .status_text
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(str::to_string)
-        .unwrap_or_else(|| fallback_details(item));
-    let details = normalize_presence_line(&details_source);
-
-    let state = item
-        .device
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(normalize_presence_line);
-    let started_at_millis = item.started_at.as_deref().and_then(parse_started_at_millis);
-    let summary = match state.as_deref() {
-        Some(device) => format!("{details} · {device}"),
-        None => details.clone(),
-    };
-
-    DiscordPresencePayload {
-        details,
-        state,
-        started_at_millis,
-        summary,
-    }
-}
-
-fn fallback_details(item: &PublicActivityItem) -> String {
-    let process_name = item
-        .process_name
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty());
-    let process_title = item
-        .process_title
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty());
-
-    match (process_title, process_name) {
-        (Some(title), Some(name)) => format!("{title} | {name}"),
-        (Some(title), None) => title.to_string(),
-        (None, Some(name)) => name.to_string(),
-        (None, None) => "Waken-Wa".to_string(),
-    }
-}
-
-fn apply_discord_presence(
-    client_slot: &mut Option<DiscordIpcClient>,
-    application_id: &str,
-    payload: &DiscordPresencePayload,
-    locale: BackendLocale,
-) -> Result<(), String> {
-    with_discord_client(client_slot, application_id, locale, |client| {
-        let mut activity_payload = activity::Activity::new().details(payload.details.clone());
-        if let Some(state) = payload.state.as_deref() {
-            activity_payload = activity_payload.state(state.to_string());
-        }
-        if let Some(started_at) = payload.started_at_millis {
-            activity_payload =
-                activity_payload.timestamps(activity::Timestamps::new().start(started_at));
-        }
-        client.set_activity(activity_payload).map_err(|error| {
-            format_error(
-                locale,
-                "更新 Discord 状态失败",
-                "Failed to update Discord presence",
-                error,
-            )
-        })
-    })
-}
-
-fn clear_discord_presence(
-    client_slot: &mut Option<DiscordIpcClient>,
-    application_id: &str,
-    locale: BackendLocale,
-) -> Result<(), String> {
-    with_discord_client(client_slot, application_id, locale, |client| {
-        client.clear_activity().map_err(|error| {
-            format_error(
-                locale,
-                "清空 Discord 状态失败",
-                "Failed to clear Discord presence",
-                error,
-            )
-        })
-    })
-}
-
-fn with_discord_client<F>(
-    client_slot: &mut Option<DiscordIpcClient>,
-    application_id: &str,
-    locale: BackendLocale,
-    mut action: F,
-) -> Result<(), String>
-where
-    F: FnMut(&mut DiscordIpcClient) -> Result<(), String>,
-{
-    for _ in 0..2 {
-        if client_slot.is_none() {
-            let mut client = DiscordIpcClient::new(application_id);
-            client.connect().map_err(|error| {
-                format_error(
-                    locale,
-                    "连接 Discord IPC 失败",
-                    "Failed to connect to Discord IPC",
-                    error,
-                )
-            })?;
-            *client_slot = Some(client);
-        }
-
-        let Some(client) = client_slot.as_mut() else {
-            continue;
-        };
-
-        match action(client) {
-            Ok(()) => return Ok(()),
-            Err(_) => {
-                *client_slot = None;
-            }
-        }
-    }
-
-    Err(discord_ipc_unavailable(locale))
-}
-
 fn validate_discord_presence_config(
     config: &ClientConfig,
     locale: BackendLocale,
@@ -480,26 +264,6 @@ fn validate_discord_presence_config(
 
 pub fn config_is_ready(config: &ClientConfig) -> bool {
     validate_discord_presence_config(config, BackendLocale::ZhCn).is_ok()
-}
-
-fn normalize_presence_line(value: &str) -> String {
-    value.split_whitespace().collect::<Vec<_>>().join(" ")
-}
-
-fn item_dc_source(item: &PublicActivityItem) -> Option<&str> {
-    item.metadata
-        .as_ref()
-        .and_then(Value::as_object)
-        .and_then(|metadata| metadata.get("dc_source"))
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-}
-
-fn parse_started_at_millis(value: &str) -> Option<i64> {
-    DateTime::parse_from_rfc3339(value)
-        .ok()
-        .map(|timestamp| timestamp.timestamp_millis())
 }
 
 fn update_presence_snapshot(
@@ -569,93 +333,6 @@ fn build_http_client(use_system_proxy: bool, locale: BackendLocale) -> Result<Cl
     )
 }
 
-fn format_error(
-    locale: BackendLocale,
-    zh_prefix: &str,
-    en_prefix: &str,
-    error: impl std::fmt::Display,
-) -> String {
-    if locale.is_en() {
-        format!("{en_prefix}: {error}")
-    } else {
-        format!("{zh_prefix}：{error}")
-    }
-}
-
-fn public_feed_status_error(locale: BackendLocale, status: u16, body: &str) -> String {
-    if body.is_empty() {
-        if locale.is_en() {
-            format!("Public activity returned HTTP {status}")
-        } else {
-            format!("公开活动接口返回状态码 {status}")
-        }
-    } else if locale.is_en() {
-        format!("Public activity returned HTTP {status}: {body}")
-    } else {
-        format!("公开活动接口返回状态码 {status}：{body}")
-    }
-}
-
-fn default_public_feed_failure(locale: BackendLocale) -> String {
-    if locale.is_en() {
-        "Public activity returned failure".into()
-    } else {
-        "公开活动接口返回失败".into()
-    }
-}
-
-fn discord_worker_stopping(locale: BackendLocale) -> String {
-    if locale.is_en() {
-        "Discord sync is still stopping. Try again shortly.".into()
-    } else {
-        "Discord 同步仍在退出，请稍后重试。".into()
-    }
-}
-
-fn discord_ipc_unavailable(locale: BackendLocale) -> String {
-    if locale.is_en() {
-        "Discord IPC is unavailable. Make sure Discord Desktop is running.".into()
-    } else {
-        "Discord IPC 不可用，请确认桌面端 Discord 已运行。".into()
-    }
-}
-
-fn discord_config_base_url_missing(locale: BackendLocale) -> String {
-    if locale.is_en() {
-        "Site URL is required before Discord sync can start.".into()
-    } else {
-        "缺少站点地址，无法启动 Discord 同步。".into()
-    }
-}
-
-fn discord_config_app_id_missing(locale: BackendLocale) -> String {
-    if locale.is_en() {
-        "Discord Application ID is required before Discord sync can start.".into()
-    } else {
-        "缺少 Discord Application ID，无法启动 Discord 同步。".into()
-    }
-}
-
-fn discord_config_source_id_missing(locale: BackendLocale) -> String {
-    if locale.is_en() {
-        "Discord source ID is required before Discord sync can start.".into()
-    } else {
-        "缺少 Discord 来源标识，无法启动 Discord 同步。".into()
-    }
-}
-
-fn sleep_with_stop(duration: Duration, stop_flag: &Arc<AtomicBool>) {
-    let mut remaining = duration.as_millis() as u64;
-    while remaining > 0 {
-        if stop_flag.load(Ordering::SeqCst) {
-            break;
-        }
-        let step = remaining.min(200);
-        thread::sleep(Duration::from_millis(step));
-        remaining = remaining.saturating_sub(step);
-    }
-}
-
 fn error_backoff(consecutive_errors: u32) -> Duration {
     let multiplier = 2u64.saturating_pow(consecutive_errors.saturating_sub(1));
     Duration::from_millis(
@@ -665,30 +342,10 @@ fn error_backoff(consecutive_errors: u32) -> Duration {
     )
 }
 
-fn wait_for_worker_exit(handle: JoinHandle<()>) -> Result<(), JoinHandle<()>> {
-    let deadline = Instant::now() + WORKER_JOIN_WAIT_TIMEOUT;
-    let handle = handle;
-
-    while Instant::now() < deadline {
-        if handle.is_finished() {
-            let _ = handle.join();
-            return Ok(());
-        }
-        thread::sleep(WORKER_JOIN_POLL_STEP);
-    }
-
-    Err(handle)
-}
-
-fn now_iso_string() -> String {
-    Utc::now().to_rfc3339()
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{
-        item_dc_source, map_activity_to_presence, select_dc_source_activity, PublicActivityItem,
-    };
+    use super::{map_activity_to_presence, select_dc_source_activity};
+    use crate::discord_presence::feed::{item_dc_source, PublicActivityItem};
     use crate::models::AppStatePayload;
     use serde_json::json;
 

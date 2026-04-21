@@ -1,67 +1,44 @@
+#[path = "realtime_reporter/logging.rs"]
+mod logging;
+#[path = "realtime_reporter/messages.rs"]
+mod messages;
+#[path = "realtime_reporter/payload.rs"]
+mod payload;
+
 use std::{
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex,
     },
     thread::{self, JoinHandle},
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime},
 };
 
-use chrono::Utc;
-use reqwest::blocking::Client;
-use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
-use serde_json::{json, Map, Value};
+use serde_json::{json, Value};
 
 use crate::{
     backend_locale::BackendLocale,
-    http_client::build_blocking_client,
     models::{
-        effective_device_name, ActivityPayload, ApiResult, ClientConfig, RealtimeReporterSnapshot,
-        ReporterActivity, ReporterLogEntry,
+        ApiResult, ClientConfig, RealtimeReporterSnapshot, ReporterActivity, ReporterLogEntry,
     },
     platform::{
-        get_foreground_snapshot_for_reporting, get_now_playing, ForegroundSnapshot, MediaInfo,
+        get_foreground_snapshot_for_reporting, get_now_playing_for_reporting, ForegroundSnapshot,
+        MediaInfo,
     },
+    runtime_utils::{now_iso_string, now_unix_millis, sleep_with_stop, wait_for_worker_exit},
+};
+
+use logging::{build_log_detail, fallback_text, localized_text, LogTextSpec};
+use messages::reporter_worker_stopping;
+use payload::{
+    build_http_client, build_payload, parse_reporter_metadata, post_activity_blocking,
+    validate_reporter_config, PostActivityResult,
 };
 
 const MAX_LOGS: usize = 120;
 const MAX_ERROR_BACKOFF_MS: u64 = 30_000;
 const WORKER_JOIN_WAIT_TIMEOUT: Duration = Duration::from_secs(2);
 const WORKER_JOIN_POLL_STEP: Duration = Duration::from_millis(50);
-
-enum PostActivityResult {
-    Success,
-    PendingApproval {
-        message: String,
-        approval_url: Option<String>,
-    },
-}
-
-struct LogTextSpec {
-    key: Option<&'static str>,
-    params: Option<Value>,
-    fallback: String,
-}
-
-fn fallback_text(value: impl Into<String>) -> LogTextSpec {
-    LogTextSpec {
-        key: None,
-        params: None,
-        fallback: value.into(),
-    }
-}
-
-fn localized_text(
-    key: &'static str,
-    params: Option<Value>,
-    fallback: impl Into<String>,
-) -> LogTextSpec {
-    LogTextSpec {
-        key: Some(key),
-        params,
-        fallback: fallback.into(),
-    }
-}
 
 struct ReporterInner {
     running: bool,
@@ -134,7 +111,9 @@ impl ReporterRuntime {
         };
 
         if let Some(handle) = previous_worker {
-            if let Err(handle) = wait_for_worker_exit(handle) {
+            if let Err(handle) =
+                wait_for_worker_exit(handle, WORKER_JOIN_WAIT_TIMEOUT, WORKER_JOIN_POLL_STEP)
+            {
                 let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
                 inner.worker = Some(handle);
                 return Err(reporter_worker_stopping(locale));
@@ -164,7 +143,6 @@ impl ReporterRuntime {
 
         let state = self.inner.clone();
         let sequence_seed = self.sequence.fetch_add(1, Ordering::SeqCst);
-
         let worker = thread::spawn(move || {
             run_reporter_loop(state, config, stop_flag, sequence_seed, run_id, locale);
         });
@@ -189,7 +167,9 @@ impl ReporterRuntime {
         };
 
         let (detail, stopped_cleanly) = if let Some(handle) = worker {
-            if let Err(handle) = wait_for_worker_exit(handle) {
+            if let Err(handle) =
+                wait_for_worker_exit(handle, WORKER_JOIN_WAIT_TIMEOUT, WORKER_JOIN_POLL_STEP)
+            {
                 let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
                 inner.worker = Some(handle);
                 (
@@ -251,6 +231,7 @@ impl ReporterRuntime {
             detail_params: detail.params,
             payload,
         };
+
         let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         inner.logs.insert(0, entry);
         if inner.logs.len() > MAX_LOGS {
@@ -355,7 +336,10 @@ fn run_reporter_loop(
         match foreground {
             Ok(snapshot) => {
                 let media = if collect_media {
-                    match get_now_playing() {
+                    match get_now_playing_for_reporting(
+                        config.report_media,
+                        config.report_play_source,
+                    ) {
                         Ok(media) => {
                             last_media_error = None;
                             media
@@ -392,7 +376,7 @@ fn run_reporter_loop(
                     "{}\u{1e}{}\u{1e}{}",
                     snapshot.process_name,
                     snapshot.process_title,
-                    media.signature()
+                    media.signature_for_reporting(config.report_media, config.report_play_source)
                 );
                 let same_as_last = last_signature
                     .as_ref()
@@ -543,91 +527,8 @@ fn run_reporter_loop(
     mark_stopped(&state, None, run_id);
 }
 
-fn validate_reporter_config(config: &ClientConfig, locale: BackendLocale) -> Result<(), String> {
-    if config.base_url.trim().is_empty() {
-        return Err(reporter_config_base_url_missing(locale));
-    }
-    if config.api_token.trim().is_empty() {
-        return Err(reporter_config_api_token_missing(locale));
-    }
-    if config.generated_hash_key.trim().is_empty() {
-        return Err(reporter_config_generated_hash_key_missing(locale));
-    }
-    Ok(())
-}
-
 pub fn config_is_ready(config: &ClientConfig) -> bool {
-    validate_reporter_config(config, BackendLocale::ZhCn).is_ok()
-}
-
-fn build_log_detail(
-    snapshot: &ForegroundSnapshot,
-    media: &MediaInfo,
-    is_heartbeat: bool,
-    locale: BackendLocale,
-) -> LogTextSpec {
-    let action = if locale.is_en() {
-        if is_heartbeat {
-            "Heartbeat"
-        } else {
-            "Report"
-        }
-    } else {
-        if is_heartbeat {
-            "心跳"
-        } else {
-            "上报"
-        }
-    };
-    let base_params = json!({
-        "processName": snapshot.process_name,
-        "processTitle": snapshot.process_title,
-    });
-    if media.is_empty() {
-        localized_text(
-            if is_heartbeat {
-                "reporterLogs.activityHeartbeat.detail"
-            } else {
-                "reporterLogs.activityReported.detail"
-            },
-            Some(base_params),
-            format!(
-                "{}{} / {}",
-                if locale.is_en() {
-                    format!("{action}: ")
-                } else {
-                    format!("{action}：")
-                },
-                snapshot.process_name,
-                snapshot.process_title
-            ),
-        )
-    } else {
-        localized_text(
-            if is_heartbeat {
-                "reporterLogs.activityHeartbeat.detailWithMedia"
-            } else {
-                "reporterLogs.activityReported.detailWithMedia"
-            },
-            Some(json!({
-                "processName": snapshot.process_name,
-                "processTitle": snapshot.process_title,
-                "mediaSummary": media.summary(),
-            })),
-            format!(
-                "{}{} / {} | {}{}",
-                if locale.is_en() {
-                    format!("{action}: ")
-                } else {
-                    format!("{action}：")
-                },
-                snapshot.process_name,
-                snapshot.process_title,
-                if locale.is_en() { "" } else { "媒体：" },
-                media.summary()
-            ),
-        )
-    }
+    payload::config_is_ready(config)
 }
 
 fn update_snapshot(
@@ -674,6 +575,7 @@ fn mark_stopped(state: &Arc<Mutex<ReporterInner>>, error: Option<String>, run_id
     if inner.active_run_id != Some(run_id) {
         return;
     }
+
     inner.running = false;
     inner.active_run_id = None;
     inner.stop_flag = None;
@@ -711,274 +613,6 @@ fn push_background_log(
     }
 }
 
-fn build_http_client(use_system_proxy: bool, locale: BackendLocale) -> Result<Client, String> {
-    build_blocking_client(
-        "waken-wa-tauri-reporter/0.1.0",
-        Some(Duration::from_secs(15)),
-        use_system_proxy,
-        locale,
-    )
-}
-
-fn parse_reporter_metadata(
-    input: &str,
-    locale: BackendLocale,
-) -> Result<Map<String, Value>, String> {
-    let trimmed = input.trim();
-    if trimmed.is_empty() {
-        return Ok(Map::new());
-    }
-
-    match serde_json::from_str::<Value>(trimmed) {
-        Ok(Value::Object(map)) => Ok(map),
-        Ok(_) => Err(if locale.is_en() {
-            "Reporter metadata must be a JSON object.".into()
-        } else {
-            "实时上报元数据必须是 JSON 对象。".into()
-        }),
-        Err(error) => Err(format_error(
-            locale,
-            "解析实时上报元数据失败",
-            "Failed to parse reporter metadata",
-            error,
-        )),
-    }
-}
-
-fn build_payload(
-    config: &ClientConfig,
-    snapshot: &ForegroundSnapshot,
-    media: &MediaInfo,
-    mut metadata: Map<String, Value>,
-) -> ActivityPayload {
-    if !config.discord_source_id.trim().is_empty() {
-        metadata.insert(
-            "dc_source".into(),
-            Value::String(config.discord_source_id.trim().to_string()),
-        );
-    }
-
-    if let Some(media_map) = media.as_metadata_map() {
-        metadata.insert("media".into(), Value::Object(media_map));
-    }
-
-    if !media.source_app_id.trim().is_empty() && !metadata.contains_key("play_source") {
-        metadata.insert(
-            "play_source".into(),
-            Value::String(media.source_app_id.trim().to_string()),
-        );
-    }
-
-    ActivityPayload {
-        generated_hash_key: config.generated_hash_key.trim().to_string(),
-        process_name: if config.report_foreground_app || !snapshot.process_name.is_empty() {
-            snapshot.process_name.clone()
-        } else {
-            String::new()
-        },
-        device: Some(effective_device_name(&config.device)),
-        process_title: if config.report_window_title || !snapshot.process_title.is_empty() {
-            Some(snapshot.process_title.clone()).filter(|value| !value.is_empty())
-        } else {
-            None
-        },
-        persist_minutes: None,
-        battery_level: None,
-        is_charging: None,
-        device_type: Some(config.device_type.trim().to_string()).filter(|value| !value.is_empty()),
-        push_mode: Some(config.push_mode.trim().to_string()).filter(|value| !value.is_empty()),
-        metadata: (!metadata.is_empty()).then_some(Value::Object(metadata)),
-    }
-}
-
-fn post_activity_blocking(
-    client: &Client,
-    config: &ClientConfig,
-    payload: &ActivityPayload,
-    locale: BackendLocale,
-) -> Result<PostActivityResult, String> {
-    let body = serde_json::to_value(payload).map_err(|error| {
-        format_error(
-            locale,
-            "序列化上报数据失败",
-            "Failed to encode report payload",
-            error,
-        )
-    })?;
-    let url = format!("{}/api/activity", config.base_url.trim_end_matches('/'));
-
-    let response = client
-        .post(url)
-        .header(CONTENT_TYPE, "application/json")
-        .header(AUTHORIZATION, format!("Bearer {}", config.api_token.trim()))
-        .json(&body)
-        .send()
-        .map_err(|error| format_error(locale, "请求失败", "Request failed", error))?;
-
-    let status = response.status().as_u16();
-    let text = response.text().unwrap_or_default();
-    if status >= 400 {
-        return Err(server_status_error(locale, status, text.trim()));
-    }
-
-    let parsed = serde_json::from_str::<Value>(&text).unwrap_or_else(|_| json!({ "raw": text }));
-    let success = parsed
-        .get("success")
-        .and_then(Value::as_bool)
-        .unwrap_or(true);
-
-    if status == 202
-        && parsed
-            .get("pending")
-            .and_then(Value::as_bool)
-            .unwrap_or(false)
-    {
-        let message = parsed
-            .get("error")
-            .and_then(Value::as_str)
-            .or_else(|| parsed.get("message").and_then(Value::as_str))
-            .map(str::to_string)
-            .unwrap_or_else(|| pending_approval_default(locale));
-        let approval_url = parsed
-            .get("approvalUrl")
-            .and_then(Value::as_str)
-            .map(str::to_string);
-        return Ok(PostActivityResult::PendingApproval {
-            message,
-            approval_url,
-        });
-    }
-
-    if !success {
-        return Err(parsed
-            .get("error")
-            .and_then(Value::as_str)
-            .or_else(|| parsed.get("message").and_then(Value::as_str))
-            .map(str::to_string)
-            .unwrap_or_else(|| server_failure_default(locale)));
-    }
-
-    Ok(PostActivityResult::Success)
-}
-
-fn sleep_with_stop(duration: Duration, stop_flag: &Arc<AtomicBool>) {
-    let mut remaining = duration.as_millis() as u64;
-    while remaining > 0 {
-        if stop_flag.load(Ordering::SeqCst) {
-            break;
-        }
-        let step = remaining.min(200);
-        thread::sleep(Duration::from_millis(step));
-        remaining = remaining.saturating_sub(step);
-    }
-}
-
-fn wait_for_worker_exit(handle: JoinHandle<()>) -> Result<(), JoinHandle<()>> {
-    let deadline = Instant::now() + WORKER_JOIN_WAIT_TIMEOUT;
-    let handle = handle;
-
-    while Instant::now() < deadline {
-        if handle.is_finished() {
-            let _ = handle.join();
-            return Ok(());
-        }
-        thread::sleep(WORKER_JOIN_POLL_STEP);
-    }
-
-    if handle.is_finished() {
-        let _ = handle.join();
-        Ok(())
-    } else {
-        Err(handle)
-    }
-}
-
-fn now_unix_millis() -> u128 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_millis())
-        .unwrap_or_default()
-}
-
-fn now_iso_string() -> String {
-    Utc::now().to_rfc3339()
-}
-
 pub fn snapshot_result(runtime: &ReporterRuntime) -> ApiResult<RealtimeReporterSnapshot> {
     ApiResult::success(200, runtime.snapshot())
-}
-
-fn format_error(
-    locale: BackendLocale,
-    zh_prefix: &str,
-    en_prefix: &str,
-    error: impl std::fmt::Display,
-) -> String {
-    if locale.is_en() {
-        format!("{en_prefix}: {error}")
-    } else {
-        format!("{zh_prefix}：{error}")
-    }
-}
-
-fn reporter_worker_stopping(locale: BackendLocale) -> String {
-    if locale.is_en() {
-        "Background sync is still stopping. Try again shortly.".into()
-    } else {
-        "后台同步仍在退出，请稍后重试。".into()
-    }
-}
-
-fn reporter_config_base_url_missing(locale: BackendLocale) -> String {
-    if locale.is_en() {
-        "Site URL is required before background sync can start.".into()
-    } else {
-        "缺少站点地址，无法启动后台同步。".into()
-    }
-}
-
-fn reporter_config_api_token_missing(locale: BackendLocale) -> String {
-    if locale.is_en() {
-        "API Token is required before background sync can start.".into()
-    } else {
-        "缺少 API Token，无法启动后台同步。".into()
-    }
-}
-
-fn reporter_config_generated_hash_key_missing(locale: BackendLocale) -> String {
-    if locale.is_en() {
-        "Device key is required before background sync can start.".into()
-    } else {
-        "缺少 GeneratedHashKey，无法启动后台同步。".into()
-    }
-}
-
-fn server_status_error(locale: BackendLocale, status: u16, body: &str) -> String {
-    if body.is_empty() {
-        if locale.is_en() {
-            format!("Server returned HTTP {status}")
-        } else {
-            format!("服务端返回状态码 {status}")
-        }
-    } else if locale.is_en() {
-        format!("Server returned HTTP {status}: {body}")
-    } else {
-        format!("服务端返回状态码 {status}：{body}")
-    }
-}
-
-fn pending_approval_default(locale: BackendLocale) -> String {
-    if locale.is_en() {
-        "Device is pending approval".into()
-    } else {
-        "设备待后台审核后可用".into()
-    }
-}
-
-fn server_failure_default(locale: BackendLocale) -> String {
-    if locale.is_en() {
-        "Server returned failure".into()
-    } else {
-        "服务端返回失败".into()
-    }
 }

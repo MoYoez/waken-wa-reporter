@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{cell::RefCell, path::Path};
 
 use serde_json::json;
 
@@ -23,6 +23,12 @@ use windows::{
         },
     },
 };
+
+#[cfg(target_os = "windows")]
+std::thread_local! {
+    static MEDIA_SESSION_MANAGER: RefCell<Option<GlobalSystemMediaTransportControlsSessionManager>> =
+        RefCell::new(None);
+}
 
 pub fn get_foreground_snapshot() -> Result<ForegroundSnapshot, String> {
     let hwnd = unsafe { GetForegroundWindow() };
@@ -165,53 +171,96 @@ fn init_com_for_media() -> Result<ComInitGuard, String> {
 }
 
 #[cfg(target_os = "windows")]
-fn get_now_playing_native() -> Result<MediaInfo, String> {
+fn get_cached_media_session_manager() -> Result<GlobalSystemMediaTransportControlsSessionManager, String> {
+    MEDIA_SESSION_MANAGER.with(|cache| {
+        if let Some(manager) = cache.borrow().as_ref().cloned() {
+            return Ok(manager);
+        }
+
+        let manager = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
+            .map_err(|error| format!("请求媒体会话管理器失败：{error}"))?
+            .get()
+            .map_err(|error| format!("获取媒体会话管理器失败：{error}"))?;
+
+        *cache.borrow_mut() = Some(manager.clone());
+        Ok(manager)
+    })
+}
+
+#[cfg(target_os = "windows")]
+fn clear_cached_media_session_manager() {
+    MEDIA_SESSION_MANAGER.with(|cache| {
+        cache.borrow_mut().take();
+    });
+}
+
+#[cfg(target_os = "windows")]
+fn get_now_playing_native(
+    include_media: bool,
+    include_play_source: bool,
+) -> Result<MediaInfo, String> {
     let _com_guard = init_com_for_media()?;
 
-    let manager = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
-        .map_err(|error| format!("请求媒体会话管理器失败：{error}"))?
-        .get()
-        .map_err(|error| format!("获取媒体会话管理器失败：{error}"))?;
+    let manager = get_cached_media_session_manager()?;
+    let session = match manager.GetCurrentSession() {
+        Ok(session) => session,
+        Err(_) => {
+            clear_cached_media_session_manager();
+            get_cached_media_session_manager()?
+                .GetCurrentSession()
+                .map_err(|error| format!("读取当前媒体会话失败：{error}"))?
+        }
+    };
 
-    let session = manager
-        .GetCurrentSession()
-        .map_err(|error| format!("读取当前媒体会话失败：{error}"))?;
+    let source_app_id = if include_play_source {
+        session
+            .SourceAppUserModelId()
+            .ok()
+            .map(|value| value.to_string())
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
 
-    let source_app_id = session
-        .SourceAppUserModelId()
-        .ok()
-        .map(|value| value.to_string())
-        .unwrap_or_default();
+    let (title, artist, album) = if include_media {
+        let properties = session
+            .TryGetMediaPropertiesAsync()
+            .map_err(|error| format!("请求媒体属性失败：{error}"))?
+            .get()
+            .map_err(|error| format!("读取媒体属性失败：{error}"))?;
 
-    let properties = session
-        .TryGetMediaPropertiesAsync()
-        .map_err(|error| format!("请求媒体属性失败：{error}"))?
-        .get()
-        .map_err(|error| format!("读取媒体属性失败：{error}"))?;
+        (
+            properties
+                .Title()
+                .ok()
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
+            properties
+                .Artist()
+                .ok()
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
+            properties
+                .AlbumTitle()
+                .ok()
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
+        )
+    } else {
+        (String::new(), String::new(), String::new())
+    };
 
-    let title = properties
-        .Title()
-        .ok()
-        .map(|value| value.to_string())
-        .unwrap_or_default();
-    let artist = properties
-        .Artist()
-        .ok()
-        .map(|value| value.to_string())
-        .unwrap_or_default();
-    let album = properties
-        .AlbumTitle()
-        .ok()
-        .map(|value| value.to_string())
-        .unwrap_or_default();
-
-    let media = MediaInfo {
+    Ok(MediaInfo {
         title,
         artist,
         album,
         source_app_id,
-    };
+    }
+    .into_reporting_subset(include_media, include_play_source))
+}
 
+pub fn get_now_playing() -> Result<MediaInfo, String> {
+    let media = get_now_playing_native(true, true)?;
     if media.is_empty() {
         return Ok(MediaInfo::default());
     }
@@ -219,8 +268,15 @@ fn get_now_playing_native() -> Result<MediaInfo, String> {
     Ok(media)
 }
 
-pub fn get_now_playing() -> Result<MediaInfo, String> {
-    get_now_playing_native()
+pub fn get_now_playing_for_reporting(
+    include_media: bool,
+    include_play_source: bool,
+) -> Result<MediaInfo, String> {
+    if !include_media && !include_play_source {
+        return Ok(MediaInfo::default());
+    }
+
+    get_now_playing_native(include_media, include_play_source)
 }
 
 pub fn run_self_test() -> PlatformSelfTestResult {

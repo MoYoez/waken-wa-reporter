@@ -1029,6 +1029,18 @@ select {
   font-size: 0.92rem;
 }
 
+.reporter-self-test-section {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(154, 131, 102, 0.12);
+}
+
+.reporter-self-test-heading {
+  align-items: flex-start;
+}
+
 .self-test-guidance {
   margin: 0;
   padding-left: 18px;

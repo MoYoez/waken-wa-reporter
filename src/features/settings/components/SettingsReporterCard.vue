@@ -2,8 +2,10 @@
 import Button from "primevue/button";
 import Card from "primevue/card";
 import Message from "primevue/message";
+import Tag from "primevue/tag";
 import { useI18n } from "vue-i18n";
 
+import type { SelfTestCardView } from "@/features/settings/composables/settingsWorkspaceProbeText";
 import type { RealtimeReporterSnapshot } from "@/types";
 
 defineProps<{
@@ -14,6 +16,9 @@ defineProps<{
   canRequestAccessibilityPermission: boolean;
   selfTestLoading: boolean;
   accessibilityPermissionLoading: boolean;
+  selfTestPlatform: string;
+  selfTestCards: SelfTestCardView[];
+  selfTestHintKey: string;
 }>();
 
 const emit = defineEmits<{
@@ -117,6 +122,73 @@ function formatTime(value?: string | null) {
           {{ t("settings.reporter.autoStartHint") }}
         </Message>
       </div>
+
+      <section
+        v-if="selfTestCards.length"
+        class="reporter-self-test-section"
+      >
+        <div class="panel-heading reporter-self-test-heading">
+          <div>
+            <p class="eyebrow">{{ t("settings.selfTest.eyebrow") }}</p>
+            <h3>{{ t("settings.selfTest.title") }}</h3>
+          </div>
+          <Tag
+            v-if="selfTestPlatform"
+            :value="selfTestPlatform"
+            severity="contrast"
+            rounded
+          />
+        </div>
+
+        <div class="self-test-grid">
+          <article
+            v-for="card in selfTestCards"
+            :key="card.key"
+            class="self-test-card"
+          >
+            <div class="self-test-head">
+              <strong>{{ t(card.titleKey) }}</strong>
+              <Tag
+                :value="card.success ? t('settings.selfTest.usable') : t('settings.selfTest.abnormal')"
+                :severity="card.success ? 'success' : 'danger'"
+                rounded
+              />
+            </div>
+            <p class="self-test-detail">
+              {{ card.primaryText }}
+            </p>
+            <p
+              v-if="card.secondaryText"
+              class="self-test-summary"
+            >
+              {{ card.secondaryText }}
+            </p>
+            <div
+              v-if="card.showAccessibilityAction"
+              class="actions-row"
+            >
+              <Button
+                :label="t('settings.reporter.accessibility')"
+                icon="pi pi-shield"
+                severity="secondary"
+                outlined
+                :loading="accessibilityPermissionLoading"
+                @click="emit('requestAccessibilityPermission')"
+              />
+            </div>
+          </article>
+        </div>
+
+        <div class="message-stack">
+          <Message
+            v-if="selfTestHintKey"
+            severity="secondary"
+            :closable="false"
+          >
+            {{ t(selfTestHintKey) }}
+          </Message>
+        </div>
+      </section>
     </template>
   </Card>
 </template>

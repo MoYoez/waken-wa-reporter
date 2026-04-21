@@ -32,17 +32,54 @@ impl MediaInfo {
             && self.album.trim().is_empty()
     }
 
-    pub fn signature(&self) -> String {
-        if self.is_empty() {
+    pub fn has_play_source(&self) -> bool {
+        !self.source_app_id.trim().is_empty()
+    }
+
+    pub fn signature_for_reporting(
+        &self,
+        include_media: bool,
+        include_play_source: bool,
+    ) -> String {
+        let title = if include_media { self.title.trim() } else { "" };
+        let artist = if include_media { self.artist.trim() } else { "" };
+        let album = if include_media { self.album.trim() } else { "" };
+        let source_app_id = if include_play_source {
+            self.source_app_id.trim()
+        } else {
+            ""
+        };
+
+        if title.is_empty()
+            && artist.is_empty()
+            && album.is_empty()
+            && source_app_id.is_empty()
+        {
             return String::new();
         }
-        format!(
-            "{}\u{1e}{}\u{1e}{}\u{1e}{}",
-            self.title.trim(),
-            self.artist.trim(),
-            self.album.trim(),
-            self.source_app_id.trim()
-        )
+
+        format!("{title}\u{1e}{artist}\u{1e}{album}\u{1e}{source_app_id}")
+    }
+
+    pub fn into_reporting_subset(
+        mut self,
+        include_media: bool,
+        include_play_source: bool,
+    ) -> Self {
+        if !include_media {
+            self.title.clear();
+            self.artist.clear();
+            self.album.clear();
+        }
+        if !include_play_source {
+            self.source_app_id.clear();
+        }
+
+        if self.is_empty() && !self.has_play_source() {
+            return Self::default();
+        }
+
+        self
     }
 
     pub fn as_metadata_map(&self) -> Option<Map<String, Value>> {
@@ -85,14 +122,18 @@ impl MediaInfo {
     }
 }
 
+#[allow(unused_imports)]
 #[cfg(target_os = "linux")]
-pub use linux::{get_foreground_snapshot_for_reporting, get_now_playing};
+pub use linux::{get_foreground_snapshot_for_reporting, get_now_playing, get_now_playing_for_reporting};
+#[allow(unused_imports)]
 #[cfg(target_os = "macos")]
-pub use macos::{get_foreground_snapshot_for_reporting, get_now_playing};
+pub use macos::{get_foreground_snapshot_for_reporting, get_now_playing, get_now_playing_for_reporting};
+#[allow(unused_imports)]
 #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-pub use stub::{get_foreground_snapshot_for_reporting, get_now_playing};
+pub use stub::{get_foreground_snapshot_for_reporting, get_now_playing, get_now_playing_for_reporting};
+#[allow(unused_imports)]
 #[cfg(target_os = "windows")]
-pub use windows::{get_foreground_snapshot_for_reporting, get_now_playing};
+pub use windows::{get_foreground_snapshot_for_reporting, get_now_playing, get_now_playing_for_reporting};
 
 #[cfg(target_os = "linux")]
 pub use linux::run_self_test;

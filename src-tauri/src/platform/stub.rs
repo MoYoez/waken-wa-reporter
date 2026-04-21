@@ -16,6 +16,13 @@ pub fn get_now_playing() -> Result<MediaInfo, String> {
     Ok(MediaInfo::default())
 }
 
+pub fn get_now_playing_for_reporting(
+    _include_media: bool,
+    _include_play_source: bool,
+) -> Result<MediaInfo, String> {
+    Ok(MediaInfo::default())
+}
+
 pub fn run_self_test() -> PlatformSelfTestResult {
     build_self_test_result(
         make_probe(
