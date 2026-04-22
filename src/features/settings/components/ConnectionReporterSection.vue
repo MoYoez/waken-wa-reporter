@@ -5,6 +5,7 @@ import ToggleSwitch from "primevue/toggleswitch";
 import { useI18n } from "vue-i18n";
 
 import {
+  formatReporterTimingIssueBrief,
   formatReporterTimingIssue,
   validateReporterTimingInput,
   type ReporterTimingIssue,
@@ -92,6 +93,10 @@ function updateTimingField(
 function timingIssueMessage(issue?: ReporterTimingIssue) {
   return issue ? formatReporterTimingIssue(issue, t) : "";
 }
+
+function timingIssueBrief(issue?: ReporterTimingIssue) {
+  return issue ? formatReporterTimingIssueBrief(issue, t) : "";
+}
 </script>
 
 <template>
@@ -108,8 +113,13 @@ function timingIssueMessage(issue?: ReporterTimingIssue) {
         :placeholder="t('connectionPanel.placeholders.pollInterval')"
         @update:model-value="updateTimingField('pollIntervalMs', $event)"
       />
-      <small v-if="pollIntervalIssue" class="field-help field-help-error">
-        {{ timingIssueMessage(pollIntervalIssue) }}
+      <small
+        class="field-help field-help-error timing-field-error"
+        :class="{ 'timing-field-error-empty': !pollIntervalIssue }"
+        :title="timingIssueMessage(pollIntervalIssue)"
+        aria-live="polite"
+      >
+        {{ timingIssueBrief(pollIntervalIssue) || "\u00A0" }}
       </small>
     </label>
 
@@ -121,8 +131,13 @@ function timingIssueMessage(issue?: ReporterTimingIssue) {
         :placeholder="t('connectionPanel.placeholders.heartbeatInterval')"
         @update:model-value="updateTimingField('heartbeatIntervalMs', $event)"
       />
-      <small v-if="heartbeatIntervalIssue" class="field-help field-help-error">
-        {{ timingIssueMessage(heartbeatIntervalIssue) }}
+      <small
+        class="field-help field-help-error timing-field-error"
+        :class="{ 'timing-field-error-empty': !heartbeatIntervalIssue }"
+        :title="timingIssueMessage(heartbeatIntervalIssue)"
+        aria-live="polite"
+      >
+        {{ timingIssueBrief(heartbeatIntervalIssue) || "\u00A0" }}
       </small>
     </label>
 

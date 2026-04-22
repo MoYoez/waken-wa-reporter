@@ -901,6 +901,19 @@ select {
   color: #b91c1c;
 }
 
+.timing-field-error {
+  display: block;
+  min-height: 1.35em;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timing-field-error-empty {
+  visibility: hidden;
+}
+
 .actions-row {
   display: flex;
   flex-wrap: wrap;

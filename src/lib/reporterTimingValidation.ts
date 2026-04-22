@@ -137,3 +137,15 @@ export function formatReporterTimingIssue(issue: ReporterTimingIssue, t: Transla
     suggested: issue.suggestedValue,
   })}`;
 }
+
+export function formatReporterTimingIssueBrief(issue: ReporterTimingIssue, t: TranslateFn) {
+  const field = t(REPORTER_TIMING_FIELDS[issue.field].labelKey);
+  const messageKey = {
+    empty: "validation.integerMsRequired",
+    notInteger: "validation.integerMsInvalid",
+    tooLarge: "validation.integerMsTooLarge",
+    tooSmall: "validation.integerMsTooSmall",
+  }[issue.reason];
+
+  return t(messageKey, { field, min: issue.min });
+}
