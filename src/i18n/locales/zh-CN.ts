@@ -120,6 +120,8 @@ const zhCN = {
       importedExistingConfigDetail: "已导入本机配置。",
       settingsSaved: "设置已保存",
       settingsSavedDetail: "已写入本地。",
+      settingsPartiallySaved: "设置已部分保存",
+      settingsSavedExceptAutostart: "普通配置已保存，但开机启动未更新。",
       settingsSaveFailed: "保存失败",
       settingsSaveFailedDetail: "写入本地失败。",
       settingsInvalid: "参数错误",

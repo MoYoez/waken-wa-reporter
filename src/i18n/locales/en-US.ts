@@ -120,6 +120,8 @@ const enUS = {
       importedExistingConfigDetail: "Local config imported.",
       settingsSaved: "Settings saved",
       settingsSavedDetail: "Saved locally.",
+      settingsPartiallySaved: "Settings partially saved",
+      settingsSavedExceptAutostart: "Regular settings were saved, but startup was not updated.",
       settingsSaveFailed: "Save failed",
       settingsSaveFailedDetail: "Failed to save locally.",
       settingsInvalid: "Parameter error",

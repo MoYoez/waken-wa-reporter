@@ -270,21 +270,52 @@ export function useAppShellSettingsPersistence(options: UseAppShellPersistenceOp
         return;
       }
 
-      if (options.autostartSupported.value) {
-        try {
-          await setAutostartEnabled(nextConfig.launchOnStartup);
-        } catch (error) {
-          throw new SettingsSaveStageError("app.notify.settingsAutostartStage", error);
+      const autostartChanged = options.autostartSupported.value
+        && nextConfig.launchOnStartup !== options.persistedConfig.value.launchOnStartup;
+      const localStateConfig = autostartChanged
+        ? {
+          ...nextConfig,
+          launchOnStartup: options.persistedConfig.value.launchOnStartup,
         }
-      }
+        : nextConfig;
 
-      options.config.value = nextConfig;
+      options.config.value = localStateConfig;
       try {
-        await persistAppState(nextConfig);
+        await persistAppState(localStateConfig);
       } catch (error) {
         throw new SettingsSaveStageError("app.notify.settingsLocalStateStage", error);
       }
-      options.persistedConfig.value = { ...nextConfig };
+      options.persistedConfig.value = { ...localStateConfig };
+
+      if (autostartChanged) {
+        try {
+          await setAutostartEnabled(nextConfig.launchOnStartup);
+        } catch (error) {
+          options.notify({
+            severity: "warn",
+            summary: options.t("app.notify.settingsPartiallySaved"),
+            detail: `${options.t("app.notify.settingsSavedExceptAutostart")} ${errorDetail(
+              new SettingsSaveStageError("app.notify.settingsAutostartStage", error),
+              options.t("app.notify.settingsSaveFailedDetail"),
+            )}`,
+            life: 6000,
+          });
+          return;
+        }
+
+        const finalConfig = {
+          ...localStateConfig,
+          launchOnStartup: nextConfig.launchOnStartup,
+        };
+        options.config.value = finalConfig;
+        try {
+          await persistAppState(finalConfig);
+        } catch (error) {
+          throw new SettingsSaveStageError("app.notify.settingsLocalStateStage", error);
+        }
+        options.persistedConfig.value = { ...finalConfig };
+      }
+
       options.notify({
         severity: "success",
         summary: options.t("app.notify.settingsSaved"),
