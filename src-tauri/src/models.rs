@@ -88,7 +88,7 @@ pub fn default_client_capabilities() -> ClientCapabilities {
         tray: true,
         platform_self_test: true,
         discord_presence: true,
-        autostart: true,
+        autostart: !cfg!(debug_assertions),
     }
 }
 

@@ -28,6 +28,8 @@ use realtime_reporter::{config_is_ready, ReporterRuntime};
 
 #[cfg(desktop)]
 const SINGLE_INSTANCE_EVENT: &str = "single-instance-attempted";
+#[cfg(desktop)]
+const AUTOSTART_ARG: &str = "--from-autostart";
 
 #[cfg(desktop)]
 #[derive(Clone, Serialize)]
@@ -37,12 +39,22 @@ struct SingleInstancePayload {
     cwd: String,
 }
 
+#[cfg(desktop)]
+fn has_autostart_arg(args: &[String]) -> bool {
+    args.iter().any(|arg| arg == AUTOSTART_ARG)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default();
 
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
+        if has_autostart_arg(&args) {
+            let _ = tray::hide_main_window(app);
+            return;
+        }
+
         let _ = tray::show_main_window(app);
         let _ = app.emit(SINGLE_INSTANCE_EVENT, SingleInstancePayload { args, cwd });
     }));
@@ -60,10 +72,13 @@ pub fn run() {
         .setup(|app| {
             #[cfg(desktop)]
             {
+                let started_from_autostart =
+                    has_autostart_arg(&std::env::args().collect::<Vec<_>>());
+
                 app.handle()
                     .plugin(tauri_plugin_autostart::init(
                         MacosLauncher::LaunchAgent,
-                        None::<Vec<&str>>,
+                        Some(vec![AUTOSTART_ARG]),
                     ))
                     .map_err(|error| -> Box<dyn std::error::Error> { error.into() })?;
 
@@ -89,6 +104,10 @@ pub fn run() {
                         saved_state.config.clone(),
                         backend_locale::BackendLocale::from_preference(&saved_state.locale),
                     );
+                }
+
+                if started_from_autostart {
+                    let _ = tray::hide_main_window(&app.handle());
                 }
             }
 
