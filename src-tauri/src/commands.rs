@@ -24,7 +24,10 @@ pub fn load_app_state(app: AppHandle) -> Result<AppStatePayload, String> {
 }
 
 #[tauri::command]
-pub fn save_app_state(app: AppHandle, payload: AppStatePayload) -> Result<(), String> {
+pub fn save_app_state(
+    app: AppHandle,
+    payload: Value,
+) -> Result<ApiResult<AppStatePayload>, String> {
     app_state::save_app_state(app, payload)
 }
 

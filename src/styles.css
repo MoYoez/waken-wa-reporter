@@ -897,6 +897,10 @@ select {
   line-height: 1.7;
 }
 
+.field-help-error {
+  color: #b91c1c;
+}
+
 .actions-row {
   display: flex;
   flex-wrap: wrap;

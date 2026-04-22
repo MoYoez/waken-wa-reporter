@@ -1,8 +1,14 @@
 <script setup lang="ts">
+import { computed, ref, watch } from "vue";
 import InputText from "primevue/inputtext";
 import ToggleSwitch from "primevue/toggleswitch";
 import { useI18n } from "vue-i18n";
 
+import {
+  formatReporterTimingIssue,
+  validateReporterTimingInput,
+  type ReporterTimingIssue,
+} from "@/lib/reporterTimingValidation";
 import type { ClientConfig } from "@/types";
 
 interface ReporterContentOption {
@@ -27,6 +33,65 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+
+const pollIntervalInput = ref(String(props.modelValue.pollIntervalMs));
+const heartbeatIntervalInput = ref(String(props.modelValue.heartbeatIntervalMs));
+
+const pollIntervalIssue = computed(() =>
+  validateReporterTimingInput(
+    "pollIntervalMs",
+    pollIntervalInput.value,
+    props.modelValue.pollIntervalMs,
+  ).issue,
+);
+const heartbeatIntervalIssue = computed(() =>
+  validateReporterTimingInput(
+    "heartbeatIntervalMs",
+    heartbeatIntervalInput.value,
+    props.modelValue.heartbeatIntervalMs,
+  ).issue,
+);
+
+watch(
+  () => props.modelValue.pollIntervalMs,
+  (value) => {
+    if (!pollIntervalIssue.value) {
+      pollIntervalInput.value = String(value);
+    }
+  },
+);
+
+watch(
+  () => props.modelValue.heartbeatIntervalMs,
+  (value) => {
+    if (!heartbeatIntervalIssue.value) {
+      heartbeatIntervalInput.value = String(value);
+    }
+  },
+);
+
+function updateTimingField(
+  key: "pollIntervalMs" | "heartbeatIntervalMs",
+  input: unknown,
+) {
+  const raw = String(input ?? "");
+  const fallback = props.modelValue[key];
+
+  if (key === "pollIntervalMs") {
+    pollIntervalInput.value = raw;
+  } else {
+    heartbeatIntervalInput.value = raw;
+  }
+
+  const result = validateReporterTimingInput(key, raw, fallback);
+  if (result.value !== undefined) {
+    emit("updateField", key, result.value);
+  }
+}
+
+function timingIssueMessage(issue?: ReporterTimingIssue) {
+  return issue ? formatReporterTimingIssue(issue, t) : "";
+}
 </script>
 
 <template>
@@ -38,19 +103,27 @@ const { t } = useI18n();
     <label class="field-block">
       <span class="field-label">{{ t("connectionPanel.fields.pollInterval") }}</span>
       <InputText
-        :model-value="String(props.modelValue.pollIntervalMs)"
+        :model-value="pollIntervalInput"
+        :invalid="Boolean(pollIntervalIssue)"
         :placeholder="t('connectionPanel.placeholders.pollInterval')"
-        @update:model-value="emit('updateField', 'pollIntervalMs', Number($event ?? 0))"
+        @update:model-value="updateTimingField('pollIntervalMs', $event)"
       />
+      <small v-if="pollIntervalIssue" class="field-help field-help-error">
+        {{ timingIssueMessage(pollIntervalIssue) }}
+      </small>
     </label>
 
     <label class="field-block">
       <span class="field-label">{{ t("connectionPanel.fields.heartbeatInterval") }}</span>
       <InputText
-        :model-value="String(props.modelValue.heartbeatIntervalMs)"
+        :model-value="heartbeatIntervalInput"
+        :invalid="Boolean(heartbeatIntervalIssue)"
         :placeholder="t('connectionPanel.placeholders.heartbeatInterval')"
-        @update:model-value="emit('updateField', 'heartbeatIntervalMs', Number($event ?? 0))"
+        @update:model-value="updateTimingField('heartbeatIntervalMs', $event)"
       />
+      <small v-if="heartbeatIntervalIssue" class="field-help field-help-error">
+        {{ timingIssueMessage(heartbeatIntervalIssue) }}
+      </small>
     </label>
 
     <div class="reporter-enabled-card field-span-2">

@@ -4,14 +4,46 @@ import {
   setAutostartEnabled,
 } from "@/lib/api";
 import { readDeviceName } from "@/lib/deviceInfo";
-import { saveAppState } from "@/lib/persistence";
+import {
+  AppStateSaveError,
+  AppStateSaveTransportError,
+  saveAppState,
+} from "@/lib/persistence";
 import { setI18nLocale } from "@/i18n";
+import { resolveApiErrorMessage } from "@/lib/localizedText";
+import {
+  REPORTER_TIMING_FIELDS,
+  formatReporterTimingIssue,
+  validateReporterTimingConfig,
+  type ReporterTimingField,
+  type ReporterTimingIssue,
+  type ReporterTimingIssueReason,
+} from "@/lib/reporterTimingValidation";
 import type { ClientConfig } from "@/types";
 
 import type {
   NormalizeConfigByCapabilities,
   UseAppShellPersistenceOptions,
 } from "@/app/composables/appShellPersistenceTypes";
+
+const reporterTimingIssueReasons = new Set<ReporterTimingIssueReason>([
+  "empty",
+  "notInteger",
+  "tooLarge",
+  "tooSmall",
+]);
+
+class SettingsSaveStageError extends Error {
+  stageKey: string;
+  originalError: unknown;
+
+  constructor(stageKey: string, originalError: unknown) {
+    super("");
+    this.name = "SettingsSaveStageError";
+    this.stageKey = stageKey;
+    this.originalError = originalError;
+  }
+}
 
 export function useAppShellSettingsPersistence(options: UseAppShellPersistenceOptions) {
   const normalizeConfigByCapabilities: NormalizeConfigByCapabilities = (raw: ClientConfig) => {
@@ -62,6 +94,76 @@ export function useAppShellSettingsPersistence(options: UseAppShellPersistenceOp
     );
   }
 
+  function isReporterTimingField(field: unknown): field is ReporterTimingField {
+    return field === "pollIntervalMs" || field === "heartbeatIntervalMs";
+  }
+
+  function backendIssueToReporterTimingIssue(
+    issue: AppStateSaveError["issues"][number],
+  ): ReporterTimingIssue | null {
+    if (!isReporterTimingField(issue.field) || !reporterTimingIssueReasons.has(issue.reason as ReporterTimingIssueReason)) {
+      return null;
+    }
+
+    const meta = REPORTER_TIMING_FIELDS[issue.field];
+    const received = typeof issue.received === "string" || typeof issue.received === "number"
+      ? issue.received
+      : JSON.stringify(issue.received ?? "");
+
+    return {
+      field: issue.field,
+      path: issue.path || `config.${issue.field}`,
+      reason: issue.reason as ReporterTimingIssueReason,
+      received,
+      min: typeof issue.min === "number" ? issue.min : meta.min,
+      suggestedValue: typeof issue.suggestedValue === "number"
+        ? issue.suggestedValue
+        : meta.defaultValue,
+    };
+  }
+
+  function prefixStage(stageKey: string, detail: string) {
+    return `${options.t(stageKey)}：${detail}`;
+  }
+
+  function errorDetail(error: unknown, fallback: string): string {
+    if (error instanceof SettingsSaveStageError) {
+      return prefixStage(error.stageKey, errorDetail(error.originalError, fallback));
+    }
+
+    if (error instanceof AppStateSaveError) {
+      const timingIssues = error.issues
+        .map(backendIssueToReporterTimingIssue)
+        .filter((issue): issue is ReporterTimingIssue => Boolean(issue));
+
+      if (timingIssues.length) {
+        return prefixStage(
+          "app.notify.settingsBackendValidationStage",
+          timingIssues.map((issue) => formatReporterTimingIssue(issue, options.t)).join("\n"),
+        );
+      }
+
+      return prefixStage(
+        "app.notify.settingsBackendValidationStage",
+        resolveApiErrorMessage(error.apiError, options.t, error.message || fallback),
+      );
+    }
+
+    if (error instanceof AppStateSaveTransportError) {
+      return prefixStage("app.notify.settingsTauriCommandStage", error.message || fallback);
+    }
+
+    if (error instanceof Error && error.message.trim()) {
+      return error.message;
+    }
+
+    if (typeof error === "string" && error.trim()) {
+      return error;
+    }
+
+    return fallback;
+  }
+
   async function applyLocale(nextLocale: string, persist = false) {
     const normalized = setI18nLocale(nextLocale);
     options.currentLocale.value = normalized;
@@ -74,9 +176,7 @@ export function useAppShellSettingsPersistence(options: UseAppShellPersistenceOp
         options.notify({
           severity: "error",
           summary: options.t("app.notify.settingsSaveFailed"),
-          detail: error instanceof Error
-            ? error.message
-            : options.t("app.notify.settingsSaveFailedDetail"),
+          detail: errorDetail(error, options.t("app.notify.settingsSaveFailedDetail")),
           life: 4000,
         });
       } finally {
@@ -120,9 +220,7 @@ export function useAppShellSettingsPersistence(options: UseAppShellPersistenceOp
       options.notify({
         severity: "error",
         summary: options.t("app.notify.restartFailed"),
-        detail: error instanceof Error
-          ? error.message
-          : options.t("app.notify.restartFailedDetail"),
+        detail: errorDetail(error, options.t("app.notify.restartFailedDetail")),
         life: 4000,
       });
     }
@@ -155,13 +253,37 @@ export function useAppShellSettingsPersistence(options: UseAppShellPersistenceOp
   async function applySettingsChanges() {
     try {
       const nextConfig = normalizeConfigByCapabilities({ ...options.config.value });
+      const timingIssues = options.reporterSupported.value
+        ? validateReporterTimingConfig(nextConfig)
+        : [];
+
+      if (timingIssues.length) {
+        options.notify({
+          severity: "warn",
+          summary: options.t("app.notify.settingsInvalid"),
+          detail: prefixStage(
+            "app.notify.settingsFrontendValidationStage",
+            timingIssues.map((issue) => formatReporterTimingIssue(issue, options.t)).join("\n"),
+          ),
+          life: 5000,
+        });
+        return;
+      }
 
       if (options.autostartSupported.value) {
-        await setAutostartEnabled(nextConfig.launchOnStartup);
+        try {
+          await setAutostartEnabled(nextConfig.launchOnStartup);
+        } catch (error) {
+          throw new SettingsSaveStageError("app.notify.settingsAutostartStage", error);
+        }
       }
 
       options.config.value = nextConfig;
-      await persistAppState(nextConfig);
+      try {
+        await persistAppState(nextConfig);
+      } catch (error) {
+        throw new SettingsSaveStageError("app.notify.settingsLocalStateStage", error);
+      }
       options.persistedConfig.value = { ...nextConfig };
       options.notify({
         severity: "success",
@@ -173,9 +295,7 @@ export function useAppShellSettingsPersistence(options: UseAppShellPersistenceOp
       options.notify({
         severity: "error",
         summary: options.t("app.notify.settingsSaveFailed"),
-        detail: error instanceof Error
-          ? error.message
-          : options.t("app.notify.settingsSaveFailedDetail"),
+        detail: errorDetail(error, options.t("app.notify.settingsSaveFailedDetail")),
         life: 4000,
       });
     }
