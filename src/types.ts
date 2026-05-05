@@ -26,6 +26,7 @@ export interface ClientConfig {
   reportWindowTitle: boolean;
   reportMedia: boolean;
   reportPlaySource: boolean;
+  reportMediaArtwork: boolean;
   discordEnabled: boolean;
   discordApplicationId: string;
   discordSourceId: string;
@@ -35,6 +36,20 @@ export interface ClientConfig {
 export interface ActivityMedia {
   title: string;
   singer?: string;
+  artist?: string;
+  album?: string;
+  coverDataUrl?: string;
+  coverUrl?: string;
+  status?: "playing" | "paused" | "stopped";
+  isPlaying?: boolean;
+  isPaused?: boolean;
+  positionMs?: number;
+  durationMs?: number;
+  timestamps?: {
+    start?: number | string;
+    end?: number | string;
+  };
+  reportedAt?: number | string;
 }
 
 export interface ActivityMetadata extends Record<string, unknown> {

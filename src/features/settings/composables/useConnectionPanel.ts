@@ -57,6 +57,12 @@ export function useConnectionPanel(
       description: t("connectionPanel.reportContent.playSource.description"),
       inputId: "report-play-source",
     },
+    {
+      key: "reportMediaArtwork" as const,
+      label: t("connectionPanel.reportContent.mediaArtwork.label"),
+      description: t("connectionPanel.reportContent.mediaArtwork.description"),
+      inputId: "report-media-artwork",
+    },
   ]);
 
   function updateField<K extends keyof ClientConfig>(key: K, value: ClientConfig[K]) {

@@ -41,6 +41,9 @@ const zhCN = {
     imageTooLarge: "图片太大。",
     imageInvalidType: "图片格式不支持。",
     accessibilityPermissionUnsupported: "当前平台不支持辅助功能权限申请。",
+    platformSelfTestAlreadyRunning: "上一次平台检测仍在等待，请稍后重试。",
+    platformSelfTestTimedOut: "平台检测超时（{timeoutMs} ms）。",
+    platformSelfTestFailed: "平台检测失败。",
     importConfigEmpty: "请先粘贴配置。",
     importConfigTooLarge: "配置过大（{size}/{maxSize} 字节）。",
     importConfigInvalid: "配置格式错误。",
@@ -455,6 +458,7 @@ const zhCN = {
       windowTitle: { label: "窗口名称", description: "当前窗口标题或名称" },
       media: { label: "播放内容", description: "正在播放的媒体内容" },
       playSource: { label: "播放来源", description: "媒体来自哪个应用" },
+      mediaArtwork: { label: "媒体封面", description: "媒体变化时附带封面图" },
     },
     toggles: {
       enabled: "已开启",

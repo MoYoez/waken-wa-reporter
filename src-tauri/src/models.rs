@@ -63,6 +63,10 @@ pub fn default_report_play_source() -> bool {
     true
 }
 
+pub fn default_report_media_artwork() -> bool {
+    false
+}
+
 pub fn default_discord_application_id() -> String {
     String::new()
 }
@@ -147,6 +151,8 @@ pub struct ClientConfig {
     pub report_media: bool,
     #[serde(default = "default_report_play_source")]
     pub report_play_source: bool,
+    #[serde(default = "default_report_media_artwork")]
+    pub report_media_artwork: bool,
     #[serde(default)]
     pub discord_enabled: bool,
     #[serde(default = "default_discord_application_id")]
@@ -175,6 +181,7 @@ impl Default for ClientConfig {
             report_window_title: default_report_window_title(),
             report_media: default_report_media(),
             report_play_source: default_report_play_source(),
+            report_media_artwork: default_report_media_artwork(),
             discord_enabled: false,
             discord_application_id: default_discord_application_id(),
             discord_source_id: default_discord_source_id(),
@@ -334,6 +341,8 @@ pub struct ReporterActivity {
     pub process_title: Option<String>,
     #[serde(default)]
     pub updated_at: Option<String>,
+    #[serde(default)]
+    pub media_cover_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

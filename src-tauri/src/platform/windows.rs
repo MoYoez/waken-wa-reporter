@@ -2,13 +2,22 @@ use std::{cell::RefCell, path::Path};
 
 use serde_json::json;
 
-use super::{build_self_test_result, localized_text, make_probe, ForegroundSnapshot, MediaInfo};
+use super::{
+    build_self_test_result, localized_text, make_probe, media_timestamps_from_position,
+    now_unix_millis_i64, ForegroundSnapshot, MediaInfo,
+};
 use crate::models::PlatformSelfTestResult;
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 
 #[cfg(target_os = "windows")]
 use windows::{
     core::{HRESULT, PWSTR},
-    Media::Control::GlobalSystemMediaTransportControlsSessionManager,
+    Media::Control::{
+        GlobalSystemMediaTransportControlsSessionManager,
+        GlobalSystemMediaTransportControlsSessionMediaProperties,
+        GlobalSystemMediaTransportControlsSessionPlaybackStatus,
+    },
+    Storage::Streams::DataReader,
     Win32::{
         Foundation::{CloseHandle, MAX_PATH},
         System::{
@@ -199,6 +208,7 @@ fn clear_cached_media_session_manager() {
 fn get_now_playing_native(
     include_media: bool,
     include_play_source: bool,
+    include_artwork: bool,
 ) -> Result<MediaInfo, String> {
     let _com_guard = init_com_for_media()?;
 
@@ -222,33 +232,70 @@ fn get_now_playing_native(
     } else {
         String::new()
     };
+    let playback_state = session
+        .GetPlaybackInfo()
+        .ok()
+        .and_then(|info| info.PlaybackStatus().ok())
+        .map(playback_status_to_string)
+        .unwrap_or_default();
+    let (position_ms, duration_ms) = session
+        .GetTimelineProperties()
+        .ok()
+        .map(|timeline| {
+            let position_ms = timeline.Position().ok().and_then(timespan_to_ms);
+            let start_ms = timeline
+                .StartTime()
+                .ok()
+                .and_then(timespan_to_ms)
+                .unwrap_or(0);
+            let end_ms = timeline
+                .EndTime()
+                .ok()
+                .and_then(timespan_to_ms)
+                .unwrap_or(0);
+            let duration_ms = if end_ms > start_ms {
+                Some(end_ms - start_ms)
+            } else {
+                None
+            };
+            (position_ms, duration_ms)
+        })
+        .unwrap_or((None, None));
+    let reported_at_ms = now_unix_millis_i64();
+    let (start_timestamp_ms, end_timestamp_ms) =
+        media_timestamps_from_position(&playback_state, position_ms, duration_ms, reported_at_ms);
 
-    let (title, artist, album) = if include_media {
+    let (title, artist, album, cover_url) = if include_media {
         let properties = session
             .TryGetMediaPropertiesAsync()
             .map_err(|error| format!("请求媒体属性失败：{error}"))?
             .get()
             .map_err(|error| format!("读取媒体属性失败：{error}"))?;
 
-        (
-            properties
-                .Title()
-                .ok()
-                .map(|value| value.to_string())
-                .unwrap_or_default(),
-            properties
-                .Artist()
-                .ok()
-                .map(|value| value.to_string())
-                .unwrap_or_default(),
-            properties
-                .AlbumTitle()
-                .ok()
-                .map(|value| value.to_string())
-                .unwrap_or_default(),
-        )
+        let title = properties
+            .Title()
+            .ok()
+            .map(|value| value.to_string())
+            .unwrap_or_default();
+        let artist = properties
+            .Artist()
+            .ok()
+            .map(|value| value.to_string())
+            .unwrap_or_default();
+        let album = properties
+            .AlbumTitle()
+            .ok()
+            .map(|value| value.to_string())
+            .unwrap_or_default();
+        let cover_url = if include_artwork {
+            read_media_artwork(&properties).unwrap_or_default()
+        } else {
+            String::new()
+        };
+
+        (title, artist, album, cover_url)
     } else {
-        (String::new(), String::new(), String::new())
+        (String::new(), String::new(), String::new(), String::new())
     };
 
     Ok(MediaInfo {
@@ -256,12 +303,38 @@ fn get_now_playing_native(
         artist,
         album,
         source_app_id,
+        cover_url,
+        playback_state,
+        position_ms,
+        duration_ms,
+        start_timestamp_ms,
+        end_timestamp_ms,
+        reported_at_ms: Some(reported_at_ms),
     }
     .into_reporting_subset(include_media, include_play_source))
 }
 
+fn playback_status_to_string(
+    status: GlobalSystemMediaTransportControlsSessionPlaybackStatus,
+) -> String {
+    match status {
+        GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing => "playing".into(),
+        GlobalSystemMediaTransportControlsSessionPlaybackStatus::Paused => "paused".into(),
+        GlobalSystemMediaTransportControlsSessionPlaybackStatus::Stopped => "stopped".into(),
+        _ => String::new(),
+    }
+}
+
+fn timespan_to_ms(value: windows::Foundation::TimeSpan) -> Option<i64> {
+    let ticks = value.Duration;
+    if ticks < 0 {
+        return None;
+    }
+    Some(ticks / 10_000)
+}
+
 pub fn get_now_playing() -> Result<MediaInfo, String> {
-    let media = get_now_playing_native(true, true)?;
+    let media = get_now_playing_native(true, true, false)?;
     if media.is_empty() {
         return Ok(MediaInfo::default());
     }
@@ -277,7 +350,13 @@ pub fn get_now_playing_for_reporting(
         return Ok(MediaInfo::default());
     }
 
-    get_now_playing_native(include_media, include_play_source)
+    get_now_playing_native(include_media, include_play_source, false)
+}
+
+pub fn get_now_playing_artwork_for_reporting(
+    include_play_source: bool,
+) -> Result<MediaInfo, String> {
+    get_now_playing_native(true, include_play_source, true)
 }
 
 pub fn run_self_test() -> PlatformSelfTestResult {
@@ -385,6 +464,56 @@ pub fn run_self_test() -> PlatformSelfTestResult {
     };
 
     build_self_test_result(foreground, window_title, media)
+}
+
+fn read_media_artwork(
+    properties: &GlobalSystemMediaTransportControlsSessionMediaProperties,
+) -> Result<String, String> {
+    let thumbnail = properties
+        .Thumbnail()
+        .map_err(|e| format!("请求媒体缩略图失败：{e}"))?;
+    let stream = thumbnail
+        .OpenReadAsync()
+        .map_err(|e| format!("打开媒体缩略图流失败：{e}"))?
+        .get()
+        .map_err(|e| format!("读取媒体缩略图流失败：{e}"))?;
+
+    let size = stream
+        .Size()
+        .map_err(|e| format!("读取媒体缩略图大小失败：{e}"))? as u32;
+    if size == 0 {
+        return Ok(String::new());
+    }
+
+    let input_stream = stream
+        .GetInputStreamAt(0)
+        .map_err(|e| format!("获取输入流失败：{e}"))?;
+    let reader =
+        DataReader::CreateDataReader(&input_stream).map_err(|e| format!("创建读取器失败：{e}"))?;
+    reader
+        .LoadAsync(size)
+        .map_err(|e| format!("加载缩略图缓冲区失败：{e}"))?
+        .get()
+        .map_err(|e| format!("读取缩略图缓冲区失败：{e}"))?;
+
+    let mut bytes = vec![0u8; size as usize];
+    reader
+        .ReadBytes(&mut bytes)
+        .map_err(|e| format!("读取缩略图字节失败：{e}"))?;
+
+    if bytes.is_empty() {
+        return Ok(String::new());
+    }
+
+    let content_type = stream
+        .ContentType()
+        .ok()
+        .map(|v| v.to_string())
+        .filter(|v| v.starts_with("image/"))
+        .unwrap_or_else(|| "image/jpeg".to_string());
+
+    let encoded = BASE64_STANDARD.encode(&bytes);
+    Ok(format!("data:{content_type};base64,{encoded}"))
 }
 
 pub fn request_accessibility_permission() -> Result<bool, String> {

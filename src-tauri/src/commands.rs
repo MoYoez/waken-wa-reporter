@@ -150,8 +150,8 @@ pub fn get_discord_presence_snapshot(
 }
 
 #[tauri::command]
-pub fn run_platform_self_test() -> Result<ApiResult<PlatformSelfTestResult>, String> {
-    platform::run_platform_self_test()
+pub async fn run_platform_self_test() -> Result<ApiResult<PlatformSelfTestResult>, String> {
+    platform::run_platform_self_test().await
 }
 
 #[tauri::command]

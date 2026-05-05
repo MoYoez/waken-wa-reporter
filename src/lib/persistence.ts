@@ -70,6 +70,7 @@ export const defaultClientConfig = (): ClientConfig => ({
   reportWindowTitle: true,
   reportMedia: true,
   reportPlaySource: true,
+  reportMediaArtwork: false,
   discordEnabled: false,
   discordApplicationId: "",
   discordSourceId: "",

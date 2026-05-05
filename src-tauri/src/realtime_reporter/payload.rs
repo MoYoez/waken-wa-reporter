@@ -18,10 +18,14 @@ use super::messages::{
 };
 
 pub(super) enum PostActivityResult {
-    Success,
+    Success {
+        media_cover_url: Option<String>,
+        response_text: String,
+    },
     PendingApproval {
         message: String,
         approval_url: Option<String>,
+        response_text: String,
     },
 }
 
@@ -88,7 +92,8 @@ pub(super) fn build_payload(
     media: &MediaInfo,
     mut metadata: Map<String, Value>,
 ) -> ActivityPayload {
-    if !config.discord_source_id.trim().is_empty() {
+    // Only include dc_source when Discord presence is enabled
+    if config.discord_enabled && !config.discord_source_id.trim().is_empty() {
         metadata.insert(
             "dc_source".into(),
             Value::String(config.discord_source_id.trim().to_string()),
@@ -188,6 +193,7 @@ pub(super) fn post_activity_blocking(
         return Ok(PostActivityResult::PendingApproval {
             message,
             approval_url,
+            response_text: text,
         });
     }
 
@@ -200,5 +206,14 @@ pub(super) fn post_activity_blocking(
             .unwrap_or_else(|| server_failure_default(locale)));
     }
 
-    Ok(PostActivityResult::Success)
+    Ok(PostActivityResult::Success {
+        media_cover_url: parsed
+            .get("data")
+            .and_then(|d| d.get("metadata"))
+            .and_then(|m| m.get("media"))
+            .and_then(|media| media.get("coverUrl"))
+            .and_then(Value::as_str)
+            .map(str::to_string),
+        response_text: text,
+    })
 }

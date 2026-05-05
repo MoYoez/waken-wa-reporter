@@ -13,7 +13,7 @@ import {
 import type { ClientConfig } from "@/types";
 
 interface ReporterContentOption {
-  key: "reportForegroundApp" | "reportWindowTitle" | "reportMedia" | "reportPlaySource";
+  key: "reportForegroundApp" | "reportWindowTitle" | "reportMedia" | "reportPlaySource" | "reportMediaArtwork";
   label: string;
   description: string;
   inputId: string;

@@ -41,6 +41,9 @@ const enUS = {
     imageTooLarge: "Image is too large.",
     imageInvalidType: "Image format is not supported.",
     accessibilityPermissionUnsupported: "This platform does not support requesting accessibility permission.",
+    platformSelfTestAlreadyRunning: "A previous platform check is still waiting. Try again later.",
+    platformSelfTestTimedOut: "Platform check timed out ({timeoutMs} ms).",
+    platformSelfTestFailed: "Platform check failed.",
     importConfigEmpty: "Paste the config first.",
     importConfigTooLarge: "Config is too large ({size}/{maxSize} bytes).",
     importConfigInvalid: "Config format is invalid.",
@@ -455,6 +458,7 @@ const enUS = {
       windowTitle: { label: "Window title", description: "The current window title or name" },
       media: { label: "Playing media", description: "The media currently playing" },
       playSource: { label: "Playback source", description: "Which app the media comes from" },
+      mediaArtwork: { label: "Media artwork", description: "Attach cover artwork when media changes" },
     },
     toggles: {
       enabled: "Enabled",

@@ -1,6 +1,7 @@
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use serde::Deserialize;
 
-use crate::platform::MediaInfo;
+use crate::platform::{media_timestamps_from_position, now_unix_millis_i64, MediaInfo};
 
 use super::command::{command_output_with_timeout, CommandError};
 
@@ -44,6 +45,28 @@ struct RawNowPlayingInfo {
     album: Option<String>,
     #[serde(rename = "kMRMediaRemoteNowPlayingInfoClientBundleIdentifier")]
     client_bundle_identifier: Option<String>,
+    #[serde(
+        rename = "kMRMediaRemoteNowPlayingInfoArtworkData",
+        alias = "artworkData"
+    )]
+    artwork_data: Option<String>,
+    #[serde(
+        rename = "kMRMediaRemoteNowPlayingInfoArtworkMIMEType",
+        alias = "artworkMimeType"
+    )]
+    artwork_mime_type: Option<String>,
+    #[serde(
+        rename = "kMRMediaRemoteNowPlayingInfoElapsedTime",
+        alias = "elapsedTime"
+    )]
+    elapsed_time: Option<f64>,
+    #[serde(rename = "kMRMediaRemoteNowPlayingInfoDuration", alias = "duration")]
+    duration: Option<f64>,
+    #[serde(
+        rename = "kMRMediaRemoteNowPlayingInfoPlaybackRate",
+        alias = "playbackRate"
+    )]
+    playback_rate: Option<f64>,
 }
 
 pub(super) fn get_now_playing() -> Result<MediaInfo, String> {
@@ -132,10 +155,91 @@ fn get_now_playing_via_nowplaying_cli() -> Result<MediaInfo, NowPlayingCliError>
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| NOWPLAYING_CLI.to_string());
 
+    let cover_url = decode_artwork_to_data_url(
+        raw.artwork_data.as_deref(),
+        raw.artwork_mime_type.as_deref(),
+    );
+    let playback_state = normalize_playback_state(raw.playback_rate);
+    let position_ms = seconds_to_ms(raw.elapsed_time);
+    let duration_ms = seconds_to_ms(raw.duration);
+    let reported_at_ms = now_unix_millis_i64();
+    let (start_timestamp_ms, end_timestamp_ms) =
+        media_timestamps_from_position(&playback_state, position_ms, duration_ms, reported_at_ms);
+
     Ok(MediaInfo {
         title,
         artist,
         album,
         source_app_id,
+        cover_url,
+        playback_state,
+        position_ms,
+        duration_ms,
+        start_timestamp_ms,
+        end_timestamp_ms,
+        reported_at_ms: Some(reported_at_ms),
     })
+}
+
+fn normalize_playback_state(playback_rate: Option<f64>) -> String {
+    match playback_rate {
+        Some(rate) if rate > 0.0 => "playing".into(),
+        Some(_) => "paused".into(),
+        None => String::new(),
+    }
+}
+
+fn seconds_to_ms(value: Option<f64>) -> Option<i64> {
+    let seconds = value?;
+    if !seconds.is_finite() || seconds < 0.0 {
+        return None;
+    }
+    Some((seconds * 1000.0).round() as i64)
+}
+
+fn decode_artwork_to_data_url(artwork_data: Option<&str>, mime_type: Option<&str>) -> String {
+    let data = match artwork_data.and_then(decode_base64_image_payload) {
+        Some(bytes) => bytes,
+        None => return String::new(),
+    };
+
+    let content_type = mime_type
+        .and_then(|v| v.trim().trim_start_matches("data:").split(';').next())
+        .filter(|v| v.starts_with("image/"))
+        .map(str::to_string)
+        .or_else(|| detect_image_content_type(&data))
+        .unwrap_or_else(|| "image/jpeg".to_string());
+
+    let encoded = BASE64_STANDARD.encode(&data);
+    format!("data:{content_type};base64,{encoded}")
+}
+
+fn decode_base64_image_payload(value: &str) -> Option<Vec<u8>> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("null") {
+        return None;
+    }
+    let encoded = trimmed
+        .split_once(',')
+        .map(|(_, payload)| payload)
+        .unwrap_or(trimmed);
+    BASE64_STANDARD
+        .decode(encoded.trim())
+        .ok()
+        .filter(|bytes| !bytes.is_empty())
+}
+
+fn detect_image_content_type(bytes: &[u8]) -> Option<String> {
+    let s = if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        "image/jpeg"
+    } else if bytes.starts_with(&[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A]) {
+        "image/png"
+    } else if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") {
+        "image/gif"
+    } else if bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
+        "image/webp"
+    } else {
+        return None;
+    };
+    Some(s.to_string())
 }
