@@ -134,6 +134,14 @@ fn resolve_artwork_data_url(input: &str) -> String {
         return String::new();
     }
 
+    let header_content_type = response
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.trim().trim_start_matches("data:").split(';').next())
+        .filter(|v| v.starts_with("image/"))
+        .map(str::to_string);
+
     let bytes = match response.bytes() {
         Ok(b) => b,
         Err(_) => return String::new(),
@@ -143,14 +151,7 @@ fn resolve_artwork_data_url(input: &str) -> String {
         return String::new();
     }
 
-    let content_type = response
-        .headers()
-        .get("content-type")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.trim().trim_start_matches("data:").split(';').next())
-        .filter(|v| v.starts_with("image/"))
-        .map(str::to_string)
-        .unwrap_or_else(|| detect_image_content_type(&bytes));
+    let content_type = header_content_type.unwrap_or_else(|| detect_image_content_type(&bytes));
 
     let encoded = BASE64_STANDARD.encode(&bytes);
     format!("data:{content_type};base64,{encoded}")
