@@ -46,7 +46,6 @@ function formatTime(value?: string | null) {
     <template #title>
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">{{ t("settings.discord.eyebrow") }}</p>
           <h3>{{ t("settings.discord.title") }}</h3>
         </div>
         <Tag

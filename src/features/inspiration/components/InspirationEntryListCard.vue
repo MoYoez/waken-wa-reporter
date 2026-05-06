@@ -31,7 +31,6 @@ const { t } = useI18n();
     <template #title>
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">{{ t("inspiration.list.eyebrow") }}</p>
           <h3>{{ t("inspiration.list.title") }}</h3>
         </div>
         <Tag :value="entryCountLabel" rounded />

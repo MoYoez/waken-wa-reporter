@@ -38,7 +38,6 @@ const lastSyncLabel = computed(() => formatOptionalDateTime(
     <template #title>
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">{{ t("overview.discord.eyebrow") }}</p>
           <h3>{{ t("overview.discord.title") }}</h3>
         </div>
         <Tag :value="statusLabel" :severity="statusSeverity" rounded />

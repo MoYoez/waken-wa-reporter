@@ -50,13 +50,12 @@ const effectiveModeLabel = computed(() => {
 
 <template>
   <div class="workspace-grid">
-    <header class="hero-panel">
+    <header class="page-header">
       <div>
-        <p class="eyebrow">{{ t("overview.hero.eyebrow") }}</p>
         <h2>{{ t("overview.hero.title") }}</h2>
-        <p class="hero-copy">{{ t("overview.hero.description") }}</p>
+        <p class="page-copy">{{ t("overview.hero.description") }}</p>
       </div>
-      <div class="hero-actions">
+      <div class="page-actions">
         <Tag
           v-if="reporterSupported"
           :value="reporterSnapshot.running ? t('overview.common.running') : t('overview.common.stopped')"

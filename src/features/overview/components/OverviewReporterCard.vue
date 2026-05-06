@@ -30,7 +30,6 @@ const currentWindowTitle = computed(() => props.snapshot.currentActivity?.proces
     <template #title>
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">{{ t("overview.reporter.eyebrow") }}</p>
           <h3>{{ t("overview.reporter.title") }}</h3>
         </div>
       </div>

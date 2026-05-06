@@ -44,7 +44,6 @@ const {
     <template #title>
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">{{ t("connectionPanel.title.eyebrow") }}</p>
           <h3>{{ t("connectionPanel.title.title") }}</h3>
         </div>
         <Tag

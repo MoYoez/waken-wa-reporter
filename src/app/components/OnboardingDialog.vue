@@ -56,7 +56,6 @@ const canComplete = computed(() => (
     <template #container>
       <div class="onboarding-panel">
         <template v-if="!setupMode">
-          <p class="eyebrow">{{ t("app.onboarding.eyebrow") }}</p>
           <h3>{{ t("app.onboarding.welcomeTitle") }}</h3>
           <p class="onboarding-copy">
             {{ t("app.onboarding.welcomeCopy") }}
@@ -113,7 +112,6 @@ const canComplete = computed(() => (
         </template>
 
         <template v-else>
-          <p class="eyebrow">{{ t("app.onboarding.eyebrow") }}</p>
           <h3>{{ t("app.onboarding.setupTitle") }}</h3>
           <p class="onboarding-copy">
             {{ t("app.onboarding.setupCopy") }}

@@ -13,7 +13,6 @@ const { t } = useI18n();
 <template>
   <section class="pending-save-float" aria-live="polite">
     <div class="pending-save-float-copy">
-      <p class="eyebrow">{{ t("app.pendingSave.eyebrow") }}</p>
       <strong>{{ t("app.pendingSave.title") }}</strong>
       <span>{{ t("app.pendingSave.detail") }}</span>
     </div>

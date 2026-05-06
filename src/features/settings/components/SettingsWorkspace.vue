@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import ConnectionPanel from "@/features/settings/components/ConnectionPanel.vue";
 import SettingsDiscordCard from "@/features/settings/components/SettingsDiscordCard.vue";
-import SettingsHeroPanel from "@/features/settings/components/SettingsHeroPanel.vue";
+import SettingsHeaderPanel from "@/features/settings/components/SettingsHeaderPanel.vue";
 import SettingsLanguageCard from "@/features/settings/components/SettingsLanguageCard.vue";
 import SettingsMobileCard from "@/features/settings/components/SettingsMobileCard.vue";
 import SettingsReporterCard from "@/features/settings/components/SettingsReporterCard.vue";
@@ -65,7 +65,7 @@ const {
 
 <template>
   <div class="workspace-grid">
-    <SettingsHeroPanel
+    <SettingsHeaderPanel
       :reporter-supported="reporterSupported"
       :reporter-running="reporterSnapshot.running"
     />

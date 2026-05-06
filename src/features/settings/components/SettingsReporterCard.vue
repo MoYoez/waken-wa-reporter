@@ -49,7 +49,6 @@ function formatTime(value?: string | null) {
     <template #title>
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">{{ t("settings.reporter.eyebrow") }}</p>
           <h3>{{ t("settings.reporter.title") }}</h3>
         </div>
       </div>
@@ -129,7 +128,6 @@ function formatTime(value?: string | null) {
       >
         <div class="panel-heading reporter-self-test-heading">
           <div>
-            <p class="eyebrow">{{ t("settings.selfTest.eyebrow") }}</p>
             <h3>{{ t("settings.selfTest.title") }}</h3>
           </div>
           <Tag

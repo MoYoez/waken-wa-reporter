@@ -47,7 +47,6 @@ const connectivitySeverity = computed(() => {
     <template #title>
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">{{ t("overview.mobile.eyebrow") }}</p>
           <h3>{{ t("overview.mobile.title") }}</h3>
         </div>
       </div>

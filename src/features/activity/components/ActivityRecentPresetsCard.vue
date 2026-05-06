@@ -26,7 +26,6 @@ function formatTime(value: string) {
     <template #title>
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">{{ t("activity.recent.eyebrow") }}</p>
           <h3>{{ t("activity.recent.title") }}</h3>
         </div>
       </div>

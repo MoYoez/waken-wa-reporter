@@ -88,7 +88,6 @@ watch(
       <template #title>
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">{{ t("realtime.title.eyebrow") }}</p>
             <h3>{{ t("realtime.title.title") }}</h3>
           </div>
           <Tag
@@ -124,7 +123,6 @@ watch(
       <template #title>
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">{{ t("realtime.list.eyebrow") }}</p>
             <h3>{{ t("realtime.list.title") }}</h3>
           </div>
         </div>

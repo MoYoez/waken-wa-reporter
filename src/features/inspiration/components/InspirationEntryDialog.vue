@@ -28,7 +28,6 @@ const { t } = useI18n();
     <template #header>
       <div v-if="entry" class="panel-heading">
         <div>
-          <p class="eyebrow">{{ t("inspiration.list.detailEyebrow") }}</p>
           <h3>{{ entry.title || t("inspiration.common.untitledEntry") }}</h3>
         </div>
         <small>{{ createdAtLabel }}</small>

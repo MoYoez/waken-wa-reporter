@@ -26,8 +26,7 @@ const { t } = useI18n();
 <template>
   <aside class="app-sidebar">
     <div class="brand-block">
-      <p class="eyebrow">Waken-Wa</p>
-      <h1>{{ t("app.brand.client") }}</h1>
+      <h1>Waken-Wa {{ t("app.brand.client") }}</h1>
     </div>
 
     <nav class="nav-stack">

@@ -28,7 +28,6 @@ defineEmits<{
     <template #title>
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">{{ t("activity.title.eyebrow") }}</p>
           <h3>{{ t("activity.title.title") }}</h3>
         </div>
       </div>

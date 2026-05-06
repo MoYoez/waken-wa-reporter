@@ -53,7 +53,6 @@ const { t } = useI18n();
     <template #title>
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">{{ t("inspiration.title.eyebrow") }}</p>
           <h3>{{ t("inspiration.title.title") }}</h3>
         </div>
         <Button

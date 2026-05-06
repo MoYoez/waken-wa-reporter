@@ -29,7 +29,6 @@ const { t } = useI18n();
     <template #title>
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">{{ t("settings.language.eyebrow") }}</p>
           <h3>{{ t("settings.language.title") }}</h3>
         </div>
       </div>

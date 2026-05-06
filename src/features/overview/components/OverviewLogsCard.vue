@@ -31,7 +31,6 @@ function translateText(key: string, params?: Record<string, unknown> | null) {
     <template #title>
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">{{ t("overview.logs.eyebrow") }}</p>
           <h3>{{ t("overview.logs.title") }}</h3>
         </div>
       </div>
