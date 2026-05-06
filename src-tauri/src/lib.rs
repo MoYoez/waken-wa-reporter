@@ -82,10 +82,10 @@ pub fn run() {
                     ))
                     .map_err(|error| -> Box<dyn std::error::Error> { error.into() })?;
 
-                tray::setup_tray(&app.handle())
+                tray::setup_tray(app.handle())
                     .map_err(|error| -> Box<dyn std::error::Error> { error.into() })?;
 
-                let saved_state = state_store::load_app_state(&app.handle())
+                let saved_state = state_store::load_app_state(app.handle())
                     .map_err(|error| -> Box<dyn std::error::Error> { error.into() })?;
 
                 if saved_state.config.reporter_enabled && config_is_ready(&saved_state.config) {
@@ -107,7 +107,7 @@ pub fn run() {
                 }
 
                 if started_from_autostart {
-                    let _ = tray::hide_main_window(&app.handle());
+                    let _ = tray::hide_main_window(app.handle());
                 }
             }
 
@@ -122,7 +122,7 @@ pub fn run() {
 
                 if let WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
-                    let _ = tray::hide_main_window(&window.app_handle());
+                    let _ = tray::hide_main_window(window.app_handle());
                 }
             }
         });
@@ -134,7 +134,6 @@ pub fn run() {
         commands::restart_app,
         commands::parse_imported_integration_config,
         commands::get_client_capabilities,
-        commands::hide_to_tray,
         commands::submit_activity_report,
         commands::get_public_activity_feed,
         commands::list_inspiration_entries,

@@ -1,7 +1,7 @@
 import { MARKDOWN_IMAGE_RE, MARKDOWN_LINK_RE } from "@/lib/inspirationRichText/patterns";
 import { escapeHtml, sanitizeHref } from "@/lib/inspirationRichText/shared";
 
-export function stripMarkdownImages(markdown: string) {
+function stripMarkdownImages(markdown: string) {
   return markdown.replace(MARKDOWN_IMAGE_RE, "");
 }
 

@@ -2,10 +2,10 @@ import { createI18n } from "vue-i18n";
 
 import { messages } from "./messages";
 
-export const SUPPORTED_LOCALES = ["zh-CN", "en-US"] as const;
+const SUPPORTED_LOCALES = ["zh-CN", "en-US"] as const;
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
 
-export const DEFAULT_LOCALE: SupportedLocale = "zh-CN";
+const DEFAULT_LOCALE: SupportedLocale = "zh-CN";
 
 export function normalizeLocale(value?: string | null): SupportedLocale {
   const normalized = String(value ?? "").trim().toLowerCase();
@@ -18,7 +18,7 @@ export function normalizeLocale(value?: string | null): SupportedLocale {
   return DEFAULT_LOCALE;
 }
 
-export function detectPreferredLocale(): SupportedLocale {
+function detectPreferredLocale(): SupportedLocale {
   if (typeof navigator === "undefined") {
     return DEFAULT_LOCALE;
   }

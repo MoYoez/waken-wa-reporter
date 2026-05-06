@@ -41,6 +41,7 @@ const WORKER_JOIN_WAIT_TIMEOUT: Duration = Duration::from_secs(2);
 const WORKER_JOIN_POLL_STEP: Duration = Duration::from_millis(50);
 const MIN_MEDIA_POLL_INTERVAL: Duration = Duration::from_secs(5);
 
+#[derive(Default)]
 struct ReporterInner {
     running: bool,
     active_run_id: Option<u64>,
@@ -52,23 +53,6 @@ struct ReporterInner {
     last_pending_approval_url: Option<String>,
     stop_flag: Option<Arc<AtomicBool>>,
     worker: Option<JoinHandle<()>>,
-}
-
-impl Default for ReporterInner {
-    fn default() -> Self {
-        Self {
-            running: false,
-            active_run_id: None,
-            logs: Vec::new(),
-            current_activity: None,
-            last_heartbeat_at: None,
-            last_error: None,
-            last_pending_approval_message: None,
-            last_pending_approval_url: None,
-            stop_flag: None,
-            worker: None,
-        }
-    }
 }
 
 pub struct ReporterRuntime {
@@ -325,7 +309,10 @@ fn run_reporter_loop(
         let mut iteration_had_error = false;
 
         let collect_foreground = config.report_foreground_app || config.report_window_title;
-        let collect_media = config.report_media || config.report_play_source;
+        let collect_media =
+            config.report_media || config.report_play_source || config.report_playback_app_icon;
+        let include_play_source_for_capture =
+            config.report_play_source || config.report_playback_app_icon;
 
         let foreground = if collect_foreground {
             get_foreground_snapshot_for_reporting(
@@ -349,11 +336,11 @@ fn run_reporter_loop(
                         last_media_poll_at = Some(SystemTime::now());
                         let previous_media_signature = cached_media.signature_for_reporting(
                             config.report_media,
-                            config.report_play_source,
+                            include_play_source_for_capture,
                         );
                         cached_media = match get_now_playing_for_reporting(
                             config.report_media,
-                            config.report_play_source,
+                            include_play_source_for_capture,
                         ) {
                             Ok(mut media) => {
                                 last_media_error = None;
@@ -361,10 +348,11 @@ fn run_reporter_loop(
                                     && previous_media_signature
                                         == media.signature_for_reporting(
                                             config.report_media,
-                                            config.report_play_source,
+                                            include_play_source_for_capture,
                                         )
                                 {
                                     media.cover_url = cached_media.cover_url.clone();
+                                    media.source_icon_url = cached_media.source_icon_url.clone();
                                 }
                                 media
                             }
@@ -405,7 +393,10 @@ fn run_reporter_loop(
                     "{}\u{1e}{}\u{1e}{}",
                     snapshot.process_name,
                     snapshot.process_title,
-                    media.signature_for_reporting(config.report_media, config.report_play_source)
+                    media.signature_for_reporting(
+                        config.report_media,
+                        include_play_source_for_capture
+                    )
                 );
                 let same_as_last = last_signature
                     .as_ref()
@@ -428,12 +419,15 @@ fn run_reporter_loop(
                 if should_send {
                     let is_heartbeat = same_as_last;
                     let mut payload_media = media_with_artwork_for_payload(&media, &config);
-                    if cached_media
-                        .signature_for_reporting(config.report_media, config.report_play_source)
-                        == payload_media
-                            .signature_for_reporting(config.report_media, config.report_play_source)
-                    {
+                    if cached_media.signature_for_reporting(
+                        config.report_media,
+                        include_play_source_for_capture,
+                    ) == payload_media.signature_for_reporting(
+                        config.report_media,
+                        include_play_source_for_capture,
+                    ) {
                         cached_media.cover_url = payload_media.cover_url.clone();
+                        cached_media.source_icon_url = payload_media.source_icon_url.clone();
                     }
                     let payload =
                         build_payload(&config, &snapshot, &payload_media, metadata.clone());
@@ -587,54 +581,37 @@ fn run_reporter_loop(
 
 fn media_with_artwork_for_payload(media: &MediaInfo, config: &ClientConfig) -> MediaInfo {
     let mut payload_media = media.clone();
-    if !config.report_media
-        || !config.report_media_artwork
-        || payload_media.is_empty()
-        || !payload_media.cover_url.trim().is_empty()
-    {
+    let needs_cover = config.report_media
+        && config.report_media_artwork
+        && payload_media.cover_url.trim().is_empty();
+    let needs_source_icon =
+        config.report_playback_app_icon && payload_media.source_icon_url.trim().is_empty();
+    if payload_media.is_empty() || (!needs_cover && !needs_source_icon) {
         return payload_media;
     }
 
+    let include_play_source_for_assets =
+        config.report_play_source || config.report_playback_app_icon;
     let expected_signature =
-        payload_media.signature_for_reporting(config.report_media, config.report_play_source);
+        payload_media.signature_for_reporting(config.report_media, include_play_source_for_assets);
     if expected_signature.is_empty() {
         return payload_media;
     }
 
-    let Ok(artwork_media) = get_now_playing_artwork_for_reporting(config.report_play_source) else {
+    let Ok(artwork_media) = get_now_playing_artwork_for_reporting(
+        include_play_source_for_assets,
+        config.report_playback_app_icon,
+    ) else {
         return payload_media;
     };
-    if artwork_media.signature_for_reporting(config.report_media, config.report_play_source)
+    if artwork_media.signature_for_reporting(config.report_media, include_play_source_for_assets)
         == expected_signature
     {
         payload_media.cover_url = artwork_media.cover_url;
+        payload_media.source_icon_url = artwork_media.source_icon_url;
     }
 
     payload_media
-}
-
-fn payload_for_log(payload: &crate::models::ActivityPayload) -> Option<Value> {
-    let mut value = serde_json::to_value(payload).ok()?;
-    omit_artwork_from_log_payload(&mut value);
-    Some(value)
-}
-
-fn omit_artwork_from_log_payload(value: &mut Value) {
-    match value {
-        Value::Object(map) => {
-            map.remove("coverDataUrl");
-            map.remove("cover_url");
-            for child in map.values_mut() {
-                omit_artwork_from_log_payload(child);
-            }
-        }
-        Value::Array(items) => {
-            for item in items {
-                omit_artwork_from_log_payload(item);
-            }
-        }
-        _ => {}
-    }
 }
 
 pub fn config_is_ready(config: &ClientConfig) -> bool {

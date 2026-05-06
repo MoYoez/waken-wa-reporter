@@ -67,6 +67,18 @@ pub fn default_report_media_artwork() -> bool {
     false
 }
 
+pub fn default_report_playback_app_icon() -> bool {
+    false
+}
+
+pub fn default_report_media_genre() -> bool {
+    false
+}
+
+pub fn default_media_play_source_rule_action() -> String {
+    "block".into()
+}
+
 pub fn default_discord_application_id() -> String {
     String::new()
 }
@@ -120,6 +132,25 @@ pub fn default_client_capabilities() -> ClientCapabilities {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct MediaPlaySourceRule {
+    #[serde(default, alias = "play_source", alias = "match", alias = "value")]
+    pub source: String,
+    #[serde(default = "default_media_play_source_rule_action", alias = "mode")]
+    pub action: String,
+    #[serde(
+        default,
+        alias = "name",
+        alias = "overrideName",
+        alias = "rewrite",
+        alias = "display_name"
+    )]
+    pub display_name: String,
+    #[serde(default)]
+    pub default: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ClientConfig {
     #[serde(default)]
     pub base_url: String,
@@ -153,6 +184,14 @@ pub struct ClientConfig {
     pub report_play_source: bool,
     #[serde(default = "default_report_media_artwork")]
     pub report_media_artwork: bool,
+    #[serde(default = "default_report_playback_app_icon")]
+    pub report_playback_app_icon: bool,
+    #[serde(default = "default_report_media_genre")]
+    pub report_media_genre: bool,
+    #[serde(default)]
+    pub media_play_source_rules: Vec<MediaPlaySourceRule>,
+    #[serde(default)]
+    pub media_play_source_blocklist: Vec<String>,
     #[serde(default)]
     pub discord_enabled: bool,
     #[serde(default = "default_discord_application_id")]
@@ -182,6 +221,10 @@ impl Default for ClientConfig {
             report_media: default_report_media(),
             report_play_source: default_report_play_source(),
             report_media_artwork: default_report_media_artwork(),
+            report_playback_app_icon: default_report_playback_app_icon(),
+            report_media_genre: default_report_media_genre(),
+            media_play_source_rules: Vec::new(),
+            media_play_source_blocklist: Vec::new(),
             discord_enabled: false,
             discord_application_id: default_discord_application_id(),
             discord_source_id: default_discord_source_id(),

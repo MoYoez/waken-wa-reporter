@@ -55,12 +55,14 @@ pub(super) fn get_now_playing() -> Result<MediaInfo, String> {
         album,
         source_app_id,
         cover_url,
+        source_icon_url: String::new(),
         playback_state,
         position_ms,
         duration_ms,
         start_timestamp_ms,
         end_timestamp_ms,
         reported_at_ms: Some(reported_at_ms),
+        genre: String::new(),
     };
 
     if media.is_empty() {

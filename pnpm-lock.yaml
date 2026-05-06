@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@lexical/history':
-        specifier: ^0.38.1
-        version: 0.38.1
       '@lexical/link':
         specifier: ^0.38.1
         version: 0.38.1
@@ -23,9 +20,6 @@ importers:
       '@lexical/selection':
         specifier: ^0.38.1
         version: 0.38.1
-      '@lexical/utils':
-        specifier: ^0.38.1
-        version: 0.38.1
       '@primevue/themes':
         specifier: ^4.5.4
         version: 4.5.4
@@ -35,9 +29,6 @@ importers:
       '@tauri-apps/plugin-autostart':
         specifier: ^2.5.1
         version: 2.5.1
-      '@tauri-apps/plugin-opener':
-        specifier: ^2
-        version: 2.5.3
       lexical:
         specifier: ^0.38.1
         version: 0.38.1
@@ -704,9 +695,6 @@ packages:
 
   '@tauri-apps/plugin-autostart@2.5.1':
     resolution: {integrity: sha512-zS/xx7yzveCcotkA+8TqkI2lysmG2wvQXv2HGAVExITmnFfHAdj1arGsbbfs3o6EktRHf6l34pJxc3YGG2mg7w==}
-
-  '@tauri-apps/plugin-opener@2.5.3':
-    resolution: {integrity: sha512-CCcUltXMOfUEArbf3db3kCE7Ggy1ExBEBl51Ko2ODJ6GDYHRp1nSNlQm5uNCFY5k7/ufaK5Ib3Du/Zir19IYQQ==}
 
   '@ts-morph/common@0.27.0':
     resolution: {integrity: sha512-Wf29UqxWDpc+i61k3oIOzcUfQt79PIT9y/MWfAGlrkjg6lBC1hwDECLXPVJAhWjiGbfBCxZd65F/LIZF3+jeJQ==}
@@ -1690,10 +1678,6 @@ snapshots:
       '@tauri-apps/cli-win32-x64-msvc': 2.10.1
 
   '@tauri-apps/plugin-autostart@2.5.1':
-    dependencies:
-      '@tauri-apps/api': 2.10.1
-
-  '@tauri-apps/plugin-opener@2.5.3':
     dependencies:
       '@tauri-apps/api': 2.10.1
 

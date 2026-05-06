@@ -13,7 +13,14 @@ import {
 import type { ClientConfig } from "@/types";
 
 interface ReporterContentOption {
-  key: "reportForegroundApp" | "reportWindowTitle" | "reportMedia" | "reportPlaySource" | "reportMediaArtwork";
+  key:
+    | "reportForegroundApp"
+    | "reportWindowTitle"
+    | "reportMedia"
+    | "reportPlaySource"
+    | "reportMediaArtwork"
+    | "reportPlaybackAppIcon"
+    | "reportMediaGenre";
   label: string;
   description: string;
   inputId: string;
@@ -97,6 +104,7 @@ function timingIssueMessage(issue?: ReporterTimingIssue) {
 function timingIssueBrief(issue?: ReporterTimingIssue) {
   return issue ? formatReporterTimingIssueBrief(issue, t) : "";
 }
+
 </script>
 
 <template>
@@ -182,5 +190,6 @@ function timingIssueBrief(issue?: ReporterTimingIssue) {
         />
       </div>
     </div>
-  </div>
+
+      </div>
 </template>

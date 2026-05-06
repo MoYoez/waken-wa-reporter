@@ -48,12 +48,6 @@ pub fn get_client_capabilities() -> Result<ApiResult<ClientCapabilities>, String
     app_state::get_client_capabilities()
 }
 
-#[cfg(desktop)]
-#[tauri::command]
-pub fn hide_to_tray(app: AppHandle) -> Result<(), String> {
-    runtime::hide_to_tray(app)
-}
-
 #[tauri::command]
 pub async fn submit_activity_report(
     config: ClientConfig,

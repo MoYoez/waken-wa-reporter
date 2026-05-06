@@ -11,7 +11,7 @@ import type {
   RecentPreset,
 } from "@/types";
 
-export function createDefaultCapabilities(): ClientCapabilities {
+function createDefaultCapabilities(): ClientCapabilities {
   return {
     realtimeReporter: true,
     tray: true,

@@ -104,6 +104,7 @@ pub fn get_now_playing_for_reporting(
 
 pub fn get_now_playing_artwork_for_reporting(
     include_play_source: bool,
+    _include_source_icon: bool,
 ) -> Result<MediaInfo, String> {
     read_now_playing().map(|media| media.into_reporting_subset(true, include_play_source))
 }

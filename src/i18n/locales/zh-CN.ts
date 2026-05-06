@@ -459,6 +459,8 @@ const zhCN = {
       media: { label: "播放内容", description: "正在播放的媒体内容" },
       playSource: { label: "播放来源", description: "媒体来自哪个应用" },
       mediaArtwork: { label: "媒体封面", description: "媒体变化时附带封面图" },
+      playbackAppIcon: { label: "上报播放程序的 ICON", description: "媒体变化时附带播放程序图标" },
+      mediaGenre: { label: "上报流派信息", description: "附带流派信息（例如 inflink-rs 的 NCM-{id}）用于歌曲链接" },
     },
     toggles: {
       enabled: "已开启",

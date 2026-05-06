@@ -7,7 +7,7 @@ use serde_json::{json, Map, Value};
 use crate::{
     backend_locale::BackendLocale,
     http_client::build_blocking_client,
-    models::{effective_device_name, ActivityPayload, ClientConfig},
+    models::{effective_device_name, ActivityPayload, ClientConfig, MediaPlaySourceRule},
     platform::{ForegroundSnapshot, MediaInfo},
 };
 
@@ -92,6 +92,8 @@ pub(super) fn build_payload(
     media: &MediaInfo,
     mut metadata: Map<String, Value>,
 ) -> ActivityPayload {
+    let media = apply_media_source_rules(config, media);
+
     // Only include dc_source when Discord presence is enabled
     if config.discord_enabled && !config.discord_source_id.trim().is_empty() {
         metadata.insert(
@@ -101,7 +103,7 @@ pub(super) fn build_payload(
     }
 
     if config.report_media {
-        if let Some(media_map) = media.as_metadata_map() {
+        if let Some(media_map) = media.as_metadata_map(config.report_media_genre) {
             metadata.insert("media".into(), Value::Object(media_map));
         }
     }
@@ -136,6 +138,70 @@ pub(super) fn build_payload(
         push_mode: Some(config.push_mode.trim().to_string()).filter(|value| !value.is_empty()),
         metadata: (!metadata.is_empty()).then_some(Value::Object(metadata)),
     }
+}
+
+fn apply_media_source_rules(config: &ClientConfig, media: &MediaInfo) -> MediaInfo {
+    let source = media.source_app_id.trim();
+    if source.is_empty() {
+        return media.clone();
+    }
+
+    if let Some(rule_match) = find_media_source_rule(config, source) {
+        if rule_match.action == "rename" {
+            if rule_match.display_name.is_empty() {
+                return media.clone();
+            }
+            let mut renamed = media.clone();
+            renamed.source_app_id = rule_match.display_name;
+            return renamed;
+        }
+
+        return MediaInfo::default();
+    }
+
+    media.clone()
+}
+
+struct MediaSourceRuleMatch {
+    action: &'static str,
+    display_name: String,
+}
+
+fn find_media_source_rule(config: &ClientConfig, source: &str) -> Option<MediaSourceRuleMatch> {
+    let normalized_source = normalize_media_source(source);
+    if let Some(rule) = config
+        .media_play_source_rules
+        .iter()
+        .find(|rule| normalize_media_source(&rule.source) == normalized_source)
+    {
+        return Some(MediaSourceRuleMatch {
+            action: media_source_rule_action(rule),
+            display_name: rule.display_name.trim().to_string(),
+        });
+    }
+
+    config
+        .media_play_source_blocklist
+        .iter()
+        .any(|legacy_source| normalize_media_source(legacy_source) == normalized_source)
+        .then(|| MediaSourceRuleMatch {
+            action: "block",
+            display_name: String::new(),
+        })
+}
+
+fn media_source_rule_action(rule: &MediaPlaySourceRule) -> &'static str {
+    if rule.action.trim().eq_ignore_ascii_case("rename")
+        || rule.action.trim().eq_ignore_ascii_case("rewrite")
+    {
+        "rename"
+    } else {
+        "block"
+    }
+}
+
+fn normalize_media_source(value: &str) -> String {
+    value.trim().to_ascii_lowercase()
 }
 
 pub(super) fn post_activity_blocking(
@@ -216,4 +282,57 @@ pub(super) fn post_activity_blocking(
             .map(str::to_string),
         response_text: text,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn media_with_genre() -> MediaInfo {
+        MediaInfo {
+            title: "Song".into(),
+            artist: "Artist".into(),
+            genre: "NCM-123".into(),
+            ..MediaInfo::default()
+        }
+    }
+
+    fn snapshot() -> ForegroundSnapshot {
+        ForegroundSnapshot {
+            process_name: "player.exe".into(),
+            process_title: "Player".into(),
+        }
+    }
+
+    fn payload_media(config: &ClientConfig) -> Value {
+        build_payload(config, &snapshot(), &media_with_genre(), Map::new())
+            .metadata
+            .and_then(|metadata| metadata.get("media").cloned())
+            .expect("media metadata")
+    }
+
+    #[test]
+    fn omits_media_genre_unless_enabled() {
+        let config = ClientConfig {
+            report_media: true,
+            report_media_genre: false,
+            ..ClientConfig::default()
+        };
+
+        assert!(payload_media(&config).get("genre").is_none());
+    }
+
+    #[test]
+    fn includes_media_genre_when_enabled() {
+        let config = ClientConfig {
+            report_media: true,
+            report_media_genre: true,
+            ..ClientConfig::default()
+        };
+
+        assert_eq!(
+            payload_media(&config).get("genre").and_then(Value::as_str),
+            Some("NCM-123"),
+        );
+    }
 }

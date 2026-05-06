@@ -27,12 +27,16 @@ pub struct MediaInfo {
     pub source_app_id: String,
     /// URL to the cover art image (optional)
     pub cover_url: String,
+    /// Data URL for the playback source app icon (optional)
+    pub source_icon_url: String,
     pub playback_state: String,
     pub position_ms: Option<i64>,
     pub duration_ms: Option<i64>,
     pub start_timestamp_ms: Option<i64>,
     pub end_timestamp_ms: Option<i64>,
     pub reported_at_ms: Option<i64>,
+    /// Genre / category info (e.g. NCM-{id} from inflink-rs)
+    pub genre: String,
 }
 
 impl MediaInfo {
@@ -89,15 +93,18 @@ impl MediaInfo {
             self.artist.clear();
             self.album.clear();
             self.cover_url.clear();
+            self.source_icon_url.clear();
             self.playback_state.clear();
             self.position_ms = None;
             self.duration_ms = None;
             self.start_timestamp_ms = None;
             self.end_timestamp_ms = None;
             self.reported_at_ms = None;
+            self.genre.clear();
         }
         if !include_play_source {
             self.source_app_id.clear();
+            self.source_icon_url.clear();
         }
 
         if self.is_empty() && !self.has_play_source() {
@@ -107,7 +114,7 @@ impl MediaInfo {
         self
     }
 
-    pub fn as_metadata_map(&self) -> Option<Map<String, Value>> {
+    pub fn as_metadata_map(&self, include_genre: bool) -> Option<Map<String, Value>> {
         if self.is_empty() {
             return None;
         }
@@ -136,6 +143,12 @@ impl MediaInfo {
                 Value::String(self.cover_url.trim().to_string()),
             );
         }
+        if !self.source_icon_url.trim().is_empty() {
+            map.insert(
+                "appIconDataUrl".into(),
+                Value::String(self.source_icon_url.trim().to_string()),
+            );
+        }
         let playback_state = self.effective_playback_state();
         if !playback_state.is_empty() {
             map.insert("status".into(), Value::String(playback_state));
@@ -148,6 +161,12 @@ impl MediaInfo {
         }
         if let Some(reported_at_ms) = self.reported_at_ms.filter(|value| *value > 0) {
             map.insert("reportedAt".into(), Value::Number(reported_at_ms.into()));
+        }
+        if include_genre && !self.genre.trim().is_empty() {
+            map.insert(
+                "genre".into(),
+                Value::String(self.genre.trim().to_string()),
+            );
         }
         if self.start_timestamp_ms.is_some() || self.end_timestamp_ms.is_some() {
             let mut timestamps = Map::new();

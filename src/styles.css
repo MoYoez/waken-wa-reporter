@@ -35,7 +35,7 @@
     radial-gradient(circle at top left, rgba(111, 183, 255, 0.2), transparent 30%),
     radial-gradient(circle at top right, rgba(145, 202, 255, 0.16), transparent 24%),
     linear-gradient(180deg, #f9fcff 0%, #f2f8ff 52%, #fbfdff 100%);
-  font-family: "Segoe UI Variable Display", "PingFang SC", "Microsoft YaHei UI", sans-serif;
+  font-family: "Noto Sans SC", sans-serif;
   line-height: 1.5;
   font-weight: 400;
   font-synthesis: none;
@@ -120,7 +120,6 @@ select {
   line-height: 1.05;
 }
 
-.sidebar-copy,
 .hero-copy,
 .sidebar-footer small {
   color: rgba(91, 120, 151, 0.78);
@@ -324,42 +323,6 @@ select {
 .overview-item strong {
   color: var(--ink);
   word-break: break-word;
-}
-
-.module-switcher {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.module-switcher-item {
-  border: 1px solid var(--line);
-  background: rgba(250, 252, 255, 0.86);
-  border-radius: 22px;
-  padding: 18px;
-  text-align: left;
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  cursor: pointer;
-  color: inherit;
-}
-
-.module-switcher-item.active {
-  border-color: rgba(45, 155, 240, 0.3);
-  background: linear-gradient(135deg, rgba(245, 251, 255, 0.98), rgba(227, 241, 255, 0.92));
-}
-
-.module-switcher-item i {
-  color: var(--sky-600);
-  margin-top: 4px;
-}
-
-.module-switcher-item span {
-  display: block;
-  margin-top: 4px;
-  color: var(--ink-soft);
-  font-size: 0.92rem;
 }
 
 .onboarding-dialog {
@@ -871,27 +834,6 @@ select {
   font-weight: 600;
 }
 
-.toggle-field {
-  align-content: start;
-}
-
-.charging-field {
-  align-content: end;
-}
-
-.charging-row {
-  min-height: 42px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-}
-
-.charging-row label {
-  color: var(--ink-soft);
-  cursor: pointer;
-}
-
 .field-help {
   color: var(--ink-muted);
   line-height: 1.7;
@@ -1090,12 +1032,6 @@ select {
   align-items: flex-start;
 }
 
-.self-test-guidance {
-  margin: 0;
-  padding-left: 18px;
-  color: var(--ink-soft);
-}
-
 .preset-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -1113,46 +1049,19 @@ select {
   cursor: pointer;
 }
 
-.preset-card strong,
-.feed-item strong {
+.preset-card strong {
   color: var(--ink);
 }
 
 .preset-card span,
-.feed-item span,
 .entry-content {
   color: var(--ink-soft);
 }
 
 .preset-card small,
-.feed-item small,
 .asset-preview small,
 .entry-header small {
   color: var(--ink-muted);
-}
-
-.feed-columns {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-}
-
-.feed-columns h4 {
-  margin: 0 0 12px;
-}
-
-.feed-list {
-  display: grid;
-  gap: 12px;
-}
-
-.feed-item {
-  padding: 14px 16px;
-  border-radius: 20px;
-  background: rgba(246, 250, 255, 0.92);
-  border: 1px solid var(--line-soft);
-  display: grid;
-  gap: 4px;
 }
 
 .inspiration-upload {
@@ -1435,70 +1344,6 @@ select {
   border-radius: 20px;
 }
 
-.guide-layout {
-  display: grid;
-  gap: 22px;
-}
-
-.guide-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.8fr);
-  gap: 20px;
-  align-items: stretch;
-}
-
-.guide-copy,
-.guide-status {
-  display: grid;
-  gap: 14px;
-}
-
-.guide-lead {
-  margin: 0;
-  font-size: 1.05rem;
-  line-height: 1.8;
-  color: var(--ink-soft);
-  max-width: 52rem;
-}
-
-.guide-status-card {
-  border-radius: 18px;
-  padding: 14px 16px;
-  background: rgba(238, 246, 255, 0.92);
-  border: 1px solid var(--line-soft);
-  display: grid;
-  gap: 6px;
-}
-
-.guide-status-card span {
-  color: var(--ink-muted);
-  font-size: 0.88rem;
-}
-
-.guide-status-card strong {
-  color: var(--ink);
-  word-break: break-word;
-}
-
-.guide-steps {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
-}
-
-.guide-step-card p,
-.guide-notes p {
-  margin: 0;
-  color: var(--ink-soft);
-  line-height: 1.75;
-}
-
-.guide-notes {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 24px;
-}
-
 .p-inputtext,
 .p-password,
 .p-select,
@@ -1511,15 +1356,6 @@ select {
   .app-main,
   .app-sidebar {
     padding: 22px 18px;
-  }
-
-  .guide-hero {
-    grid-template-columns: 1fr;
-  }
-
-  .guide-notes {
-    grid-template-columns: 1fr;
-    gap: 16px;
   }
 }
 
@@ -1564,11 +1400,7 @@ select {
   }
 
   .overview-summary,
-  .module-switcher,
-  .self-test-grid,
-  .guide-hero,
-  .guide-steps,
-  .guide-notes {
+  .self-test-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -1611,7 +1443,6 @@ select {
   }
 
   .panel-grid,
-  .feed-columns,
   .compact-toggle-grid {
     grid-template-columns: 1fr;
   }
@@ -1768,8 +1599,7 @@ select {
   .entry-card,
   .log-item,
   .self-test-card,
-  .preset-card,
-  .feed-item {
+  .preset-card {
     padding: 14px;
   }
 

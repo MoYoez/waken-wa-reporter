@@ -1,8 +1,7 @@
 export type { LexicalNode, LexicalRoot } from "@/lib/inspirationRichText/types";
 
 export { appendParagraphTextToLexical, lexicalTextContent } from "@/lib/inspirationRichText/lexical";
-export { parseLexicalJson } from "@/lib/inspirationRichText/shared";
-export { renderMarkdownBlock, sanitizeEntryContent, stripMarkdownImages } from "@/lib/inspirationRichText/markdown";
+export { sanitizeEntryContent } from "@/lib/inspirationRichText/markdown";
 
 import { lexicalTextContent, renderLexicalNode } from "@/lib/inspirationRichText/lexical";
 import { renderMarkdownBlock, previewMarkdownContent } from "@/lib/inspirationRichText/markdown";

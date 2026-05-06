@@ -172,12 +172,14 @@ fn get_now_playing_via_nowplaying_cli() -> Result<MediaInfo, NowPlayingCliError>
         album,
         source_app_id,
         cover_url,
+        source_icon_url: String::new(),
         playback_state,
         position_ms,
         duration_ms,
         start_timestamp_ms,
         end_timestamp_ms,
         reported_at_ms: Some(reported_at_ms),
+        genre: String::new(),
     })
 }
 

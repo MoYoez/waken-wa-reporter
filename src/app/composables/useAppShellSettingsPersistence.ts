@@ -7,6 +7,7 @@ import { readDeviceName } from "@/lib/deviceInfo";
 import {
   AppStateSaveError,
   AppStateSaveTransportError,
+  defaultClientConfig,
   saveAppState,
 } from "@/lib/persistence";
 import { setI18nLocale } from "@/i18n";
@@ -47,12 +48,40 @@ class SettingsSaveStageError extends Error {
 
 export function useAppShellSettingsPersistence(options: UseAppShellPersistenceOptions) {
   const normalizeConfigByCapabilities: NormalizeConfigByCapabilities = (raw: ClientConfig) => {
-    const normalizedDevice = raw.device.trim();
-    const launchOnStartup = options.autostartSupported.value ? raw.launchOnStartup : false;
+    const fallback = defaultClientConfig();
+    const legacyBlockRules = Array.isArray(raw.mediaPlaySourceBlocklist)
+      ? raw.mediaPlaySourceBlocklist
+          .map((source) => String(source ?? "").trim())
+          .filter(Boolean)
+          .map((source) => ({ source, action: "block" as const, default: true }))
+      : [];
+    const explicitRules = Array.isArray(raw.mediaPlaySourceRules)
+      ? raw.mediaPlaySourceRules
+          .map((rule) => ({
+            source: String(rule.source ?? "").trim(),
+            action: rule.action === "rename" ? "rename" as const : "block" as const,
+            displayName: String(rule.displayName ?? "").trim(),
+            default: rule.default ?? true,
+          }))
+          .filter((rule) => rule.source)
+      : [];
+    const mediaPlaySourceRules = explicitRules.length ? explicitRules : legacyBlockRules;
+    const normalizedBase = {
+      ...fallback,
+      ...raw,
+      reportPlaybackAppIcon: Boolean(raw.reportPlaybackAppIcon ?? fallback.reportPlaybackAppIcon),
+      reportMediaGenre: Boolean(raw.reportMediaGenre ?? fallback.reportMediaGenre),
+      mediaPlaySourceRules,
+      mediaPlaySourceBlocklist: mediaPlaySourceRules
+        .filter((rule) => (rule.action ?? "block") === "block")
+        .map((rule) => rule.source),
+    };
+    const normalizedDevice = normalizedBase.device.trim();
+    const launchOnStartup = options.autostartSupported.value ? normalizedBase.launchOnStartup : false;
 
     if (options.reporterSupported.value) {
       return {
-        ...raw,
+        ...normalizedBase,
         device: normalizedDevice,
         deviceType: "desktop",
         launchOnStartup,
@@ -60,7 +89,7 @@ export function useAppShellSettingsPersistence(options: UseAppShellPersistenceOp
     }
 
     return {
-      ...raw,
+      ...normalizedBase,
       device: normalizedDevice,
       deviceType: options.inferMobileDeviceType(),
       pushMode: "active",

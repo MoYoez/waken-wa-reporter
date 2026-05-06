@@ -6,12 +6,7 @@ use crate::{
     discord_presence::DiscordPresenceRuntime,
     models::{ApiResult, ClientConfig, DiscordPresenceSnapshot, RealtimeReporterSnapshot},
     realtime_reporter::{snapshot_result, ReporterRuntime},
-    tray,
 };
-
-pub fn hide_to_tray(app: AppHandle) -> Result<(), String> {
-    tray::hide_main_window(&app)
-}
 
 pub fn start_realtime_reporter(
     app: AppHandle,

@@ -1,8 +1,8 @@
 import type { ActivityFeedItem, InspirationEntry } from "@/types";
 
-export const MAX_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024;
+const MAX_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024;
 export const ENTRY_PAGE_SIZE = 10;
-export const SUPPORTED_IMAGE_TYPES = new Set([
+const SUPPORTED_IMAGE_TYPES = new Set([
   "image/png",
   "image/jpeg",
   "image/webp",

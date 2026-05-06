@@ -63,6 +63,18 @@ export function useConnectionPanel(
       description: t("connectionPanel.reportContent.mediaArtwork.description"),
       inputId: "report-media-artwork",
     },
+    {
+      key: "reportPlaybackAppIcon" as const,
+      label: t("connectionPanel.reportContent.playbackAppIcon.label"),
+      description: t("connectionPanel.reportContent.playbackAppIcon.description"),
+      inputId: "report-playback-app-icon",
+    },
+    {
+      key: "reportMediaGenre" as const,
+      label: t("connectionPanel.reportContent.mediaGenre.label"),
+      description: t("connectionPanel.reportContent.mediaGenre.description"),
+      inputId: "report-media-genre",
+    },
   ]);
 
   function updateField<K extends keyof ClientConfig>(key: K, value: ClientConfig[K]) {

@@ -27,10 +27,23 @@ export interface ClientConfig {
   reportMedia: boolean;
   reportPlaySource: boolean;
   reportMediaArtwork: boolean;
+  reportPlaybackAppIcon: boolean;
+  reportMediaGenre: boolean;
+  mediaPlaySourceRules: MediaPlaySourceRule[];
+  mediaPlaySourceBlocklist?: string[];
   discordEnabled: boolean;
   discordApplicationId: string;
   discordSourceId: string;
   launchOnStartup: boolean;
+}
+
+export type MediaPlaySourceRuleAction = "block" | "rename";
+
+export interface MediaPlaySourceRule {
+  source: string;
+  action?: MediaPlaySourceRuleAction;
+  displayName?: string;
+  default?: boolean;
 }
 
 export interface ActivityMedia {
@@ -40,6 +53,8 @@ export interface ActivityMedia {
   album?: string;
   coverDataUrl?: string;
   coverUrl?: string;
+  appIconDataUrl?: string;
+  appIconUrl?: string;
   status?: "playing" | "paused" | "stopped";
   isPlaying?: boolean;
   isPaused?: boolean;

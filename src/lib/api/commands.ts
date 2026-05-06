@@ -89,10 +89,6 @@ export async function parseImportedIntegrationConfig(
   return result.data;
 }
 
-export async function hideToTray(): Promise<void> {
-  await invoke("hide_to_tray");
-}
-
 export async function startRealtimeReporter(
   config: ClientConfig,
 ): Promise<ApiResult<RealtimeReporterSnapshot>> {

@@ -25,6 +25,7 @@ pub fn get_now_playing_for_reporting(
 
 pub fn get_now_playing_artwork_for_reporting(
     _include_play_source: bool,
+    _include_source_icon: bool,
 ) -> Result<MediaInfo, String> {
     Ok(MediaInfo::default())
 }

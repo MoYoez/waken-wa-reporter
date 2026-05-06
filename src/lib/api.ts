@@ -5,7 +5,6 @@ export {
   getDiscordPresenceSnapshot,
   getPublicActivityFeed,
   getRealtimeReporterSnapshot,
-  hideToTray,
   listInspirationEntries,
   parseImportedIntegrationConfig,
   probeConnectivity,
