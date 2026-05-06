@@ -323,7 +323,13 @@ fn get_now_playing_native(
 
         (title, artist, album, cover_url, genre)
     } else {
-        (String::new(), String::new(), String::new(), String::new(), String::new())
+        (
+            String::new(),
+            String::new(),
+            String::new(),
+            String::new(),
+            String::new(),
+        )
     };
     let source_icon_url = if include_play_source && include_source_icon {
         read_source_app_icon_data_url(&source_app_id).unwrap_or_default()
@@ -508,7 +514,9 @@ fn read_media_genre(
     let genres = properties
         .Genres()
         .map_err(|e| format!("请求媒体流派失败：{e}"))?;
-    let size = genres.Size().map_err(|e| format!("获取流派数量失败：{e}"))?;
+    let size = genres
+        .Size()
+        .map_err(|e| format!("获取流派数量失败：{e}"))?;
     if size == 0 {
         return Ok(String::new());
     }

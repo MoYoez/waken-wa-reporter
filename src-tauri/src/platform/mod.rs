@@ -163,10 +163,7 @@ impl MediaInfo {
             map.insert("reportedAt".into(), Value::Number(reported_at_ms.into()));
         }
         if include_genre && !self.genre.trim().is_empty() {
-            map.insert(
-                "genre".into(),
-                Value::String(self.genre.trim().to_string()),
-            );
+            map.insert("genre".into(), Value::String(self.genre.trim().to_string()));
         }
         if self.start_timestamp_ms.is_some() || self.end_timestamp_ms.is_some() {
             let mut timestamps = Map::new();
