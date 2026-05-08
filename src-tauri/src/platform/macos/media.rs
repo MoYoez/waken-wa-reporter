@@ -4,8 +4,8 @@ use serde::Deserialize;
 use crate::platform::{media_timestamps_from_position, now_unix_millis_i64, MediaInfo};
 
 use super::{
+    bridge::read_bundle_app_icon_data_url,
     command::{command_output_with_timeout, CommandError},
-    read_bundle_app_icon_data_url,
 };
 
 const PERL_BINARY: &str = "/usr/bin/perl";

@@ -148,7 +148,7 @@ fn make_media_probe(info: &MediaInfo) -> PlatformProbeResult {
     )
 }
 
-fn macos_guidance(error: &str, probe: &str) -> Vec<ProbeTextSpec> {
+fn macos_guidance(_error: &str, probe: &str) -> Vec<ProbeTextSpec> {
     let mut guidance = Vec::new();
 
     if probe == "foreground" {
