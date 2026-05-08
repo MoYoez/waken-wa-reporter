@@ -74,11 +74,16 @@ pub fn run() {
             {
                 #[cfg(target_os = "macos")]
                 {
-                    if let Ok(resource_root) = app
-                        .path()
-                        .resolve("mediaremote-adapter", tauri::path::BaseDirectory::Resource)
-                    {
-                        platform::set_macos_mediaremote_adapter_root(resource_root);
+                    for resource_path in ["resources/mediaremote-adapter", "mediaremote-adapter"] {
+                        if let Ok(resource_root) = app
+                            .path()
+                            .resolve(resource_path, tauri::path::BaseDirectory::Resource)
+                        {
+                            if resource_root.exists() {
+                                platform::set_macos_mediaremote_adapter_root(resource_root);
+                                break;
+                            }
+                        }
                     }
                 }
 
