@@ -93,7 +93,8 @@ const enUS = {
       macosWindowPermissionRequired: "Window-title capture on macOS requires Accessibility permission.",
       macosWindowPermissionSettings: "Use the Settings button, or enable the app in System Settings.",
       macosWindowTitleUnstable: "Some apps still do not expose a stable title.",
-      macosInstallNowPlayingCli: "Install nowplaying-cli first: `brew install nowplaying-cli`.",
+      macosMediaRemoteAdapter:
+        "The macOS now-playing adapter is prepared automatically during `pnpm tauri dev/build`; rebuild if it is missing.",
       macosMediaEmpty: "If nothing is playing, the client now returns an empty result.",
       macosCheckPermissions: "If this looks permission-related, check Accessibility and Automation.",
       playMediaThenRetry: "Play media first, then try again.",

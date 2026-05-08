@@ -2,7 +2,7 @@ use std::process::{Command, Output, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
-const COMMAND_TIMEOUT: Duration = Duration::from_millis(1500);
+const COMMAND_TIMEOUT: Duration = Duration::from_millis(5000);
 const COMMAND_POLL_STEP: Duration = Duration::from_millis(100);
 
 pub(super) enum CommandError {

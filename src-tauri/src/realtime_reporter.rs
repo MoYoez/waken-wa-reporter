@@ -586,7 +586,10 @@ fn media_with_artwork_for_payload(media: &MediaInfo, config: &ClientConfig) -> M
         && payload_media.cover_url.trim().is_empty();
     let needs_source_icon =
         config.report_playback_app_icon && payload_media.source_icon_url.trim().is_empty();
-    if payload_media.is_empty() || (!needs_cover && !needs_source_icon) {
+    let has_play_source = !payload_media.source_app_id.trim().is_empty();
+    if (!needs_cover && !needs_source_icon)
+        || (payload_media.is_empty() && !(needs_source_icon && has_play_source))
+    {
         return payload_media;
     }
 

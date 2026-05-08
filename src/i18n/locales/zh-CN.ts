@@ -93,7 +93,8 @@ const zhCN = {
       macosWindowPermissionRequired: "macOS 窗口标题采集依赖“辅助功能”授权。",
       macosWindowPermissionSettings: "可在设置页申请，或到系统设置手动开启。",
       macosWindowTitleUnstable: "部分应用即使已授权，也不会返回稳定标题。",
-      macosInstallNowPlayingCli: "请先安装 nowplaying-cli：`brew install nowplaying-cli`。",
+      macosMediaRemoteAdapter:
+        "macOS 的正在播放适配器会随 `pnpm tauri dev/build` 自动准备；如仍失败，请重新打包应用。",
       macosMediaEmpty: "当前没有播放时会直接返回空结果。",
       macosCheckPermissions: "如是权限问题，请检查“辅助功能”和“自动化”授权。",
       playMediaThenRetry: "先播放媒体再重试。",

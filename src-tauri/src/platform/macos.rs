@@ -15,7 +15,10 @@ use crate::models::PlatformSelfTestResult;
 use bridge::{
     accessibility_permission_granted, read_frontmost_app_name, read_frontmost_window_title,
 };
-use media::get_now_playing as read_now_playing;
+use media::{
+    get_now_playing as read_now_playing,
+    get_now_playing_with_artwork as read_now_playing_with_artwork,
+};
 
 pub fn get_foreground_snapshot() -> Result<ForegroundSnapshot, String> {
     let process_name = read_frontmost_app_name()
@@ -76,7 +79,8 @@ pub fn get_now_playing_artwork_for_reporting(
     include_play_source: bool,
     _include_source_icon: bool,
 ) -> Result<MediaInfo, String> {
-    read_now_playing().map(|media| media.into_reporting_subset(true, include_play_source))
+    read_now_playing_with_artwork(_include_source_icon)
+        .map(|media| media.into_reporting_subset(true, include_play_source))
 }
 
 pub fn run_self_test() -> PlatformSelfTestResult {

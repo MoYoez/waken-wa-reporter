@@ -14,8 +14,6 @@ fn main() {
         println!("cargo:rustc-link-lib=framework=Foundation");
         println!("cargo:rustc-link-lib=framework=AppKit");
         println!("cargo:rustc-link-lib=framework=ApplicationServices");
-        println!("cargo:rustc-link-search=framework=/System/Library/PrivateFrameworks");
-        println!("cargo:rustc-link-lib=framework=MediaRemote");
     }
 
     tauri_build::build()

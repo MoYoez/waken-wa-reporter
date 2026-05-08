@@ -72,6 +72,16 @@ pub fn run() {
         .setup(|app| {
             #[cfg(desktop)]
             {
+                #[cfg(target_os = "macos")]
+                {
+                    if let Ok(resource_root) = app
+                        .path()
+                        .resolve("mediaremote-adapter", tauri::path::BaseDirectory::Resource)
+                    {
+                        platform::set_macos_mediaremote_adapter_root(resource_root);
+                    }
+                }
+
                 let started_from_autostart =
                     has_autostart_arg(&std::env::args().collect::<Vec<_>>());
 

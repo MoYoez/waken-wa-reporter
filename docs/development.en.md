@@ -11,10 +11,12 @@
 - [pnpm](https://pnpm.io/) 9+
 - [Rust](https://www.rust-lang.org/tools/install) stable
 
-On macOS, install this extra dependency if you want "Now Playing" media capture:
+On macOS, the "Now Playing" adapter is prepared automatically during `pnpm tauri dev` / `pnpm tauri build`, so there is no manual `nowplaying-cli` install step.
+
+If you ever need to refresh the bundled adapter manually, run:
 
 ```bash
-brew install nowplaying-cli
+pnpm prepare:mediaremote-adapter
 ```
 
 On Linux, these packages are recommended:

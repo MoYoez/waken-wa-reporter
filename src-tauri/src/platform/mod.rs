@@ -8,10 +8,15 @@ mod stub;
 mod windows;
 
 use std::time::{SystemTime, UNIX_EPOCH};
+#[cfg(target_os = "macos")]
+use std::{path::PathBuf, sync::OnceLock};
 
 use serde_json::{Map, Value};
 
 use crate::models::{LocalizedTextEntry, PlatformProbeResult, PlatformSelfTestResult};
+
+#[cfg(target_os = "macos")]
+static MACOS_MEDIAREMOTE_ADAPTER_ROOT: OnceLock<PathBuf> = OnceLock::new();
 
 #[derive(Clone, Debug, Default)]
 pub struct ForegroundSnapshot {
@@ -37,6 +42,16 @@ pub struct MediaInfo {
     pub reported_at_ms: Option<i64>,
     /// Genre / category info (e.g. NCM-{id} from inflink-rs)
     pub genre: String,
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn set_macos_mediaremote_adapter_root(path: PathBuf) {
+    let _ = MACOS_MEDIAREMOTE_ADAPTER_ROOT.set(path);
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn macos_mediaremote_adapter_root() -> Option<&'static PathBuf> {
+    MACOS_MEDIAREMOTE_ADAPTER_ROOT.get()
 }
 
 impl MediaInfo {

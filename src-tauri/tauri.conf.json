@@ -26,6 +26,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "resources": [
+      "resources/mediaremote-adapter"
+    ],
     "macOS": {
       "dmg": {
         "windowSize": {

@@ -149,7 +149,6 @@ fn make_media_probe(info: &MediaInfo) -> PlatformProbeResult {
 }
 
 fn macos_guidance(error: &str, probe: &str) -> Vec<ProbeTextSpec> {
-    let lower = error.to_lowercase();
     let mut guidance = Vec::new();
 
     if probe == "foreground" {
@@ -191,11 +190,11 @@ fn macos_guidance(error: &str, probe: &str) -> Vec<ProbeTextSpec> {
         ));
     }
 
-    if probe == "media" || lower.contains("nowplaying-cli") {
+    if probe == "media" {
         guidance.push(localized_text(
-            "platformSelfTest.guidance.macosInstallNowPlayingCli",
+            "platformSelfTest.guidance.macosMediaRemoteAdapter",
             None,
-            "请先安装 nowplaying-cli：`brew install nowplaying-cli`。",
+            "macOS 的正在播放适配器会随 `pnpm tauri dev/build` 自动准备；如仍失败，请重新打包应用。",
         ));
         guidance.push(localized_text(
             "platformSelfTest.guidance.macosMediaEmpty",

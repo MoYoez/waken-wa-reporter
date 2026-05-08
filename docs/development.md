@@ -11,10 +11,12 @@
 - [pnpm](https://pnpm.io/) 9+
 - [Rust](https://www.rust-lang.org/tools/install) stable
 
-macOS 如需读取“正在播放”媒体信息，额外安装：
+macOS 的“正在播放”适配器会在 `pnpm tauri dev` / `pnpm tauri build` 时自动准备，无需手动安装 `nowplaying-cli`。
+
+如果需要手动刷新资源，可以运行：
 
 ```bash
-brew install nowplaying-cli
+pnpm prepare:mediaremote-adapter
 ```
 
 Linux 建议安装：
