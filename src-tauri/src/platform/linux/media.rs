@@ -168,7 +168,12 @@ fn detect_image_content_type(bytes: &[u8]) -> String {
         "image/gif".to_string()
     } else if bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
         "image/webp".to_string()
-    } else if bytes.len() >= 4 && bytes[0] == 0x00 && bytes[1] == 0x00 && (bytes[2] == 0x01 || bytes[2] == 0x02) && bytes[3] == 0x00 {
+    } else if bytes.len() >= 4
+        && bytes[0] == 0x00
+        && bytes[1] == 0x00
+        && (bytes[2] == 0x01 || bytes[2] == 0x02)
+        && bytes[3] == 0x00
+    {
         "image/x-icon".to_string()
     } else if looks_like_svg(bytes) {
         "image/svg+xml".to_string()
