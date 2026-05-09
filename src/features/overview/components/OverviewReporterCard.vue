@@ -23,11 +23,6 @@ defineEmits<{
 
 const currentProcessName = computed(() => props.snapshot.currentActivity?.processName || t("overview.common.none"));
 const currentWindowTitle = computed(() => props.snapshot.currentActivity?.processTitle || t("overview.common.none"));
-const currentPlaySource = computed(
-  () =>
-    String(props.snapshot.currentActivity?.metadata?.play_source_name ?? props.snapshot.currentActivity?.metadata?.play_source ?? "").trim()
-    || t("overview.common.none"),
-);
 </script>
 
 <template>
@@ -52,10 +47,6 @@ const currentPlaySource = computed(
         <div class="overview-item">
           <span>{{ t("overview.reporter.windowTitle") }}</span>
           <strong>{{ currentWindowTitle }}</strong>
-        </div>
-        <div class="overview-item">
-          <span>{{ t("overview.reporter.playSource") }}</span>
-          <strong>{{ currentPlaySource }}</strong>
         </div>
         <div class="overview-item">
           <span>{{ t("overview.reporter.pollInterval") }}</span>
