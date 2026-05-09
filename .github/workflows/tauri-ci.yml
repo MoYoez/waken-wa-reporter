@@ -158,6 +158,17 @@ jobs:
         run: |
           npm install --global pnpm@${{ env.PNPM_VERSION }}
 
+      - name: install-macos-dmg-build-deps
+        if: matrix.os == 'macos-latest'
+        run: |
+          if ! brew list coreutils >/dev/null 2>&1; then
+            brew install coreutils
+          fi
+
+          COREUTILS_BIN="$(brew --prefix coreutils)/libexec/gnubin"
+          echo "$COREUTILS_BIN" >> "$GITHUB_PATH"
+          "$COREUTILS_BIN/du" --version | head -n 1
+
       - name: install-rust-toolchain
         uses: dtolnay/rust-toolchain@stable
 
