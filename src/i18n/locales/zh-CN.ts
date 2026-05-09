@@ -259,6 +259,7 @@ const zhCN = {
       title: "管理同步状态",
       runtimeStatus: "运行状态",
       currentProcess: "当前进程",
+      playSource: "播放来源",
       lastHeartbeat: "最近心跳",
       lastError: "最近错误",
       start: "开启后台同步",
@@ -566,6 +567,7 @@ const zhCN = {
     summary: {
       currentProcess: "当前进程",
       windowTitle: "窗口标题",
+      playSource: "播放来源",
       lastHeartbeat: "最近心跳",
       logTotal: "日志总数",
       none: "暂无",

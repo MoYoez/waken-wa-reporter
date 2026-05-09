@@ -2,16 +2,17 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     ffi::c_void,
+    fs,
     mem::size_of,
-    path::Path,
+    path::{Path, PathBuf},
     sync::{Mutex, OnceLock},
 };
 
 use serde_json::json;
 
 use super::{
-    build_self_test_result, localized_text, make_probe, media_timestamps_from_position,
-    now_unix_millis_i64, ForegroundSnapshot, MediaInfo,
+    build_self_test_result, image_bytes_to_png_data_url, localized_text, make_probe,
+    media_timestamps_from_position, now_unix_millis_i64, ForegroundSnapshot, MediaInfo,
 };
 use crate::models::PlatformSelfTestResult;
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
@@ -20,7 +21,7 @@ use image::{codecs::png::PngEncoder, ColorType, ImageEncoder};
 
 #[cfg(target_os = "windows")]
 use windows::{
-    core::{HRESULT, HSTRING, PCWSTR, PWSTR},
+    core::{Interface, GUID, HRESULT, HSTRING, PCWSTR, PWSTR},
     ApplicationModel::AppInfo,
     Foundation::Size,
     Media::Control::{
@@ -30,13 +31,18 @@ use windows::{
     },
     Storage::Streams::{DataReader, RandomAccessStreamReference},
     Win32::{
-        Foundation::{CloseHandle, MAX_PATH},
+        Foundation::{CloseHandle, MAX_PATH, PROPERTYKEY},
         Graphics::Gdi::{
             CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, GetDC, ReleaseDC,
             SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HGDIOBJ,
         },
+        Storage::FileSystem::{GetFileVersionInfoSizeW, GetFileVersionInfoW, VerQueryValueW},
         System::{
-            Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED},
+            Com::StructuredStorage::{PropVariantClear, PropVariantToStringAlloc, PROPVARIANT},
+            Com::{
+                CoCreateInstance, CoInitializeEx, CoTaskMemFree, CoUninitialize, IPersistFile,
+                CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED, STGM_READ,
+            },
             Diagnostics::ToolHelp::{
                 CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
                 TH32CS_SNAPPROCESS,
@@ -47,7 +53,12 @@ use windows::{
             },
         },
         UI::{
-            Shell::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON},
+            Shell::PropertiesSystem::IPropertyStore,
+            Shell::{
+                FOLDERID_CommonPrograms, FOLDERID_CommonStartMenu, FOLDERID_Programs,
+                FOLDERID_StartMenu, IShellLinkW, SHGetFileInfoW, SHGetKnownFolderPath, ShellLink,
+                KF_FLAG_DEFAULT, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON, SLGP_RAWPATH,
+            },
             WindowsAndMessaging::{
                 DestroyIcon, DrawIconEx, GetForegroundWindow, GetWindowTextLengthW, GetWindowTextW,
                 GetWindowThreadProcessId, PrivateExtractIconsW, DI_NORMAL, HICON,
@@ -62,6 +73,11 @@ std::thread_local! {
 }
 
 const APP_ICON_SIZE: i32 = 256;
+#[cfg(target_os = "windows")]
+const PKEY_APP_USER_MODEL_ID: PROPERTYKEY = PROPERTYKEY {
+    fmtid: GUID::from_u128(0x9f4c2855_9f79_4b39_a8d0_e1d42de1d5f3),
+    pid: 5,
+};
 
 pub fn get_foreground_snapshot() -> Result<ForegroundSnapshot, String> {
     let hwnd = unsafe { GetForegroundWindow() };
@@ -258,6 +274,11 @@ fn get_now_playing_native(
     } else {
         String::new()
     };
+    let source_app_name = if include_play_source {
+        resolve_source_app_name(&source_app_id).unwrap_or_default()
+    } else {
+        String::new()
+    };
     let playback_state = session
         .GetPlaybackInfo()
         .ok()
@@ -342,6 +363,7 @@ fn get_now_playing_native(
         artist,
         album,
         source_app_id,
+        source_app_name,
         cover_url,
         source_icon_url,
         playback_state,
@@ -569,18 +591,15 @@ fn read_media_artwork(
         return Ok(String::new());
     }
 
-    let content_type = stream
-        .ContentType()
-        .ok()
-        .map(|v| v.to_string())
-        .filter(|v| v.starts_with("image/"))
-        .unwrap_or_else(|| "image/jpeg".to_string());
-
-    let encoded = BASE64_STANDARD.encode(&bytes);
-    Ok(format!("data:{content_type};base64,{encoded}"))
+    Ok(image_bytes_to_png_data_url(&bytes).unwrap_or_default())
 }
 
 fn source_icon_cache() -> &'static Mutex<HashMap<String, String>> {
+    static CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn source_name_cache() -> &'static Mutex<HashMap<String, String>> {
     static CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
@@ -641,6 +660,330 @@ fn read_process_app_icon_data_url(source_app_id: &str) -> Result<Option<String>,
     )))
 }
 
+fn resolve_source_app_name(source_app_id: &str) -> Option<String> {
+    let trimmed = source_app_id.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    if let Some(cached) = source_name_cache()
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .get(trimmed)
+        .cloned()
+    {
+        return (!cached.is_empty()).then_some(cached);
+    }
+
+    let name = resolve_source_app_name_uncached(trimmed).unwrap_or_default();
+    source_name_cache()
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .insert(trimmed.to_string(), name.clone());
+
+    (!name.is_empty()).then_some(name)
+}
+
+fn resolve_source_app_name_uncached(source_app_id: &str) -> Option<String> {
+    let executable_path = resolve_process_image_path_from_source_app_id(source_app_id);
+
+    read_start_menu_app_title(source_app_id, executable_path.as_deref())
+        .or_else(|| {
+            executable_path
+                .as_deref()
+                .and_then(read_executable_product_name)
+        })
+        .or_else(|| {
+            executable_path
+                .as_deref()
+                .and_then(file_name)
+                .or_else(|| source_app_id_file_name_fallback(source_app_id))
+        })
+}
+
+fn read_start_menu_app_title(source_app_id: &str, executable_path: Option<&str>) -> Option<String> {
+    start_menu_shortcut_paths()
+        .into_iter()
+        .find_map(|root| read_start_menu_app_title_from_dir(&root, source_app_id, executable_path))
+}
+
+fn read_start_menu_app_title_from_dir(
+    dir: &Path,
+    source_app_id: &str,
+    executable_path: Option<&str>,
+) -> Option<String> {
+    let entries = fs::read_dir(dir).ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let file_type = match entry.file_type() {
+            Ok(file_type) => file_type,
+            Err(_) => continue,
+        };
+
+        if file_type.is_dir() {
+            if let Some(title) =
+                read_start_menu_app_title_from_dir(&path, source_app_id, executable_path)
+            {
+                return Some(title);
+            }
+            continue;
+        }
+
+        if !file_type.is_file() || !path_has_extension(&path, "lnk") {
+            continue;
+        }
+
+        if shortcut_matches_source(&path, source_app_id, executable_path) {
+            if let Some(title) = file_stem_path(&path) {
+                return Some(title);
+            }
+        }
+    }
+
+    None
+}
+
+fn start_menu_shortcut_paths() -> Vec<PathBuf> {
+    [
+        FOLDERID_StartMenu,
+        FOLDERID_CommonStartMenu,
+        FOLDERID_Programs,
+        FOLDERID_CommonPrograms,
+    ]
+    .into_iter()
+    .filter_map(known_folder_path)
+    .collect()
+}
+
+fn known_folder_path(folder_id: GUID) -> Option<PathBuf> {
+    let raw = unsafe { SHGetKnownFolderPath(&folder_id, KF_FLAG_DEFAULT, None) }.ok()?;
+    if raw.is_null() {
+        return None;
+    }
+
+    let path = unsafe { raw.to_string().ok() };
+    unsafe {
+        CoTaskMemFree(Some(raw.as_ptr().cast()));
+    }
+
+    path.map(PathBuf::from)
+}
+
+fn shortcut_matches_source(
+    shortcut_path: &Path,
+    source_app_id: &str,
+    executable_path: Option<&str>,
+) -> bool {
+    let link = match load_shell_link(shortcut_path) {
+        Some(link) => link,
+        None => return false,
+    };
+
+    read_shell_link_app_user_model_id(&link)
+        .is_some_and(|aumid| aumid.eq_ignore_ascii_case(source_app_id))
+        || executable_path.is_some_and(|expected_path| {
+            read_shell_link_target_path(&link)
+                .is_some_and(|target_path| paths_match(&target_path, expected_path))
+        })
+}
+
+fn load_shell_link(shortcut_path: &Path) -> Option<IShellLinkW> {
+    let link: IShellLinkW =
+        unsafe { CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER) }.ok()?;
+    let persist_file: IPersistFile = link.cast().ok()?;
+    let shortcut_path = encode_wide_path(shortcut_path);
+    unsafe {
+        persist_file
+            .Load(PCWSTR(shortcut_path.as_ptr()), STGM_READ)
+            .ok()?;
+    }
+
+    Some(link)
+}
+
+fn read_shell_link_app_user_model_id(link: &IShellLinkW) -> Option<String> {
+    let property_store: IPropertyStore = link.cast().ok()?;
+    let mut value = unsafe { property_store.GetValue(&PKEY_APP_USER_MODEL_ID).ok()? };
+    let result = propvariant_to_string(&value);
+    let _ = unsafe { PropVariantClear(&mut value) };
+
+    result
+}
+
+fn propvariant_to_string(value: &PROPVARIANT) -> Option<String> {
+    let raw = unsafe { PropVariantToStringAlloc(value) }.ok()?;
+    if raw.is_null() {
+        return None;
+    }
+
+    let text = unsafe { raw.to_string().ok() };
+    unsafe {
+        CoTaskMemFree(Some(raw.as_ptr().cast()));
+    }
+
+    text.map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn read_shell_link_target_path(link: &IShellLinkW) -> Option<String> {
+    let mut buffer = vec![0u16; MAX_PATH as usize * 8];
+    unsafe {
+        link.GetPath(&mut buffer, std::ptr::null_mut(), SLGP_RAWPATH.0 as u32)
+            .ok()?;
+    }
+
+    let path = utf16z_to_string(&buffer).trim().to_string();
+    (!path.is_empty()).then_some(path)
+}
+
+fn paths_match(left: &str, right: &str) -> bool {
+    normalize_windows_path(left) == normalize_windows_path(right)
+}
+
+fn normalize_windows_path(path: &str) -> String {
+    path.trim()
+        .trim_start_matches(r"\\?\")
+        .replace('/', "\\")
+        .to_ascii_lowercase()
+}
+
+fn read_executable_product_name(executable_path: &str) -> Option<String> {
+    let wide_path = encode_wide(executable_path);
+    let mut handle = 0u32;
+    let size = unsafe { GetFileVersionInfoSizeW(PCWSTR(wide_path.as_ptr()), Some(&mut handle)) };
+    if size == 0 {
+        return None;
+    }
+
+    let mut data = vec![0u8; size as usize];
+    let ok = unsafe {
+        GetFileVersionInfoW(
+            PCWSTR(wide_path.as_ptr()),
+            Some(0),
+            size,
+            data.as_mut_ptr().cast(),
+        )
+        .is_ok()
+    };
+    if !ok {
+        return None;
+    }
+
+    read_version_string(&data, "ProductName")
+}
+
+fn read_version_string(data: &[u8], key: &str) -> Option<String> {
+    read_version_translations(data)
+        .into_iter()
+        .flatten()
+        .chain([(0x0409u16, 0x04b0u16)])
+        .find_map(|(language, code_page)| {
+            read_version_string_for_translation(data, key, language, code_page)
+        })
+}
+
+fn read_version_translations(data: &[u8]) -> Option<Vec<(u16, u16)>> {
+    let query = encode_wide("\\VarFileInfo\\Translation");
+    let mut value_ptr = std::ptr::null_mut::<c_void>();
+    let mut value_len = 0u32;
+    let ok = unsafe {
+        VerQueryValueW(
+            data.as_ptr().cast(),
+            PCWSTR(query.as_ptr()),
+            &mut value_ptr,
+            &mut value_len,
+        )
+        .as_bool()
+    };
+    if !ok || value_ptr.is_null() || value_len < size_of::<u16>() as u32 * 2 {
+        return None;
+    }
+
+    let raw = unsafe {
+        std::slice::from_raw_parts(
+            value_ptr as *const u16,
+            value_len as usize / size_of::<u16>(),
+        )
+    };
+    let translations = raw
+        .chunks_exact(2)
+        .map(|chunk| (chunk[0], chunk[1]))
+        .collect::<Vec<_>>();
+    (!translations.is_empty()).then_some(translations)
+}
+
+fn read_version_string_for_translation(
+    data: &[u8],
+    key: &str,
+    language: u16,
+    code_page: u16,
+) -> Option<String> {
+    let query = encode_wide(&format!(
+        "\\StringFileInfo\\{language:04x}{code_page:04x}\\{key}"
+    ));
+    let mut value_ptr = std::ptr::null_mut::<c_void>();
+    let mut value_len = 0u32;
+    let ok = unsafe {
+        VerQueryValueW(
+            data.as_ptr().cast(),
+            PCWSTR(query.as_ptr()),
+            &mut value_ptr,
+            &mut value_len,
+        )
+        .as_bool()
+    };
+    if !ok || value_ptr.is_null() || value_len == 0 {
+        return None;
+    }
+
+    let value = unsafe { std::slice::from_raw_parts(value_ptr as *const u16, value_len as usize) };
+    let value = utf16z_to_string(value).trim().to_string();
+    (!value.is_empty()).then_some(value)
+}
+
+fn file_name(path: &str) -> Option<String> {
+    Path::new(path)
+        .file_name()
+        .and_then(|value| value.to_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
+fn file_stem_path(path: &Path) -> Option<String> {
+    path.file_stem()
+        .and_then(|value| value.to_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
+fn source_app_id_file_name_fallback(source_app_id: &str) -> Option<String> {
+    let tail = source_app_id
+        .trim()
+        .rsplit(['\\', '/', '!'])
+        .next()
+        .unwrap_or(source_app_id.trim());
+    let tail = tail.split('_').next().unwrap_or(tail);
+    let file_name = tail.trim();
+    (!file_name.is_empty() && !file_name.eq_ignore_ascii_case(source_app_id.trim()))
+        .then(|| file_name.to_string())
+}
+
+fn path_has_extension(path: &Path, extension: &str) -> bool {
+    path.extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|value| value.eq_ignore_ascii_case(extension))
+}
+
+fn encode_wide_path(path: &Path) -> Vec<u16> {
+    path.as_os_str()
+        .to_string_lossy()
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect()
+}
+
 fn read_stream_reference_data_url(
     reference: &RandomAccessStreamReference,
 ) -> Result<Option<String>, String> {
@@ -679,17 +1022,7 @@ fn read_stream_reference_data_url(
         return Ok(None);
     }
 
-    let content_type = stream
-        .ContentType()
-        .ok()
-        .map(|value| value.to_string())
-        .filter(|value| value.starts_with("image/"))
-        .unwrap_or_else(|| "image/png".to_string());
-
-    Ok(Some(format!(
-        "data:{content_type};base64,{}",
-        BASE64_STANDARD.encode(bytes)
-    )))
+    Ok(image_bytes_to_png_data_url(&bytes))
 }
 
 fn process_image_path_from_pid(pid: u32) -> Result<String, String> {
@@ -890,6 +1223,18 @@ fn render_hicon_png(hicon: HICON, target_size: i32) -> Result<Vec<u8>, String> {
         )
     }
     .map_err(|error| format!("创建应用图标位图失败：{error}"))?;
+    if bits_ptr.is_null() {
+        let _ = unsafe { DeleteObject(HGDIOBJ(bitmap.0)) };
+        let _ = unsafe { DeleteDC(memory_dc) };
+        let _ = unsafe { ReleaseDC(None, screen_dc) };
+        return Err("应用图标位图缓冲区为空。".to_string());
+    }
+
+    let pixel_len = (target_size as usize)
+        .saturating_mul(target_size as usize)
+        .saturating_mul(4);
+    let bitmap_bgra = unsafe { std::slice::from_raw_parts_mut(bits_ptr as *mut u8, pixel_len) };
+    bitmap_bgra.fill(0);
 
     let old_object = unsafe { SelectObject(memory_dc, HGDIOBJ(bitmap.0)) };
     let draw_result = unsafe {
@@ -911,19 +1256,17 @@ fn render_hicon_png(hicon: HICON, target_size: i32) -> Result<Vec<u8>, String> {
     let _ = unsafe { ReleaseDC(None, screen_dc) };
 
     draw_result.map_err(|error| format!("绘制应用图标失败：{error}"))?;
-    if bits_ptr.is_null() {
-        let _ = unsafe { DeleteObject(HGDIOBJ(bitmap.0)) };
-        return Err("应用图标位图缓冲区为空。".to_string());
-    }
 
-    let pixel_len = (target_size as usize)
-        .saturating_mul(target_size as usize)
-        .saturating_mul(4);
-    let raw_bgra = unsafe { std::slice::from_raw_parts(bits_ptr as *const u8, pixel_len) };
-    let mut rgba = raw_bgra.to_vec();
+    let mut rgba = bitmap_bgra.to_vec();
     let _ = unsafe { DeleteObject(HGDIOBJ(bitmap.0)) };
 
     for pixel in rgba.chunks_exact_mut(4) {
+        let alpha = pixel[3];
+        if alpha > 0 && alpha < 255 {
+            pixel[0] = unpremultiply_alpha_channel(pixel[0], alpha);
+            pixel[1] = unpremultiply_alpha_channel(pixel[1], alpha);
+            pixel[2] = unpremultiply_alpha_channel(pixel[2], alpha);
+        }
         pixel.swap(0, 2);
     }
 
@@ -938,6 +1281,11 @@ fn render_hicon_png(hicon: HICON, target_size: i32) -> Result<Vec<u8>, String> {
         .map_err(|error| format!("编码应用图标 PNG 失败：{error}"))?;
 
     Ok(png)
+}
+
+fn unpremultiply_alpha_channel(channel: u8, alpha: u8) -> u8 {
+    let value = (channel as u16 * 255 + alpha as u16 / 2) / alpha as u16;
+    value.min(255) as u8
 }
 
 fn encode_wide(value: &str) -> Vec<u16> {

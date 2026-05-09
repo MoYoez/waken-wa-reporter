@@ -30,7 +30,6 @@ export interface ClientConfig {
   reportPlaybackAppIcon: boolean;
   reportMediaGenre: boolean;
   mediaPlaySourceRules: MediaPlaySourceRule[];
-  mediaPlaySourceBlocklist?: string[];
   discordEnabled: boolean;
   discordApplicationId: string;
   discordSourceId: string;
@@ -70,6 +69,7 @@ export interface ActivityMedia {
 export interface ActivityMetadata extends Record<string, unknown> {
   source?: string;
   play_source?: string;
+  play_source_name?: string;
   media?: ActivityMedia;
 }
 

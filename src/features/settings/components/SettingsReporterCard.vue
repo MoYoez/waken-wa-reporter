@@ -3,12 +3,13 @@ import Button from "primevue/button";
 import Card from "primevue/card";
 import Message from "primevue/message";
 import Tag from "primevue/tag";
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 
 import type { SelfTestCardView } from "@/features/settings/composables/settingsWorkspaceProbeText";
 import type { RealtimeReporterSnapshot } from "@/types";
 
-defineProps<{
+const props = defineProps<{
   configReady: boolean;
   snapshot: RealtimeReporterSnapshot;
   reporterBusy: boolean;
@@ -29,6 +30,11 @@ const emit = defineEmits<{
 }>();
 
 const { t, locale } = useI18n();
+const currentPlaySource = computed(
+  () =>
+    String(props.snapshot.currentActivity?.metadata?.play_source_name ?? props.snapshot.currentActivity?.metadata?.play_source ?? "").trim()
+    || t("settings.notify.none"),
+);
 
 function formatTime(value?: string | null) {
   if (!value) {
@@ -62,6 +68,10 @@ function formatTime(value?: string | null) {
         <div class="overview-item">
           <span>{{ t("settings.reporter.currentProcess") }}</span>
           <strong>{{ snapshot.currentActivity?.processName || t("settings.notify.none") }}</strong>
+        </div>
+        <div class="overview-item">
+          <span>{{ t("settings.reporter.playSource") }}</span>
+          <strong>{{ currentPlaySource }}</strong>
         </div>
         <div class="overview-item">
           <span>{{ t("settings.reporter.lastHeartbeat") }}</span>

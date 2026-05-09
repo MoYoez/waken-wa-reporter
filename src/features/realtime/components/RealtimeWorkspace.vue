@@ -21,6 +21,10 @@ const first = ref(0);
 const rows = 10;
 
 const pagedLogs = computed(() => props.snapshot.logs.slice(first.value, first.value + rows));
+const currentPlaySource = computed(() =>
+  String(props.snapshot.currentActivity?.metadata?.play_source_name ?? props.snapshot.currentActivity?.metadata?.play_source ?? "").trim()
+  || t("realtime.summary.none"),
+);
 
 const selectedLogPayloadText = computed(() => {
   if (!selectedLog.value?.payload) return "";
@@ -106,6 +110,10 @@ watch(
           <div class="overview-item">
             <span>{{ t("realtime.summary.windowTitle") }}</span>
             <strong>{{ snapshot.currentActivity?.processTitle || t("realtime.summary.none") }}</strong>
+          </div>
+          <div class="overview-item">
+            <span>{{ t("realtime.summary.playSource") }}</span>
+            <strong>{{ currentPlaySource }}</strong>
           </div>
           <div class="overview-item">
             <span>{{ t("realtime.summary.lastHeartbeat") }}</span>

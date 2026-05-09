@@ -259,6 +259,7 @@ const enUS = {
       title: "Background sync",
       runtimeStatus: "Runtime status",
       currentProcess: "Current process",
+      playSource: "Playback source",
       lastHeartbeat: "Last heartbeat",
       lastError: "Last error",
       start: "Start background sync",
@@ -566,6 +567,7 @@ const enUS = {
     summary: {
       currentProcess: "Current process",
       windowTitle: "Window title",
+      playSource: "Playback source",
       lastHeartbeat: "Last heartbeat",
       logTotal: "Log count",
       none: "None",

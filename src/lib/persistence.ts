@@ -74,7 +74,6 @@ export const defaultClientConfig = (): ClientConfig => ({
   reportPlaybackAppIcon: false,
   reportMediaGenre: false,
   mediaPlaySourceRules: [],
-  mediaPlaySourceBlocklist: [],
   discordEnabled: false,
   discordApplicationId: "",
   discordSourceId: "",

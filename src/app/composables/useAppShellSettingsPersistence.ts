@@ -49,12 +49,8 @@ class SettingsSaveStageError extends Error {
 export function useAppShellSettingsPersistence(options: UseAppShellPersistenceOptions) {
   const normalizeConfigByCapabilities: NormalizeConfigByCapabilities = (raw: ClientConfig) => {
     const fallback = defaultClientConfig();
-    const legacyBlockRules = Array.isArray(raw.mediaPlaySourceBlocklist)
-      ? raw.mediaPlaySourceBlocklist
-          .map((source) => String(source ?? "").trim())
-          .filter(Boolean)
-          .map((source) => ({ source, action: "block" as const, default: true }))
-      : [];
+    const rawConfig = { ...raw } as ClientConfig & { mediaPlaySourceBlocklist?: string[] };
+    delete rawConfig.mediaPlaySourceBlocklist;
     const explicitRules = Array.isArray(raw.mediaPlaySourceRules)
       ? raw.mediaPlaySourceRules
           .map((rule) => ({
@@ -65,16 +61,12 @@ export function useAppShellSettingsPersistence(options: UseAppShellPersistenceOp
           }))
           .filter((rule) => rule.source)
       : [];
-    const mediaPlaySourceRules = explicitRules.length ? explicitRules : legacyBlockRules;
     const normalizedBase = {
       ...fallback,
-      ...raw,
-      reportPlaybackAppIcon: Boolean(raw.reportPlaybackAppIcon ?? fallback.reportPlaybackAppIcon),
-      reportMediaGenre: Boolean(raw.reportMediaGenre ?? fallback.reportMediaGenre),
-      mediaPlaySourceRules,
-      mediaPlaySourceBlocklist: mediaPlaySourceRules
-        .filter((rule) => (rule.action ?? "block") === "block")
-        .map((rule) => rule.source),
+      ...rawConfig,
+      reportPlaybackAppIcon: Boolean(rawConfig.reportPlaybackAppIcon ?? fallback.reportPlaybackAppIcon),
+      reportMediaGenre: Boolean(rawConfig.reportMediaGenre ?? fallback.reportMediaGenre),
+      mediaPlaySourceRules: explicitRules,
     };
     const normalizedDevice = normalizedBase.device.trim();
     const launchOnStartup = options.autostartSupported.value ? normalizedBase.launchOnStartup : false;

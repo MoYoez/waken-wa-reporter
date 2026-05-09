@@ -7,10 +7,13 @@ mod stub;
 #[cfg(target_os = "windows")]
 mod windows;
 
+use std::io::Cursor;
 use std::time::{SystemTime, UNIX_EPOCH};
 #[cfg(target_os = "macos")]
 use std::{path::PathBuf, sync::OnceLock};
 
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
+use image::ImageFormat;
 use serde_json::{Map, Value};
 
 use crate::models::{LocalizedTextEntry, PlatformProbeResult, PlatformSelfTestResult};
@@ -30,6 +33,7 @@ pub struct MediaInfo {
     pub artist: String,
     pub album: String,
     pub source_app_id: String,
+    pub source_app_name: String,
     /// URL to the cover art image (optional)
     pub cover_url: String,
     /// Data URL for the playback source app icon (optional)
@@ -42,6 +46,45 @@ pub struct MediaInfo {
     pub reported_at_ms: Option<i64>,
     /// Genre / category info (e.g. NCM-{id} from inflink-rs)
     pub genre: String,
+}
+
+pub(super) fn image_bytes_to_png_data_url(bytes: &[u8]) -> Option<String> {
+    if bytes.is_empty() {
+        return None;
+    }
+
+    if bytes.starts_with(&[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A]) {
+        return Some(format!(
+            "data:image/png;base64,{}",
+            BASE64_STANDARD.encode(bytes)
+        ));
+    }
+
+    let image = image::load_from_memory(bytes).ok()?;
+    let mut png = Vec::new();
+    image
+        .write_to(&mut Cursor::new(&mut png), ImageFormat::Png)
+        .ok()?;
+    if png.is_empty() {
+        return None;
+    }
+
+    Some(format!(
+        "data:image/png;base64,{}",
+        BASE64_STANDARD.encode(png)
+    ))
+}
+
+#[cfg(target_os = "linux")]
+pub(super) fn image_data_url_to_png_data_url(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if !trimmed.starts_with("data:") {
+        return None;
+    }
+
+    let payload = trimmed.split_once(',')?.1.trim();
+    let bytes = BASE64_STANDARD.decode(payload).ok()?;
+    image_bytes_to_png_data_url(&bytes)
 }
 
 #[cfg(target_os = "macos")]
@@ -119,6 +162,7 @@ impl MediaInfo {
         }
         if !include_play_source {
             self.source_app_id.clear();
+            self.source_app_name.clear();
             self.source_icon_url.clear();
         }
 

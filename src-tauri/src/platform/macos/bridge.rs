@@ -3,6 +3,7 @@ use std::ffi::{c_char, CStr, CString};
 unsafe extern "C" {
     fn waken_frontmost_app_name() -> *mut c_char;
     fn waken_frontmost_window_title() -> *mut c_char;
+    fn waken_bundle_app_name(bundle_identifier: *const c_char) -> *mut c_char;
     fn waken_bundle_app_icon_data_url(bundle_identifier: *const c_char) -> *mut c_char;
     fn waken_accessibility_is_trusted() -> bool;
     fn waken_request_accessibility_permission() -> bool;
@@ -41,6 +42,11 @@ pub(super) fn read_frontmost_app_name() -> Option<String> {
 
 pub(super) fn read_frontmost_window_title() -> Option<String> {
     read_bridge_string(waken_frontmost_window_title)
+}
+
+pub(super) fn read_bundle_app_name(bundle_identifier: &str) -> Option<String> {
+    let name = read_bridge_string_with_arg(waken_bundle_app_name, bundle_identifier)?;
+    (!name.trim().is_empty()).then_some(name)
 }
 
 pub(super) fn read_bundle_app_icon_data_url(bundle_identifier: &str) -> Option<String> {

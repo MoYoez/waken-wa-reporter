@@ -1,10 +1,11 @@
-use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use serde::Deserialize;
 
-use crate::platform::{media_timestamps_from_position, now_unix_millis_i64, MediaInfo};
+use crate::platform::{
+    image_bytes_to_png_data_url, media_timestamps_from_position, now_unix_millis_i64, MediaInfo,
+};
 
 use super::{
-    bridge::read_bundle_app_icon_data_url,
+    bridge::{read_bundle_app_icon_data_url, read_bundle_app_name},
     command::{command_output_with_timeout, CommandError},
 };
 
@@ -166,6 +167,7 @@ fn get_now_playing_via_mediaremote_adapter(
     };
 
     let source_app_id = resolve_source_app_id(&raw);
+    let source_app_name = resolve_source_app_name(&source_app_id);
     let source_icon_url = if include_source_icon {
         resolve_source_icon_data_url(&raw)
     } else {
@@ -195,6 +197,7 @@ fn get_now_playing_via_mediaremote_adapter(
         artist,
         album,
         source_app_id,
+        source_app_name,
         cover_url,
         source_icon_url,
         playback_state,
@@ -265,6 +268,10 @@ fn resolve_source_app_id(raw: &RawNowPlayingInfo) -> String {
     normalize_optional_str(raw.bundle_identifier.as_deref())
         .or_else(|| normalize_optional_str(raw.parent_application_bundle_identifier.as_deref()))
         .unwrap_or_default()
+}
+
+fn resolve_source_app_name(source_app_id: &str) -> String {
+    read_bundle_app_name(source_app_id).unwrap_or_default()
 }
 
 fn normalize_playback_state(playing: Option<bool>, playback_rate: Option<f64>) -> String {
@@ -350,15 +357,8 @@ fn decode_artwork_to_data_url(artwork_data: Option<&str>, mime_type: Option<&str
         None => return String::new(),
     };
 
-    let content_type = mime_type
-        .and_then(|value| value.trim().trim_start_matches("data:").split(';').next())
-        .filter(|value| value.starts_with("image/"))
-        .map(str::to_string)
-        .or_else(|| detect_image_content_type(&data))
-        .unwrap_or_else(|| "image/jpeg".to_string());
-
-    let encoded = BASE64_STANDARD.encode(&data);
-    format!("data:{content_type};base64,{encoded}")
+    let _ = mime_type;
+    image_bytes_to_png_data_url(&data).unwrap_or_default()
 }
 
 fn decode_base64_image_payload(value: &str) -> Option<Vec<u8>> {
@@ -375,20 +375,4 @@ fn decode_base64_image_payload(value: &str) -> Option<Vec<u8>> {
         .decode(encoded.trim())
         .ok()
         .filter(|bytes| !bytes.is_empty())
-}
-
-fn detect_image_content_type(bytes: &[u8]) -> Option<String> {
-    let content_type = if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
-        "image/jpeg"
-    } else if bytes.starts_with(&[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A]) {
-        "image/png"
-    } else if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") {
-        "image/gif"
-    } else if bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
-        "image/webp"
-    } else {
-        return None;
-    };
-
-    Some(content_type.to_string())
 }

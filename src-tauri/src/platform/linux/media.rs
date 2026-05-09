@@ -38,6 +38,7 @@ pub(super) fn get_now_playing() -> Result<MediaInfo, String> {
     let artist = lines.next().unwrap_or_default().to_string();
     let album = lines.next().unwrap_or_default().to_string();
     let source_app_id = lines.next().unwrap_or_default().to_string();
+    let source_app_name = source_app_id.clone();
     let cover_url_raw = lines.next().unwrap_or_default().to_string();
     let playback_state = normalize_playback_state(lines.next().unwrap_or_default());
     let position_ms = parse_position_seconds_to_ms(lines.next().unwrap_or_default());
@@ -54,6 +55,7 @@ pub(super) fn get_now_playing() -> Result<MediaInfo, String> {
         artist,
         album,
         source_app_id,
+        source_app_name,
         cover_url,
         source_icon_url: String::new(),
         playback_state,
@@ -107,7 +109,6 @@ fn resolve_artwork_data_url(input: &str) -> String {
         return String::new();
     }
 
-    // Already a data URL — return as-is
     if trimmed.starts_with("data:") {
         return trimmed.to_string();
     }
@@ -140,7 +141,7 @@ fn resolve_artwork_data_url(input: &str) -> String {
         .headers()
         .get("content-type")
         .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.trim().trim_start_matches("data:").split(';').next())
+        .map(str::trim)
         .filter(|v| v.starts_with("image/"))
         .map(str::to_string);
 
@@ -154,7 +155,6 @@ fn resolve_artwork_data_url(input: &str) -> String {
     }
 
     let content_type = header_content_type.unwrap_or_else(|| detect_image_content_type(&bytes));
-
     let encoded = BASE64_STANDARD.encode(&bytes);
     format!("data:{content_type};base64,{encoded}")
 }
@@ -168,7 +168,17 @@ fn detect_image_content_type(bytes: &[u8]) -> String {
         "image/gif".to_string()
     } else if bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
         "image/webp".to_string()
+    } else if bytes.len() >= 4 && bytes[0] == 0x00 && bytes[1] == 0x00 && (bytes[2] == 0x01 || bytes[2] == 0x02) && bytes[3] == 0x00 {
+        "image/x-icon".to_string()
+    } else if looks_like_svg(bytes) {
+        "image/svg+xml".to_string()
     } else {
         "image/jpeg".to_string()
     }
+}
+
+fn looks_like_svg(bytes: &[u8]) -> bool {
+    let sample = bytes.len().min(512);
+    let text = String::from_utf8_lossy(&bytes[..sample]).to_ascii_lowercase();
+    text.contains("<svg")
 }

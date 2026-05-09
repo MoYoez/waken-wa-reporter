@@ -92,7 +92,29 @@ pub(super) fn build_payload(
     media: &MediaInfo,
     mut metadata: Map<String, Value>,
 ) -> ActivityPayload {
-    let media = apply_media_source_rules(config, media);
+    let play_source = media.source_app_id.trim().to_string();
+    let source_rule_match = (!play_source.is_empty())
+        .then(|| find_media_source_rule(config, &play_source))
+        .flatten();
+    let media_blocked = source_rule_match
+        .as_ref()
+        .is_some_and(|rule_match| rule_match.action == "block");
+    let play_source_name = source_rule_match
+        .as_ref()
+        .filter(|rule_match| rule_match.action == "rename")
+        .map(|rule_match| rule_match.display_name.trim())
+        .filter(|display_name| !display_name.is_empty())
+        .or_else(|| {
+            let source_app_name = media.source_app_name.trim();
+            (!source_app_name.is_empty()).then_some(source_app_name)
+        })
+        .unwrap_or(play_source.as_str())
+        .to_string();
+    let media = if media_blocked {
+        MediaInfo::default()
+    } else {
+        media.clone()
+    };
 
     // Only include dc_source when Discord presence is enabled
     if config.discord_enabled && !config.discord_source_id.trim().is_empty() {
@@ -108,14 +130,16 @@ pub(super) fn build_payload(
         }
     }
 
-    if config.report_play_source
-        && !media.source_app_id.trim().is_empty()
-        && !metadata.contains_key("play_source")
+    if config.report_play_source && !play_source.is_empty() && !metadata.contains_key("play_source")
     {
-        metadata.insert(
-            "play_source".into(),
-            Value::String(media.source_app_id.trim().to_string()),
-        );
+        metadata.insert("play_source".into(), Value::String(play_source));
+    }
+
+    if config.report_play_source
+        && !play_source_name.is_empty()
+        && !metadata.contains_key("play_source_name")
+    {
+        metadata.insert("play_source_name".into(), Value::String(play_source_name));
     }
 
     ActivityPayload {
@@ -138,28 +162,6 @@ pub(super) fn build_payload(
         push_mode: Some(config.push_mode.trim().to_string()).filter(|value| !value.is_empty()),
         metadata: (!metadata.is_empty()).then_some(Value::Object(metadata)),
     }
-}
-
-fn apply_media_source_rules(config: &ClientConfig, media: &MediaInfo) -> MediaInfo {
-    let source = media.source_app_id.trim();
-    if source.is_empty() {
-        return media.clone();
-    }
-
-    if let Some(rule_match) = find_media_source_rule(config, source) {
-        if rule_match.action == "rename" {
-            if rule_match.display_name.is_empty() {
-                return media.clone();
-            }
-            let mut renamed = media.clone();
-            renamed.source_app_id = rule_match.display_name;
-            return renamed;
-        }
-
-        return MediaInfo::default();
-    }
-
-    media.clone()
 }
 
 struct MediaSourceRuleMatch {
@@ -297,6 +299,16 @@ mod tests {
         }
     }
 
+    fn media_with_source() -> MediaInfo {
+        MediaInfo {
+            title: "Song".into(),
+            artist: "Artist".into(),
+            source_app_id: "cloudmusic.exe".into(),
+            source_app_name: "NetEase Cloud Music".into(),
+            ..MediaInfo::default()
+        }
+    }
+
     fn snapshot() -> ForegroundSnapshot {
         ForegroundSnapshot {
             process_name: "player.exe".into(),
@@ -333,6 +345,56 @@ mod tests {
         assert_eq!(
             payload_media(&config).get("genre").and_then(Value::as_str),
             Some("NCM-123"),
+        );
+    }
+
+    #[test]
+    fn includes_resolved_play_source_name_without_rule() {
+        let config = ClientConfig {
+            report_media: true,
+            report_play_source: true,
+            ..ClientConfig::default()
+        };
+
+        let metadata = build_payload(&config, &snapshot(), &media_with_source(), Map::new())
+            .metadata
+            .expect("metadata");
+
+        assert_eq!(
+            metadata.get("play_source").and_then(Value::as_str),
+            Some("cloudmusic.exe"),
+        );
+        assert_eq!(
+            metadata.get("play_source_name").and_then(Value::as_str),
+            Some("NetEase Cloud Music"),
+        );
+    }
+
+    #[test]
+    fn rename_rule_preserves_raw_play_source_and_sets_display_name() {
+        let config = ClientConfig {
+            report_media: true,
+            report_play_source: true,
+            media_play_source_rules: vec![MediaPlaySourceRule {
+                source: "cloudmusic.exe".into(),
+                action: "rename".into(),
+                display_name: "NetEase Cloud Music".into(),
+                default: false,
+            }],
+            ..ClientConfig::default()
+        };
+
+        let metadata = build_payload(&config, &snapshot(), &media_with_source(), Map::new())
+            .metadata
+            .expect("metadata");
+
+        assert_eq!(
+            metadata.get("play_source").and_then(Value::as_str),
+            Some("cloudmusic.exe"),
+        );
+        assert_eq!(
+            metadata.get("play_source_name").and_then(Value::as_str),
+            Some("NetEase Cloud Music"),
         );
     }
 }

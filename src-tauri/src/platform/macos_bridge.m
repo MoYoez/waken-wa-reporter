@@ -60,6 +60,42 @@ char *waken_frontmost_window_title(void) {
     return result;
 }
 
+char *waken_bundle_app_name(const char *bundle_identifier) {
+    if (bundle_identifier == NULL) return NULL;
+
+    NSString *bundleId = [NSString stringWithUTF8String:bundle_identifier];
+    if (!bundleId || bundleId.length == 0) return NULL;
+
+    NSWorkspace *workspace = [NSWorkspace sharedWorkspace];
+    NSURL *applicationURL = [workspace URLForApplicationWithBundleIdentifier:bundleId];
+    if (applicationURL && applicationURL.path.length > 0) {
+        NSBundle *bundle = [NSBundle bundleWithURL:applicationURL];
+        NSString *displayName =
+            [bundle objectForInfoDictionaryKey:@"CFBundleDisplayName"] ?:
+            [bundle objectForInfoDictionaryKey:@"CFBundleName"];
+        if (displayName && displayName.length > 0) {
+            return strdup([displayName UTF8String]);
+        }
+
+        NSString *fileName = applicationURL.lastPathComponent.stringByDeletingPathExtension;
+        if (fileName && fileName.length > 0) {
+            return strdup([fileName UTF8String]);
+        }
+    }
+
+    for (NSRunningApplication *runningApp in workspace.runningApplications) {
+        if ([runningApp.bundleIdentifier isEqualToString:bundleId]) {
+            NSString *localizedName = runningApp.localizedName;
+            if (localizedName && localizedName.length > 0) {
+                return strdup([localizedName UTF8String]);
+            }
+            break;
+        }
+    }
+
+    return NULL;
+}
+
 static NSData *waken_png_data_from_image(NSImage *image) {
     if (!image) return nil;
 
