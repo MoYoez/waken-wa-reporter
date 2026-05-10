@@ -6,7 +6,10 @@ import Tag from "primevue/tag";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 
-import type { SelfTestCardView } from "@/features/settings/composables/settingsWorkspaceProbeText";
+import type {
+  SelfTestCardView,
+  SelfTestPermissionAction,
+} from "@/features/settings/composables/settingsWorkspaceProbeText";
 import type { RealtimeReporterSnapshot } from "@/types";
 
 const props = defineProps<{
@@ -14,7 +17,6 @@ const props = defineProps<{
   snapshot: RealtimeReporterSnapshot;
   reporterBusy: boolean;
   selfTestSupported: boolean;
-  canRequestAccessibilityPermission: boolean;
   selfTestLoading: boolean;
   accessibilityPermissionLoading: boolean;
   selfTestPlatform: string;
@@ -26,7 +28,7 @@ const emit = defineEmits<{
   start: [];
   stop: [];
   selfTest: [];
-  requestAccessibilityPermission: [];
+  requestPermission: [action: SelfTestPermissionAction];
 }>();
 
 const { t, locale } = useI18n();
@@ -47,6 +49,16 @@ function formatTime(value?: string | null) {
   }
 
   return date.toLocaleString(locale.value);
+}
+
+function permissionActionLabel(action: SelfTestPermissionAction) {
+  if (action === "usage") {
+    return t("settings.reporter.usageAccess");
+  }
+  if (action === "notification") {
+    return t("settings.reporter.notificationAccess");
+  }
+  return t("settings.reporter.accessibility");
 }
 </script>
 
@@ -109,15 +121,6 @@ function formatTime(value?: string | null) {
           :loading="selfTestLoading"
           @click="emit('selfTest')"
         />
-        <Button
-          v-if="canRequestAccessibilityPermission"
-          :label="t('settings.reporter.accessibility')"
-          icon="pi pi-shield"
-          severity="secondary"
-          outlined
-          :loading="accessibilityPermissionLoading"
-          @click="emit('requestAccessibilityPermission')"
-        />
       </div>
 
       <div class="message-stack">
@@ -172,16 +175,16 @@ function formatTime(value?: string | null) {
               {{ card.secondaryText }}
             </p>
             <div
-              v-if="card.showAccessibilityAction"
+              v-if="card.permissionAction"
               class="actions-row"
             >
               <Button
-                :label="t('settings.reporter.accessibility')"
+                :label="permissionActionLabel(card.permissionAction)"
                 icon="pi pi-shield"
                 severity="secondary"
                 outlined
                 :loading="accessibilityPermissionLoading"
-                @click="emit('requestAccessibilityPermission')"
+                @click="emit('requestPermission', card.permissionAction)"
               />
             </div>
           </article>

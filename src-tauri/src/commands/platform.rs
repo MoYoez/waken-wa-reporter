@@ -99,3 +99,56 @@ pub fn request_accessibility_permission() -> Result<ApiResult<bool>, String> {
         )),
     }
 }
+
+pub fn request_android_usage_access() -> Result<ApiResult<bool>, String> {
+    match platform::request_android_usage_access() {
+        Ok(granted) => Ok(ApiResult::success(200, granted)),
+        Err(error) => Ok(ApiResult::failure_localized(
+            400,
+            Some("backendErrors.accessibilityPermissionUnsupported".to_string()),
+            error,
+            None,
+            None,
+        )),
+    }
+}
+
+pub fn request_android_notification_access() -> Result<ApiResult<bool>, String> {
+    match platform::request_android_notification_access() {
+        Ok(granted) => Ok(ApiResult::success(200, granted)),
+        Err(error) => Ok(ApiResult::failure_localized(
+            400,
+            Some("backendErrors.accessibilityPermissionUnsupported".to_string()),
+            error,
+            None,
+            None,
+        )),
+    }
+}
+
+pub fn open_android_reporter_notification_settings() -> Result<ApiResult<bool>, String> {
+    match platform::open_android_reporter_notification_settings() {
+        Ok(granted) => Ok(ApiResult::success(200, granted)),
+        Err(error) => Ok(ApiResult::failure_localized(
+            400,
+            Some("backendErrors.accessibilityPermissionUnsupported".to_string()),
+            error,
+            None,
+            None,
+        )),
+    }
+}
+
+pub fn get_android_permission_status(
+) -> Result<ApiResult<crate::models::AndroidPermissionStatus>, String> {
+    match platform::get_permission_status() {
+        Ok(status) => Ok(ApiResult::success(200, status)),
+        Err(error) => Ok(ApiResult::failure_localized(
+            400,
+            Some("backendErrors.accessibilityPermissionUnsupported".to_string()),
+            error,
+            None,
+            None,
+        )),
+    }
+}

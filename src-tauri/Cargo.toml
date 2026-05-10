@@ -41,6 +41,7 @@ windows-future = "0.3.2"
 jni = "0.21.1"
 ndk-context = "0.1.1"
 tauri-plugin-barcode-scanner = "2.4.4"
+tauri-plugin-notification = "2.3.3"
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-autostart = "2.5.1"

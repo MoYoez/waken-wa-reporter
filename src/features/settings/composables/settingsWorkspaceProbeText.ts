@@ -2,7 +2,13 @@ import {
   resolveLocalizedEntry,
   resolveLocalizedText,
 } from "@/lib/localizedText";
-import type { PlatformProbeResult, PlatformSelfTestResult } from "@/types";
+import type {
+  AndroidPermissionStatus,
+  PlatformProbeResult,
+  PlatformSelfTestResult,
+} from "@/types";
+
+export type SelfTestPermissionAction = "usage" | "notification" | "accessibility";
 
 export interface SelfTestCardView {
   key: "foreground" | "windowTitle" | "media";
@@ -10,7 +16,7 @@ export interface SelfTestCardView {
   success: boolean;
   primaryText: string;
   secondaryText: string;
-  showAccessibilityAction?: boolean;
+  permissionAction?: SelfTestPermissionAction;
 }
 
 type TranslateFn = (key: string, params?: Record<string, unknown>) => string;
@@ -18,10 +24,14 @@ type TranslateFn = (key: string, params?: Record<string, unknown>) => string;
 export function buildSelfTestCardViews(
   result: PlatformSelfTestResult | null,
   t: TranslateFn,
+  permissionStatus: AndroidPermissionStatus | null = null,
 ) {
   if (!result) {
     return [];
   }
+
+  const usageAccessGranted = Boolean(permissionStatus?.usageAccessGranted);
+  const notificationListenerGranted = Boolean(permissionStatus?.notificationListenerGranted);
 
   return [
     {
@@ -30,9 +40,12 @@ export function buildSelfTestCardViews(
       success: result.foreground.success,
       primaryText: primaryProbeText(result.foreground, t),
       secondaryText: secondaryProbeText(result.foreground, t),
-      showAccessibilityAction:
+      permissionAction:
         result.platform === "android"
-        && !result.foreground.success,
+        && !usageAccessGranted
+        && result.foreground.detailKey === "platformSelfTest.detail.androidUsageAccessRequired"
+          ? "usage"
+          : undefined,
     },
     {
       key: "windowTitle",
@@ -40,9 +53,11 @@ export function buildSelfTestCardViews(
       success: result.windowTitle.success,
       primaryText: primaryProbeText(result.windowTitle, t),
       secondaryText: secondaryProbeText(result.windowTitle, t),
-      showAccessibilityAction:
-        (result.platform === "macos" || result.platform === "android")
-        && !result.windowTitle.success,
+      permissionAction:
+        result.platform === "macos"
+        && result.windowTitle.detailKey === "platformSelfTest.detail.windowTitleEmptyPermissionMissing"
+          ? "accessibility"
+          : undefined,
     },
     {
       key: "media",
@@ -50,9 +65,12 @@ export function buildSelfTestCardViews(
       success: result.media.success,
       primaryText: primaryProbeText(result.media, t),
       secondaryText: secondaryProbeText(result.media, t),
-      showAccessibilityAction:
+      permissionAction:
         result.platform === "android"
-        && !result.media.success,
+        && !notificationListenerGranted
+        && result.media.detailKey === "platformSelfTest.detail.androidNotificationAccessRequired"
+          ? "notification"
+          : undefined,
     },
   ] satisfies SelfTestCardView[];
 }

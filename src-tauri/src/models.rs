@@ -87,6 +87,10 @@ pub fn default_discord_source_id() -> String {
     String::new()
 }
 
+pub fn default_android_reporter_notification_enabled() -> bool {
+    false
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClientCapabilities {
@@ -218,6 +222,8 @@ pub struct ClientConfig {
     pub discord_source_id: String,
     #[serde(default)]
     pub launch_on_startup: bool,
+    #[serde(default = "default_android_reporter_notification_enabled")]
+    pub android_reporter_notification_enabled: bool,
 }
 
 impl Default for ClientConfig {
@@ -248,6 +254,7 @@ impl Default for ClientConfig {
             discord_application_id: default_discord_application_id(),
             discord_source_id: default_discord_source_id(),
             launch_on_startup: false,
+            android_reporter_notification_enabled: default_android_reporter_notification_enabled(),
         }
     }
 }
@@ -458,6 +465,17 @@ pub struct DiscordPresenceSnapshot {
     pub last_error: Option<String>,
     #[serde(default)]
     pub current_summary: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AndroidPermissionStatus {
+    #[serde(default)]
+    pub usage_access_granted: bool,
+    #[serde(default)]
+    pub notification_listener_granted: bool,
+    #[serde(default)]
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

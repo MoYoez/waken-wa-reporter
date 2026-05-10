@@ -44,15 +44,6 @@ export function useSettingsWorkspace(
   const selfTestSupported = computed(() => props.capabilities.platformSelfTest);
   const autostartSupported = computed(() => props.capabilities.autostart);
   const isNativeNotice = computed(() => !props.capabilities.realtimeReporter);
-  const canRequestAccessibilityPermission = computed(() => {
-    if (!props.capabilities.platformSelfTest) {
-      return false;
-    }
-    if (typeof navigator === "undefined") {
-      return false;
-    }
-    return /mac|android/i.test(navigator.userAgent);
-  });
   const { notify } = createNotifier(toast, () => isNativeNotice.value);
   const discordConfigIssues = computed(() =>
     validateDiscordPresenceConfig(props.modelValue, props.capabilities),
@@ -60,8 +51,13 @@ export function useSettingsWorkspace(
   const discordConfigReady = computed(() => discordConfigIssues.value.length === 0);
   const {
     accessibilityPermissionLoading,
-    handleRequestAccessibilityPermission,
+    androidNotificationPermissionLoading,
+    androidReporterNotificationPermissionGranted,
+    handleRequestAndroidReporterNotificationPermission,
+    handleRequestPermission,
     handleSelfTest,
+    refreshAndroidReporterNotificationPermission,
+    refreshAndroidPermissionStatus,
     selfTestCards,
     selfTestLoading,
     selfTestPlatformHintKey,
@@ -109,16 +105,20 @@ export function useSettingsWorkspace(
 
   return {
     accessibilityPermissionLoading,
+    androidNotificationPermissionLoading,
+    androidReporterNotificationPermissionGranted,
     autostartSupported,
-    canRequestAccessibilityPermission,
     configReady,
     discordConfigIssues,
     discordConfigReady,
     discordSupported,
     formatTime,
-    handleRequestAccessibilityPermission,
+    handleRequestAndroidReporterNotificationPermission,
+    handleRequestPermission,
     handleRestartApp,
     handleSelfTest,
+    refreshAndroidReporterNotificationPermission,
+    refreshAndroidPermissionStatus,
     reporterSupported,
     selfTestCards,
     selfTestLoading,

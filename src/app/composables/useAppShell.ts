@@ -13,6 +13,7 @@ import { useAppShellState } from "@/app/composables/useAppShellState";
 import { useAppShellRuntime } from "@/app/composables/useAppShellRuntime";
 import { useAppShellViewport } from "@/app/composables/useAppShellViewport";
 import { useAppShellWatchers } from "@/app/composables/useAppShellWatchers";
+import { useAndroidReporterNotification } from "@/app/composables/useAndroidReporterNotification";
 import { resolveApiErrorMessage } from "@/lib/localizedText";
 import { createNotifier } from "@/lib/notify";
 
@@ -170,6 +171,19 @@ export function useAppShell() {
     discordSupported,
     readiness,
     rememberVerifiedGeneratedHashKey,
+  });
+
+  useAndroidReporterNotification({
+    t: translateText,
+    capabilities,
+    config,
+    hydrated,
+    readiness,
+    reporterBusy,
+    reporterSnapshot,
+    reporterSupported,
+    handleStartReporter,
+    handleStopReporter,
   });
 
   const { bootstrapAppShell } = useAppShellBootstrap({

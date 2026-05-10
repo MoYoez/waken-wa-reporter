@@ -91,6 +91,9 @@ pub fn run() {
                 app.handle()
                     .plugin(tauri_plugin_barcode_scanner::init())
                     .map_err(|error| -> Box<dyn std::error::Error> { error.into() })?;
+                app.handle()
+                    .plugin(tauri_plugin_notification::init())
+                    .map_err(|error| -> Box<dyn std::error::Error> { error.into() })?;
             }
 
             #[cfg(desktop)]
@@ -200,6 +203,10 @@ pub fn run() {
         commands::get_discord_presence_snapshot,
         commands::run_platform_self_test,
         commands::request_accessibility_permission,
+        commands::get_android_permission_status,
+        commands::request_android_usage_access,
+        commands::request_android_notification_access,
+        commands::open_android_reporter_notification_settings,
         commands::discover_existing_reporter_config
     ]);
 
@@ -221,6 +228,10 @@ pub fn run() {
         commands::get_realtime_reporter_snapshot,
         commands::run_platform_self_test,
         commands::request_accessibility_permission,
+        commands::get_android_permission_status,
+        commands::request_android_usage_access,
+        commands::request_android_notification_access,
+        commands::open_android_reporter_notification_settings,
         commands::discover_existing_reporter_config
     ]);
 

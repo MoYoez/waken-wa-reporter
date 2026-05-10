@@ -36,6 +36,7 @@ export interface ClientConfig {
   discordApplicationId: string;
   discordSourceId: string;
   launchOnStartup: boolean;
+  androidReporterNotificationEnabled: boolean;
 }
 
 export type MediaPlaySourceRuleAction = "block" | "rename";
@@ -221,6 +222,12 @@ export interface DiscordPresenceSnapshot {
   lastSyncAt?: string | null;
   lastError?: string | null;
   currentSummary?: string | null;
+}
+
+export interface AndroidPermissionStatus {
+  usageAccessGranted: boolean;
+  notificationListenerGranted: boolean;
+  error?: string | null;
 }
 
 export interface LocalizedTextEntry {

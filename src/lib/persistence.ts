@@ -79,6 +79,7 @@ export const defaultClientConfig = (): ClientConfig => ({
   discordApplicationId: "",
   discordSourceId: "",
   launchOnStartup: false,
+  androidReporterNotificationEnabled: false,
 });
 
 export async function loadAppState(): Promise<AppStatePayload> {

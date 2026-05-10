@@ -23,6 +23,7 @@
     "@tauri-apps/plugin-autostart": "^2.5.1",
     "@tauri-apps/plugin-barcode-scanner": "^2.4.4",
     "@tauri-apps/plugin-deep-link": "^2.4.9",
+    "@tauri-apps/plugin-notification": "^2.3.3",
     "lexical": "^0.38.1",
     "lexical-vue": "^0.14.1",
     "pinia": "^3.0.4",

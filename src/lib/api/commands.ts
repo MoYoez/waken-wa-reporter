@@ -14,6 +14,7 @@ import type {
   ActivityFeedData,
   ActivityPayload,
   ApiResult,
+  AndroidPermissionStatus,
   ClientCapabilities,
   ClientConfig,
   DiscordPresenceSnapshot,
@@ -172,6 +173,22 @@ export async function runPlatformSelfTest(): Promise<ApiResult<PlatformSelfTestR
 
 export async function requestAccessibilityPermission(): Promise<ApiResult<boolean>> {
   return invokeApi("request_accessibility_permission");
+}
+
+export async function requestAndroidUsageAccess(): Promise<ApiResult<boolean>> {
+  return invokeApi("request_android_usage_access");
+}
+
+export async function requestAndroidNotificationAccess(): Promise<ApiResult<boolean>> {
+  return invokeApi("request_android_notification_access");
+}
+
+export async function openAndroidReporterNotificationSettings(): Promise<ApiResult<boolean>> {
+  return invokeApi("open_android_reporter_notification_settings");
+}
+
+export async function getAndroidPermissionStatus(): Promise<ApiResult<AndroidPermissionStatus>> {
+  return invokeApi("get_android_permission_status");
 }
 
 export async function discoverExistingReporterConfig(): Promise<ApiResult<ExistingReporterConfig>> {

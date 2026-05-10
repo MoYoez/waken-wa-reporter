@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { onBeforeUnmount, onMounted } from "vue";
+
 import ConnectionPanel from "@/features/settings/components/ConnectionPanel.vue";
+import SettingsAndroidNotificationCard from "@/features/settings/components/SettingsAndroidNotificationCard.vue";
 import SettingsDiscordCard from "@/features/settings/components/SettingsDiscordCard.vue";
 import SettingsHeaderPanel from "@/features/settings/components/SettingsHeaderPanel.vue";
 import SettingsLanguageCard from "@/features/settings/components/SettingsLanguageCard.vue";
@@ -41,15 +44,19 @@ const emit = defineEmits<{
 
 const {
   accessibilityPermissionLoading,
+  androidNotificationPermissionLoading,
+  androidReporterNotificationPermissionGranted,
   autostartSupported,
-  canRequestAccessibilityPermission,
   configReady,
   discordConfigIssues,
   discordConfigReady,
   discordSupported,
-  handleRequestAccessibilityPermission,
+  handleRequestAndroidReporterNotificationPermission,
+  handleRequestPermission,
   handleRestartApp,
   handleSelfTest,
+  refreshAndroidReporterNotificationPermission,
+  refreshAndroidPermissionStatus,
   reporterSupported,
   selfTestCards,
   selfTestLoading,
@@ -60,6 +67,47 @@ const {
 } = useSettingsWorkspace(props, {
   onUpdateModelValue: (value) => emit("update:modelValue", value),
   onRestartApp: () => emit("restartApp"),
+});
+
+let permissionRefreshTimer: number | undefined;
+
+function isAndroidRuntime() {
+  return typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+}
+
+function refreshPermissionStateAfterReturn() {
+  window.clearTimeout(permissionRefreshTimer);
+  permissionRefreshTimer = window.setTimeout(() => {
+    void refreshAndroidReporterNotificationPermission({ silent: true });
+    void refreshAndroidPermissionStatus({ silent: true });
+    void handleSelfTest({ silent: true });
+  }, 250);
+}
+
+function handleVisibilityChange() {
+  if (document.visibilityState === "visible" && isAndroidRuntime()) {
+    refreshPermissionStateAfterReturn();
+  }
+}
+
+function handleWindowFocus() {
+  if (isAndroidRuntime()) {
+    refreshPermissionStateAfterReturn();
+  }
+}
+
+onMounted(() => {
+  if (isAndroidRuntime()) {
+    void refreshAndroidReporterNotificationPermission({ silent: true });
+  }
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+  window.addEventListener("focus", handleWindowFocus);
+});
+
+onBeforeUnmount(() => {
+  window.clearTimeout(permissionRefreshTimer);
+  document.removeEventListener("visibilitychange", handleVisibilityChange);
+  window.removeEventListener("focus", handleWindowFocus);
 });
 </script>
 
@@ -98,7 +146,6 @@ const {
       :snapshot="reporterSnapshot"
       :reporter-busy="reporterBusy"
       :self-test-supported="selfTestSupported"
-      :can-request-accessibility-permission="canRequestAccessibilityPermission"
       :self-test-loading="selfTestLoading"
       :accessibility-permission-loading="accessibilityPermissionLoading"
       :self-test-platform="selfTestResult?.platform || ''"
@@ -107,10 +154,19 @@ const {
       @start="$emit('startReporter')"
       @stop="$emit('stopReporter')"
       @self-test="handleSelfTest"
-      @request-accessibility-permission="handleRequestAccessibilityPermission"
+      @request-permission="handleRequestPermission"
     />
 
-    <SettingsMobileCard v-else />
+    <SettingsAndroidNotificationCard
+      v-if="isAndroidRuntime()"
+      :enabled="modelValue.androidReporterNotificationEnabled"
+      :permission-granted="androidReporterNotificationPermissionGranted"
+      :permission-loading="androidNotificationPermissionLoading"
+      @update-enabled="updateField('androidReporterNotificationEnabled', $event)"
+      @request-permission="handleRequestAndroidReporterNotificationPermission"
+    />
+
+    <SettingsMobileCard v-if="!reporterSupported" />
 
     <SettingsDiscordCard
       v-if="discordSupported"

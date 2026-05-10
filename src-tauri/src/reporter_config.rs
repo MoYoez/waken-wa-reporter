@@ -101,6 +101,8 @@ pub fn discover_existing_reporter_config(
             discord_application_id: crate::models::default_discord_application_id(),
             discord_source_id: crate::models::default_discord_source_id(),
             launch_on_startup: false,
+            android_reporter_notification_enabled:
+                crate::models::default_android_reporter_notification_enabled(),
         }),
     })
 }

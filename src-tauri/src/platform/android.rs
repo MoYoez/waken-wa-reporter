@@ -10,18 +10,19 @@ use super::{
     build_self_test_result, localized_text, make_probe, media_timestamps_from_position,
     now_unix_millis_i64, DevicePowerInfo, ForegroundSnapshot, MediaInfo,
 };
-use crate::models::PlatformSelfTestResult;
+use crate::models::{AndroidPermissionStatus, PlatformSelfTestResult};
 
 const COLLECTOR_CLASS: &str = "com/waken_wa_reporter_rustc/app/AndroidActivityCollector";
 const COLLECTOR_BINARY_NAME: &str = "com.waken_wa_reporter_rustc.app.AndroidActivityCollector";
-
-#[derive(Debug, Default, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct AndroidPermissionStatus {
-    usage_access_granted: bool,
-    notification_listener_granted: bool,
-    error: Option<String>,
-}
+const ANDROID_INTENT_FLAG_ACTIVITY_NEW_TASK: i32 = 0x10000000;
+const ANDROID_SETTINGS_USAGE_ACCESS: &str = "android.settings.USAGE_ACCESS_SETTINGS";
+const ANDROID_SETTINGS_NOTIFICATION_LISTENER: &str =
+    "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS";
+const ANDROID_SETTINGS_ACCESSIBILITY: &str = "android.settings.ACCESSIBILITY_SETTINGS";
+const ANDROID_SETTINGS_APP_NOTIFICATION: &str = "android.settings.APP_NOTIFICATION_SETTINGS";
+const ANDROID_SETTINGS_APPLICATION_DETAILS: &str =
+    "android.settings.APPLICATION_DETAILS_SETTINGS";
+const ANDROID_SETTINGS_EXTRA_APP_PACKAGE: &str = "android.provider.extra.APP_PACKAGE";
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -55,13 +56,6 @@ struct AndroidMediaInfo {
 struct AndroidPowerInfo {
     battery_level: Option<i64>,
     is_charging: Option<bool>,
-}
-
-#[derive(Debug, Default, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct AndroidPermissionRequestResult {
-    granted: bool,
-    error: Option<String>,
 }
 
 pub fn get_foreground_snapshot() -> Result<ForegroundSnapshot, String> {
@@ -325,17 +319,215 @@ pub fn run_self_test() -> PlatformSelfTestResult {
 }
 
 pub fn request_accessibility_permission() -> Result<bool, String> {
-    let raw = call_static_string(
-        "openRequiredPermissionSettings",
-        "()Ljava/lang/String;",
-        &[],
-    )?;
-    let parsed: AndroidPermissionRequestResult = serde_json::from_str(&raw)
-        .map_err(|error| format!("解析 Android 权限跳转结果失败：{error}；原始数据：{raw}"))?;
-    if let Some(error) = parsed.error.filter(|value| !value.trim().is_empty()) {
-        return Err(error);
+    let _ = request_android_accessibility_permission()?;
+    Ok(false)
+}
+
+pub fn request_android_usage_access() -> Result<bool, String> {
+    let granted = permission_status()?.usage_access_granted;
+    open_android_settings(ANDROID_SETTINGS_USAGE_ACCESS)?;
+    Ok(granted)
+}
+
+pub fn request_android_notification_access() -> Result<bool, String> {
+    let granted = permission_status()?.notification_listener_granted;
+    open_android_settings(ANDROID_SETTINGS_NOTIFICATION_LISTENER)?;
+    Ok(granted)
+}
+
+pub fn request_android_accessibility_permission() -> Result<bool, String> {
+    open_android_settings(ANDROID_SETTINGS_ACCESSIBILITY)?;
+    Ok(false)
+}
+
+pub fn open_android_reporter_notification_settings() -> Result<bool, String> {
+    match open_android_app_notification_settings() {
+        Ok(()) => Ok(false),
+        Err(notification_error) => {
+            open_android_application_details_settings().map_err(|fallback_error| {
+                format!(
+                    "打开 Android 通知设置失败：{notification_error}；打开应用设置也失败：{fallback_error}"
+                )
+            })?;
+            Ok(false)
+        }
     }
-    Ok(parsed.granted)
+}
+
+pub fn get_permission_status() -> Result<AndroidPermissionStatus, String> {
+    permission_status()
+}
+
+fn open_android_settings(action: &str) -> Result<(), String> {
+    let context = ndk_context::android_context();
+    let java_vm = unsafe {
+        JavaVM::from_raw(context.vm().cast())
+            .map_err(|error| format!("获取 Android JVM 失败：{error}"))?
+    };
+    let mut env = java_vm
+        .attach_current_thread()
+        .map_err(|error| format!("附加 Android JVM 线程失败：{error}"))?;
+    let action = env
+        .new_string(action)
+        .map_err(|error| format!("创建 Android 设置 Intent action 失败：{error}"))?;
+    let action = JObject::from(action);
+    let intent_class = env
+        .find_class("android/content/Intent")
+        .map_err(|error| format!("查找 Android Intent 类失败：{error}"))?;
+    let intent = env
+        .new_object(
+            intent_class,
+            "(Ljava/lang/String;)V",
+            &[JValue::Object(&action)],
+        )
+        .map_err(|error| format!("创建 Android 设置 Intent 失败：{error}"))?;
+    env.call_method(
+        &intent,
+        "addFlags",
+        "(I)Landroid/content/Intent;",
+        &[JValue::Int(ANDROID_INTENT_FLAG_ACTIVITY_NEW_TASK)],
+    )
+    .map_err(|error| format!("设置 Android Intent flag 失败：{error}"))?;
+
+    let context = unsafe { JObject::from_raw(context.context().cast()) };
+    env.call_method(
+        context,
+        "startActivity",
+        "(Landroid/content/Intent;)V",
+        &[JValue::Object(&intent)],
+    )
+    .map_err(|error| format!("打开 Android 设置失败：{error}"))?;
+    Ok(())
+}
+
+fn open_android_app_notification_settings() -> Result<(), String> {
+    let context = ndk_context::android_context();
+    let java_vm = unsafe {
+        JavaVM::from_raw(context.vm().cast())
+            .map_err(|error| format!("获取 Android JVM 失败：{error}"))?
+    };
+    let mut env = java_vm
+        .attach_current_thread()
+        .map_err(|error| format!("附加 Android JVM 线程失败：{error}"))?;
+    let action = env
+        .new_string(ANDROID_SETTINGS_APP_NOTIFICATION)
+        .map_err(|error| format!("创建 Android 通知设置 Intent action 失败：{error}"))?;
+    let action = JObject::from(action);
+    let intent_class = env
+        .find_class("android/content/Intent")
+        .map_err(|error| format!("查找 Android Intent 类失败：{error}"))?;
+    let intent = env
+        .new_object(
+            intent_class,
+            "(Ljava/lang/String;)V",
+            &[JValue::Object(&action)],
+        )
+        .map_err(|error| format!("创建 Android 通知设置 Intent 失败：{error}"))?;
+    let package_name = android_package_name(&mut env, context.context().cast())?;
+    let package_extra = env
+        .new_string(ANDROID_SETTINGS_EXTRA_APP_PACKAGE)
+        .map_err(|error| format!("创建 Android 通知设置包名参数失败：{error}"))?;
+    let package_extra = JObject::from(package_extra);
+    env.call_method(
+        &intent,
+        "putExtra",
+        "(Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent;",
+        &[JValue::Object(&package_extra), JValue::Object(&package_name)],
+    )
+    .map_err(|error| format!("设置 Android 通知设置包名失败：{error}"))?;
+    start_android_activity(&mut env, context.context().cast(), &intent)
+}
+
+fn open_android_application_details_settings() -> Result<(), String> {
+    let context = ndk_context::android_context();
+    let java_vm = unsafe {
+        JavaVM::from_raw(context.vm().cast())
+            .map_err(|error| format!("获取 Android JVM 失败：{error}"))?
+    };
+    let mut env = java_vm
+        .attach_current_thread()
+        .map_err(|error| format!("附加 Android JVM 线程失败：{error}"))?;
+    let action = env
+        .new_string(ANDROID_SETTINGS_APPLICATION_DETAILS)
+        .map_err(|error| format!("创建 Android 应用设置 Intent action 失败：{error}"))?;
+    let action = JObject::from(action);
+    let intent_class = env
+        .find_class("android/content/Intent")
+        .map_err(|error| format!("查找 Android Intent 类失败：{error}"))?;
+    let intent = env
+        .new_object(
+            intent_class,
+            "(Ljava/lang/String;)V",
+            &[JValue::Object(&action)],
+        )
+        .map_err(|error| format!("创建 Android 应用设置 Intent 失败：{error}"))?;
+    let package_name = android_package_name(&mut env, context.context().cast())?;
+    let scheme = env
+        .new_string("package")
+        .map_err(|error| format!("创建 Android 应用设置 URI scheme 失败：{error}"))?;
+    let scheme = JObject::from(scheme);
+    let uri_class = env
+        .find_class("android/net/Uri")
+        .map_err(|error| format!("查找 Android Uri 类失败：{error}"))?;
+    let uri = env
+        .call_static_method(
+            uri_class,
+            "fromParts",
+            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Landroid/net/Uri;",
+            &[
+                JValue::Object(&scheme),
+                JValue::Object(&package_name),
+                JValue::Object(&JObject::null()),
+            ],
+        )
+        .and_then(|value| value.l())
+        .map_err(|error| format!("创建 Android 应用设置 URI 失败：{error}"))?;
+    env.call_method(
+        &intent,
+        "setData",
+        "(Landroid/net/Uri;)Landroid/content/Intent;",
+        &[JValue::Object(&uri)],
+    )
+    .map_err(|error| format!("设置 Android 应用设置 URI 失败：{error}"))?;
+    start_android_activity(&mut env, context.context().cast(), &intent)
+}
+
+fn android_package_name<'local>(
+    env: &mut jni::JNIEnv<'local>,
+    context: jobject,
+) -> Result<JObject<'local>, String> {
+    let context = unsafe { JObject::from_raw(context) };
+    env.call_method(context, "getPackageName", "()Ljava/lang/String;", &[])
+        .and_then(|value| value.l())
+        .map_err(|error| format!("读取 Android 包名失败：{error}"))
+}
+
+fn start_android_activity(
+    env: &mut jni::JNIEnv<'_>,
+    context: jobject,
+    intent: &JObject<'_>,
+) -> Result<(), String> {
+    env.call_method(
+        intent,
+        "addFlags",
+        "(I)Landroid/content/Intent;",
+        &[JValue::Int(ANDROID_INTENT_FLAG_ACTIVITY_NEW_TASK)],
+    )
+    .map_err(|error| format!("设置 Android Intent flag 失败：{error}"))?;
+
+    let context = unsafe { JObject::from_raw(context) };
+    match env.call_method(
+        context,
+        "startActivity",
+        "(Landroid/content/Intent;)V",
+        &[JValue::Object(intent)],
+    ) {
+        Ok(_) => Ok(()),
+        Err(error) => {
+            let _ = clear_pending_exception(env);
+            Err(format!("打开 Android 设置失败：{error}"))
+        }
+    }
 }
 
 fn read_now_playing(

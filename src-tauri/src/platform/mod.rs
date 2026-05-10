@@ -23,6 +23,7 @@ use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use image::ImageFormat;
 use serde_json::{Map, Value};
 
+use crate::models::AndroidPermissionStatus;
 use crate::models::{LocalizedTextEntry, PlatformProbeResult, PlatformSelfTestResult};
 
 #[cfg(target_os = "macos")]
@@ -366,6 +367,28 @@ pub use stub::run_self_test;
 #[cfg(target_os = "windows")]
 pub use windows::run_self_test;
 
+#[cfg(target_os = "android")]
+pub use android::{
+    get_permission_status, open_android_reporter_notification_settings,
+    request_android_accessibility_permission,
+    request_android_notification_access, request_android_usage_access,
+};
+#[cfg(not(target_os = "android"))]
+pub fn get_permission_status() -> Result<AndroidPermissionStatus, String> {
+    Err("当前平台不支持 Android 权限状态查询。".into())
+}
+#[cfg(not(target_os = "android"))]
+pub fn request_android_usage_access() -> Result<bool, String> {
+    Err("当前平台不支持 Android 使用情况访问权限申请。".into())
+}
+#[cfg(not(target_os = "android"))]
+pub fn request_android_notification_access() -> Result<bool, String> {
+    Err("当前平台不支持 Android 通知使用权申请。".into())
+}
+#[cfg(not(target_os = "android"))]
+pub fn open_android_reporter_notification_settings() -> Result<bool, String> {
+    Err("当前平台不支持 Android 通知设置。".into())
+}
 #[cfg(target_os = "android")]
 pub use android::request_accessibility_permission;
 #[cfg(target_os = "linux")]

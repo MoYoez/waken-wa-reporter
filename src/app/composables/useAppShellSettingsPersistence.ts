@@ -88,6 +88,9 @@ export function useAppShellSettingsPersistence(options: UseAppShellPersistenceOp
       reporterEnabled: false,
       discordEnabled: false,
       launchOnStartup: false,
+      androidReporterNotificationEnabled: Boolean(
+        normalizedBase.androidReporterNotificationEnabled,
+      ),
     };
   };
 

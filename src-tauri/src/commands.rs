@@ -13,8 +13,8 @@ use crate::discord_presence::DiscordPresenceRuntime;
 #[cfg(desktop)]
 use crate::models::DiscordPresenceSnapshot;
 use crate::models::{
-    ActivityPayload, ApiResult, AppStatePayload, ClientCapabilities, ClientConfig,
-    ExistingReporterConfig, ImportedIntegrationConfig, InspirationEntryCreateInput,
+    ActivityPayload, AndroidPermissionStatus, ApiResult, AppStatePayload, ClientCapabilities,
+    ClientConfig, ExistingReporterConfig, ImportedIntegrationConfig, InspirationEntryCreateInput,
     PlatformSelfTestResult, RealtimeReporterSnapshot,
 };
 use crate::realtime_reporter::ReporterRuntime;
@@ -149,6 +149,26 @@ pub async fn run_platform_self_test() -> Result<ApiResult<PlatformSelfTestResult
 #[tauri::command]
 pub fn request_accessibility_permission() -> Result<ApiResult<bool>, String> {
     platform::request_accessibility_permission()
+}
+
+#[tauri::command]
+pub fn get_android_permission_status() -> Result<ApiResult<AndroidPermissionStatus>, String> {
+    platform::get_android_permission_status()
+}
+
+#[tauri::command]
+pub fn request_android_usage_access() -> Result<ApiResult<bool>, String> {
+    platform::request_android_usage_access()
+}
+
+#[tauri::command]
+pub fn request_android_notification_access() -> Result<ApiResult<bool>, String> {
+    platform::request_android_notification_access()
+}
+
+#[tauri::command]
+pub fn open_android_reporter_notification_settings() -> Result<ApiResult<bool>, String> {
+    platform::open_android_reporter_notification_settings()
 }
 
 #[tauri::command]
