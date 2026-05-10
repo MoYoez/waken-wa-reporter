@@ -1,4 +1,4 @@
-use serde_json::Value;
+use serde_json::{json, Value};
 
 use super::helpers::{
     build_activity_report_body, build_connectivity_probe_body, build_inspiration_asset_body,
@@ -20,6 +20,7 @@ pub async fn submit_activity_report(
         "/api/activity",
         Some(&config.api_token),
         config.use_system_proxy,
+        &config.proxy_url,
         reqwest::Method::POST,
         Some(body),
     )
@@ -32,6 +33,7 @@ pub async fn get_public_activity_feed(config: ClientConfig) -> Result<ApiResult<
         "/api/activity?public=1",
         None,
         config.use_system_proxy,
+        &config.proxy_url,
         reqwest::Method::GET,
         None,
     )
@@ -62,6 +64,7 @@ pub async fn list_inspiration_entries(
         &path,
         None,
         config.use_system_proxy,
+        &config.proxy_url,
         reqwest::Method::GET,
         None,
     )
@@ -71,15 +74,31 @@ pub async fn list_inspiration_entries(
 pub async fn probe_connectivity(config: ClientConfig) -> Result<ApiResult<Value>, String> {
     let body = build_connectivity_probe_body(&config);
 
-    Ok(request_json(
+    let result = request_json(
         &config.base_url,
         "/api/activity/verify",
         Some(&config.api_token),
         config.use_system_proxy,
+        &config.proxy_url,
         reqwest::Method::POST,
         Some(body),
     )
-    .await)
+    .await;
+
+    if !result.success && result.status == 404 {
+        return Ok(ApiResult::failure_localized(
+            404,
+            Some("backendErrors.verifyEndpointUnsupported".to_string()),
+            "服务端不支持新版校验接口，但上报接口可能仍可用。如需严格校验 Token/Key，请在服务端补齐 /api/activity/verify。",
+            Some(json!({ "status": 404 })),
+            Some(json!({
+                "path": "/api/activity/verify",
+                "original": result.error,
+            })),
+        ));
+    }
+
+    Ok(result)
 }
 
 pub async fn create_inspiration_entry(
@@ -108,6 +127,7 @@ pub async fn create_inspiration_entry(
         "/api/inspiration/entries",
         Some(&config.api_token),
         config.use_system_proxy,
+        &config.proxy_url,
         reqwest::Method::POST,
         Some(body),
     )
@@ -140,6 +160,7 @@ pub async fn upload_inspiration_asset(
         "/api/inspiration/assets",
         Some(&config.api_token),
         config.use_system_proxy,
+        &config.proxy_url,
         reqwest::Method::POST,
         Some(body),
     )

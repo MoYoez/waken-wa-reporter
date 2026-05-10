@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "android-barcode-scanner",
+  "description": "Android-only barcode scanner access for QR config import",
+  "windows": ["main"],
+  "platforms": ["android"],
+  "permissions": [
+    "barcode-scanner:allow-scan"
+  ]
+}

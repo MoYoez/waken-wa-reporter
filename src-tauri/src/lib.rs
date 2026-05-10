@@ -31,6 +31,8 @@ use realtime_reporter::{config_is_ready, ReporterRuntime};
 const SINGLE_INSTANCE_EVENT: &str = "single-instance-attempted";
 #[cfg(desktop)]
 const AUTOSTART_ARG: &str = "--from-autostart";
+#[cfg(desktop)]
+const DEEP_LINK_SCHEME_PREFIX: &str = "waken-wa-reporter://";
 
 #[cfg(desktop)]
 #[derive(Clone, Serialize)]
@@ -45,9 +47,18 @@ fn has_autostart_arg(args: &[String]) -> bool {
     args.iter().any(|arg| arg == AUTOSTART_ARG)
 }
 
+#[cfg(desktop)]
+fn has_deep_link_arg(args: &[String]) -> bool {
+    args.iter()
+        .any(|arg| arg.starts_with(DEEP_LINK_SCHEME_PREFIX))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default();
+
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_deep_link::init());
 
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
@@ -57,6 +68,10 @@ pub fn run() {
         }
 
         let _ = tray::show_main_window(app);
+        if has_deep_link_arg(&args) {
+            return;
+        }
+
         let _ = app.emit(SINGLE_INSTANCE_EVENT, SingleInstancePayload { args, cwd });
     }));
 
@@ -71,6 +86,13 @@ pub fn run() {
 
     let builder = builder
         .setup(|app| {
+            #[cfg(target_os = "android")]
+            {
+                app.handle()
+                    .plugin(tauri_plugin_barcode_scanner::init())
+                    .map_err(|error| -> Box<dyn std::error::Error> { error.into() })?;
+            }
+
             #[cfg(desktop)]
             {
                 #[cfg(target_os = "macos")]

@@ -3,6 +3,7 @@ import { useI18n } from "vue-i18n";
 import { useToast } from "primevue/usetoast";
 
 import { useAppShellBootstrap } from "@/app/composables/useAppShellBootstrap";
+import { useAppShellDeepLinks } from "@/app/composables/useAppShellDeepLinks";
 import { useAppShellDerivedState } from "@/app/composables/useAppShellDerivedState";
 import { useAppShellLifecycle } from "@/app/composables/useAppShellLifecycle";
 import { useAppShellNavigation } from "@/app/composables/useAppShellNavigation";
@@ -207,6 +208,29 @@ export function useAppShell() {
     handleStartDiscordPresence,
   });
 
+  const { initializeDeepLinks } = useAppShellDeepLinks({
+    t: translateText,
+    notify,
+    config,
+    onboardingDraftConfig,
+    onboardingDismissed,
+    onboardingSetupMode,
+    reporterConfigPromptHandled,
+    reporterSupported,
+    normalizeConfigByCapabilities,
+    inferMobileDeviceType,
+    selectSection,
+  });
+
+  async function bootstrapAppShellWithDeepLinks() {
+    const unlistenSingleInstance = await bootstrapAppShell();
+    const unlistenDeepLinks = await initializeDeepLinks();
+    return () => {
+      unlistenDeepLinks?.();
+      unlistenSingleInstance?.();
+    };
+  }
+
   const { handlePresetSaved } = useAppShellRecentPresets({
     persistAppState,
     recentPresets,
@@ -244,7 +268,7 @@ export function useAppShell() {
     shouldPollDiscordPresenceSnapshot,
     refreshReporterSnapshot,
     refreshDiscordPresenceSnapshot,
-    bootstrapAppShell,
+    bootstrapAppShell: bootstrapAppShellWithDeepLinks,
     stopAllPolling,
   });
 

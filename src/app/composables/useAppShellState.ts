@@ -18,6 +18,7 @@ function createDefaultCapabilities(): ClientCapabilities {
     platformSelfTest: true,
     discordPresence: true,
     autostart: true,
+    qrImport: false,
   };
 }
 

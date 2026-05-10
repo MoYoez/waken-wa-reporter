@@ -91,5 +91,16 @@ const { t } = useI18n();
         @update:model-value="emit('updateField', 'useSystemProxy', Boolean($event))"
       />
     </div>
+
+    <label v-if="props.showUseSystemProxy" class="field-block field-span-2">
+      <span class="field-label">{{ t("connectionPanel.fields.proxyUrl") }}</span>
+      <InputText
+        :model-value="props.modelValue.proxyUrl"
+        :placeholder="t('connectionPanel.placeholders.proxyUrl')"
+        @update:model-value="emit('updateField', 'proxyUrl', $event ?? '')"
+      />
+      <small class="field-help">{{ t("connectionPanel.help.proxyUrl") }}</small>
+      <small class="field-help">{{ t("connectionPanel.help.proxyCaptureTiming") }}</small>
+    </label>
   </div>
 </template>

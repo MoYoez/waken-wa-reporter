@@ -6,6 +6,7 @@ import {
   discoverExistingReporterConfig,
   getClientCapabilities,
 } from "@/lib/api";
+import { isImportDeepLink } from "@/lib/deepLinkImport";
 import type { NotifyPayload } from "@/lib/notify";
 import { loadAppState } from "@/lib/persistence";
 import type {
@@ -59,7 +60,11 @@ export function useAppShellBootstrap(options: UseAppShellBootstrapOptions) {
     try {
       return await listen<SingleInstanceAttemptPayload>(
         "single-instance-attempted",
-        () => {
+        ({ payload }) => {
+          if (payload.args.some(isImportDeepLink)) {
+            return;
+          }
+
           options.notify({
             severity: "warn",
             summary: options.t("app.notify.singleInstanceDetected"),

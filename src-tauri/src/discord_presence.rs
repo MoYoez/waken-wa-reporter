@@ -176,7 +176,7 @@ fn run_discord_presence_loop(
     run_id: u64,
     locale: BackendLocale,
 ) {
-    let http_client = match build_http_client(config.use_system_proxy, locale) {
+    let http_client = match build_http_client(&config, locale) {
         Ok(client) => client,
         Err(error) => {
             set_discord_error(&state, Some(error), false, run_id);
@@ -322,11 +322,12 @@ fn mark_stopped(state: &Arc<Mutex<DiscordPresenceInner>>, run_id: u64) {
     inner.stop_flag = None;
 }
 
-fn build_http_client(use_system_proxy: bool, locale: BackendLocale) -> Result<Client, String> {
+fn build_http_client(config: &ClientConfig, locale: BackendLocale) -> Result<Client, String> {
     build_blocking_client(
         "waken-wa-tauri-discord-presence/0.1.0",
         Some(Duration::from_secs(15)),
-        use_system_proxy,
+        config.use_system_proxy,
+        &config.proxy_url,
         locale,
     )
 }

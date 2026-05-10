@@ -115,6 +115,8 @@ export function useAppShellWatchers(options: UseAppShellWatchersOptions) {
       options.config.value.baseUrl.trim(),
       options.config.value.apiToken.trim(),
       options.config.value.generatedHashKey.trim(),
+      String(options.config.value.useSystemProxy),
+      options.config.value.proxyUrl.trim(),
     ].join("|"),
     () => {
       if (!options.hydrated.value) {

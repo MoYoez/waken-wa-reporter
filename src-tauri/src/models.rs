@@ -95,6 +95,7 @@ pub struct ClientCapabilities {
     pub platform_self_test: bool,
     pub discord_presence: bool,
     pub autostart: bool,
+    pub qr_import: bool,
 }
 
 #[cfg(desktop)]
@@ -105,6 +106,7 @@ pub fn default_client_capabilities() -> ClientCapabilities {
         platform_self_test: true,
         discord_presence: true,
         autostart: !cfg!(debug_assertions),
+        qr_import: false,
     }
 }
 
@@ -116,6 +118,7 @@ pub fn default_client_capabilities() -> ClientCapabilities {
         platform_self_test: true,
         discord_presence: false,
         autostart: false,
+        qr_import: true,
     }
 }
 
@@ -127,6 +130,7 @@ pub fn default_client_capabilities() -> ClientCapabilities {
         platform_self_test: false,
         discord_presence: false,
         autostart: false,
+        qr_import: false,
     }
 }
 
@@ -138,6 +142,7 @@ pub fn default_client_capabilities() -> ClientCapabilities {
         platform_self_test: false,
         discord_presence: false,
         autostart: false,
+        qr_import: false,
     }
 }
 
@@ -171,6 +176,8 @@ pub struct ClientConfig {
     pub generated_hash_key: String,
     #[serde(default = "default_use_system_proxy")]
     pub use_system_proxy: bool,
+    #[serde(default)]
+    pub proxy_url: String,
     #[serde(default = "default_device_name")]
     pub device: String,
     #[serde(default = "default_device_type")]
@@ -220,6 +227,7 @@ impl Default for ClientConfig {
             api_token: String::new(),
             generated_hash_key: String::new(),
             use_system_proxy: default_use_system_proxy(),
+            proxy_url: String::new(),
             device: default_device_name(),
             device_type: default_device_type(),
             push_mode: default_push_mode(),

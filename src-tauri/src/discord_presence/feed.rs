@@ -3,7 +3,7 @@ use reqwest::header::CONTENT_TYPE;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::backend_locale::BackendLocale;
+use crate::{backend_locale::BackendLocale, http_client::format_reqwest_error};
 
 use super::messages::{default_public_feed_failure, format_error, public_feed_status_error};
 
@@ -42,16 +42,23 @@ pub(super) fn fetch_public_activity_feed_blocking(
         .header(CONTENT_TYPE, "application/json")
         .send()
         .map_err(|error| {
-            format_error(
+            format_reqwest_error(
                 locale,
                 "拉取公开活动失败",
                 "Failed to fetch public activity",
-                error,
+                &error,
             )
         })?;
 
     let status = response.status().as_u16();
-    let text = response.text().unwrap_or_default();
+    let text = response.text().map_err(|error| {
+        format_reqwest_error(
+            locale,
+            "读取公开活动响应失败",
+            "Failed to read public activity response",
+            &error,
+        )
+    })?;
     if status >= 400 {
         return Err(public_feed_status_error(locale, status, text.trim()));
     }

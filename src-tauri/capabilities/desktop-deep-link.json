@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "desktop-deep-link",
+  "description": "Desktop-only deep-link handling for config import",
+  "windows": ["main"],
+  "platforms": ["macOS", "windows", "linux"],
+  "permissions": [
+    "core:event:default",
+    "deep-link:default"
+  ]
+}

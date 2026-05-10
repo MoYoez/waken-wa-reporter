@@ -6,7 +6,7 @@ use serde_json::{json, Map, Value};
 
 use crate::{
     backend_locale::BackendLocale,
-    http_client::build_blocking_client,
+    http_client::{build_blocking_client, format_reqwest_error},
     models::{effective_device_name, ActivityPayload, ClientConfig, MediaPlaySourceRule},
     platform::{ForegroundSnapshot, MediaInfo},
 };
@@ -50,13 +50,14 @@ pub(super) fn config_is_ready(config: &ClientConfig) -> bool {
 }
 
 pub(super) fn build_http_client(
-    use_system_proxy: bool,
+    config: &ClientConfig,
     locale: BackendLocale,
 ) -> Result<Client, String> {
     build_blocking_client(
         "waken-wa-tauri-reporter/0.1.0",
         Some(Duration::from_secs(15)),
-        use_system_proxy,
+        config.use_system_proxy,
+        &config.proxy_url,
         locale,
     )
 }
@@ -229,10 +230,12 @@ pub(super) fn post_activity_blocking(
         .header(AUTHORIZATION, format!("Bearer {}", config.api_token.trim()))
         .json(&body)
         .send()
-        .map_err(|error| format_error(locale, "请求失败", "Request failed", error))?;
+        .map_err(|error| format_reqwest_error(locale, "请求失败", "Request failed", &error))?;
 
     let status = response.status().as_u16();
-    let text = response.text().unwrap_or_default();
+    let text = response.text().map_err(|error| {
+        format_reqwest_error(locale, "读取响应失败", "Failed to read response", &error)
+    })?;
     if status >= 400 {
         return Err(server_status_error(locale, status, text.trim()));
     }

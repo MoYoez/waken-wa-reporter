@@ -11,6 +11,7 @@ export {
   requestAccessibilityPermission,
   restartApp,
   runPlatformSelfTest,
+  scanImportQrCode,
   startDiscordPresenceSync,
   startRealtimeReporter,
   stopDiscordPresenceSync,

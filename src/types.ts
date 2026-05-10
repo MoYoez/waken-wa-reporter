@@ -8,6 +8,7 @@ export interface ClientCapabilities {
   platformSelfTest: boolean;
   discordPresence: boolean;
   autostart: boolean;
+  qrImport: boolean;
 }
 
 export interface ClientConfig {
@@ -15,6 +16,7 @@ export interface ClientConfig {
   apiToken: string;
   generatedHashKey: string;
   useSystemProxy: boolean;
+  proxyUrl: string;
   device: string;
   deviceType: DeviceType;
   pushMode: PushMode;

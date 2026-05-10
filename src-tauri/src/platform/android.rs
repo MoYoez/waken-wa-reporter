@@ -471,6 +471,9 @@ fn load_collector_class<'local>(
     match env.find_class(COLLECTOR_CLASS) {
         Ok(class) => return Ok(class),
         Err(find_error) => {
+            clear_pending_exception(env).map_err(|error| {
+                format!("直接查找 Android 采集器失败：{find_error}；清除 JNI 异常失败：{error}")
+            })?;
             let context = unsafe { JObject::from_raw(context) };
             let class_loader = env
                 .call_method(context, "getClassLoader", "()Ljava/lang/ClassLoader;", &[])
@@ -494,6 +497,13 @@ fn load_collector_class<'local>(
             Ok(JClass::from(class))
         }
     }
+}
+
+fn clear_pending_exception(env: &mut jni::JNIEnv<'_>) -> Result<(), jni::errors::Error> {
+    if env.exception_check()? {
+        env.exception_clear()?;
+    }
+    Ok(())
 }
 
 fn jni_bool(value: bool) -> jboolean {

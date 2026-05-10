@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { Format, scan } from "@tauri-apps/plugin-barcode-scanner";
 
 import { translate } from "../../i18n";
 import { resolveApiErrorMessage } from "../localizedText";
@@ -87,6 +88,29 @@ export async function parseImportedIntegrationConfig(
   }
 
   return result.data;
+}
+
+export async function scanImportQrCode(): Promise<string | null> {
+  try {
+    const result = await scan({
+      cameraDirection: "back",
+      formats: [Format.QRCode],
+    });
+
+    return result.content.trim() || null;
+  } catch (error) {
+    const message = error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : "";
+
+    if (message.toLowerCase().includes("cancel")) {
+      return null;
+    }
+
+    throw new Error(message || translate("connectionPanel.notify.qrScanFailedDetail"));
+  }
 }
 
 export async function startRealtimeReporter(

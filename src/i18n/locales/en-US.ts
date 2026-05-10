@@ -30,6 +30,8 @@ const enUS = {
     requestFailed: "Failed to send the request.",
     responseReadFailed: "Failed to read the server response.",
     requestRejected: "Request failed (HTTP {status}).",
+    verifyEndpointUnsupported:
+      "The server does not support the newer verify endpoint, but the report endpoint may still work. Add /api/activity/verify on the server if strict token/key validation is required.",
     reporterConfigBaseUrlMissing: "Missing site URL.",
     reporterConfigApiTokenMissing: "Missing API token.",
     reporterConfigGeneratedHashKeyMissing: "Missing device key.",
@@ -47,6 +49,7 @@ const enUS = {
     importConfigEmpty: "Paste the config first.",
     importConfigTooLarge: "Config is too large ({size}/{maxSize} bytes).",
     importConfigInvalid: "Config format is invalid.",
+    qrScanFailed: "QR scan failed.",
     settingsConfigInvalid: "Settings parameter error.",
     settingsPayloadInvalid: "Settings payload format is invalid.",
   },
@@ -127,6 +130,12 @@ const enUS = {
     },
     notify: {
       importedConfig: "Integration config imported",
+      deepLinkImported: "Config imported from link",
+      deepLinkImportedDetail: "The URL and token were filled in. Review and save the settings.",
+      deepLinkImportedToken: "Imported token from link: {tokenName}",
+      deepLinkImportFailed: "Link import failed",
+      deepLinkImportFailedDetail: "The link did not contain a readable integration config.",
+      deepLinkImportNoPayload: "The link does not contain importable config content.",
       importedExistingConfig: "Existing config imported",
       importedExistingConfigDetail: "Local config imported.",
       settingsSaved: "Settings saved",
@@ -185,6 +194,9 @@ const enUS = {
       configIncompleteDetail: "Required configuration is missing.",
       siteUnreachable: "Site unreachable",
       siteUnreachableDetail: "Check the URL, network, or service status.",
+      verifyUnsupported: "Verify endpoint unavailable",
+      verifyUnsupportedDetail:
+        "The server does not support the newer verify endpoint, but the report endpoint may still work. Add /api/activity/verify on the server if strict token/key validation is required.",
     },
     onboarding: {
       eyebrow: "First-run setup",
@@ -435,6 +447,7 @@ const enUS = {
       generatedHashKey: "Device key (auto-generated)",
       deviceName: "Device name (optional)",
       useSystemProxy: "Use system proxy",
+      proxyUrl: "Explicit proxy URL (optional)",
       pollInterval: "Polling interval",
       heartbeatInterval: "Heartbeat interval",
       reporterEnabled: "Auto-start background sync on launch",
@@ -445,6 +458,7 @@ const enUS = {
       apiToken: "Paste the full token",
       generatedHashKey: "Generated after the first launch",
       deviceName: "Leave blank to use the default device name",
+      proxyUrl: "http://127.0.0.1:7890",
       pollInterval: "2000",
       heartbeatInterval: "60000",
     },
@@ -452,7 +466,9 @@ const enUS = {
       onboardingImport: "Paste the integration config to fill in the URL and token automatically.",
       onboardingAdvanced: "Open this only when manual changes are needed.",
       generatedHashKey: "This identifies the device. Changing it may require approval again.",
-      useSystemProxy: "Requests follow the system proxy settings.",
+      useSystemProxy: "Requests follow the system proxy settings. Turn this off to connect directly.",
+      proxyUrl: "Leave empty to use the system-proxy or direct strategy. Fill this to force all requests through that proxy.",
+      proxyCaptureTiming: "System proxy settings are captured when the HTTP client is created. After changing the system proxy, restart the client or stop and restart realtime sync.",
       reporterOnboarding: "Set polling, heartbeat, auto-start, and report content.",
       reporter: "Set polling, heartbeat, auto-start, and report content.",
       reporterEnabledOnboarding: "If enabled, sync starts on next launch.",
@@ -479,6 +495,7 @@ const enUS = {
     },
     buttons: {
       import: "Import integration config",
+      scanQr: "Scan QR",
     },
     messages: {
       ready: "The current config is ready.",
@@ -490,6 +507,8 @@ const enUS = {
       importSuccessDetail: "The URL and token were filled in automatically.",
       importFailed: "Import failed",
       importFailedDetail: "The config is invalid.",
+      qrScanFailed: "QR scan failed",
+      qrScanFailedDetail: "The QR code could not be read.",
     },
   },
   activity: {

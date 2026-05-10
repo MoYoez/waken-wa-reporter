@@ -30,6 +30,8 @@ const zhCN = {
     requestFailed: "请求发送失败。",
     responseReadFailed: "读取服务端响应失败。",
     requestRejected: "请求失败（HTTP {status}）。",
+    verifyEndpointUnsupported:
+      "服务端不支持新版校验接口，但上报接口可能仍可用。如需严格校验 Token/Key，请在服务端补齐 /api/activity/verify。",
     reporterConfigBaseUrlMissing: "缺少站点地址。",
     reporterConfigApiTokenMissing: "缺少 API Token。",
     reporterConfigGeneratedHashKeyMissing: "缺少设备 Key。",
@@ -47,6 +49,7 @@ const zhCN = {
     importConfigEmpty: "请先粘贴配置。",
     importConfigTooLarge: "配置过大（{size}/{maxSize} 字节）。",
     importConfigInvalid: "配置格式错误。",
+    qrScanFailed: "二维码扫描失败。",
     settingsConfigInvalid: "设置参数错误。",
     settingsPayloadInvalid: "设置数据格式错误。",
   },
@@ -127,6 +130,12 @@ const zhCN = {
     },
     notify: {
       importedConfig: "已导入接入配置",
+      deepLinkImported: "已通过链接导入配置",
+      deepLinkImportedDetail: "已自动填入地址与 Token，请确认后保存。",
+      deepLinkImportedToken: "已通过链接导入 Token：{tokenName}",
+      deepLinkImportFailed: "链接导入失败",
+      deepLinkImportFailedDetail: "无法从链接读取接入配置。",
+      deepLinkImportNoPayload: "链接中没有可导入的配置内容。",
       importedExistingConfig: "已导入现有配置",
       importedExistingConfigDetail: "已导入本机配置。",
       settingsSaved: "设置已保存",
@@ -185,6 +194,9 @@ const zhCN = {
       configIncompleteDetail: "缺少必要配置。",
       siteUnreachable: "无法连接站点",
       siteUnreachableDetail: "请检查地址、网络或服务状态。",
+      verifyUnsupported: "校验接口不可用",
+      verifyUnsupportedDetail:
+        "服务端不支持新版校验接口，但上报接口可能仍可用。如需严格校验 Token/Key，请在服务端补齐 /api/activity/verify。",
     },
     onboarding: {
       eyebrow: "首次引导",
@@ -435,6 +447,7 @@ const zhCN = {
       generatedHashKey: "设备 Key（自动生成）",
       deviceName: "设备名称（可选）",
       useSystemProxy: "使用系统代理",
+      proxyUrl: "显式代理 URL（可选）",
       pollInterval: "轮询间隔",
       heartbeatInterval: "心跳间隔",
       reporterEnabled: "启动后自动开启后台同步",
@@ -445,6 +458,7 @@ const zhCN = {
       apiToken: "粘贴完整 Token",
       generatedHashKey: "首次启动后自动生成",
       deviceName: "留空则使用默认设备名",
+      proxyUrl: "http://127.0.0.1:7890",
       pollInterval: "2000",
       heartbeatInterval: "60000",
     },
@@ -452,7 +466,9 @@ const zhCN = {
       onboardingImport: "粘贴接入配置后会自动填好地址和 Token。",
       onboardingAdvanced: "需要时再手动调整参数。",
       generatedHashKey: "用于标识设备；变更后可能需要重新审核。",
-      useSystemProxy: "按系统代理发送请求。",
+      useSystemProxy: "按系统代理发送请求；关闭后直连。",
+      proxyUrl: "留空时使用系统代理或直连策略；填写后会强制通过该代理发送所有请求。",
+      proxyCaptureTiming: "系统代理在 HTTP 客户端创建时捕获；修改系统代理后，请重启客户端或停止后重新开启实时同步。",
       reporterOnboarding: "配置轮询、心跳、自动启动和上报内容。",
       reporter: "配置轮询、心跳、自动启动和上报内容。",
       reporterEnabledOnboarding: "开启后，下次启动会自动开始同步。",
@@ -479,6 +495,7 @@ const zhCN = {
     },
     buttons: {
       import: "导入接入配置",
+      scanQr: "扫码导入",
     },
     messages: {
       ready: "当前配置可用。",
@@ -490,6 +507,8 @@ const zhCN = {
       importSuccessDetail: "已自动填入地址与 Token。",
       importFailed: "导入失败",
       importFailedDetail: "配置无效。",
+      qrScanFailed: "扫码失败",
+      qrScanFailedDetail: "无法读取二维码。",
     },
   },
   activity: {

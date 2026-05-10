@@ -53,6 +53,8 @@ export function useAppShellMobileConnectivity(options: UseAppShellMobileConnecti
       options.config.value.baseUrl.trim(),
       options.config.value.apiToken.trim(),
       options.config.value.generatedHashKey.trim(),
+      String(options.config.value.useSystemProxy),
+      options.config.value.proxyUrl.trim(),
     ].join("|");
 
     if (
@@ -103,6 +105,7 @@ export function useAppShellMobileConnectivity(options: UseAppShellMobileConnecti
       return;
     }
 
+    let ok: boolean | null = false;
     let summary = options.t("app.mobileConnectivity.failed");
     let detail = options.apiErrorDetail(result.error, options.t("app.mobileConnectivity.failedDetail"));
 
@@ -115,6 +118,10 @@ export function useAppShellMobileConnectivity(options: UseAppShellMobileConnecti
     } else if (result.status === 400) {
       summary = options.t("app.mobileConnectivity.configIncomplete");
       detail = options.apiErrorDetail(result.error, options.t("app.mobileConnectivity.configIncompleteDetail"));
+    } else if (result.status === 404 || result.error?.code === "backendErrors.verifyEndpointUnsupported") {
+      ok = null;
+      summary = options.t("app.mobileConnectivity.verifyUnsupported");
+      detail = options.t("app.mobileConnectivity.verifyUnsupportedDetail");
     } else if (result.status === 0) {
       summary = options.t("app.mobileConnectivity.siteUnreachable");
       detail = options.apiErrorDetail(result.error, options.t("app.mobileConnectivity.siteUnreachableDetail"));
@@ -123,7 +130,7 @@ export function useAppShellMobileConnectivity(options: UseAppShellMobileConnecti
     options.mobileConnectivity.value = {
       checking: false,
       checked: true,
-      ok: false,
+      ok,
       summary,
       detail,
       checkedAt,

@@ -25,6 +25,9 @@ const connectivityLabel = computed(() => {
   if (props.mobileConnectivity.ok === true) {
     return t("overview.mobile.passed");
   }
+  if (props.mobileConnectivity.checked && props.mobileConnectivity.ok === null && props.mobileConnectivity.summary) {
+    return props.mobileConnectivity.summary;
+  }
   if (props.mobileConnectivity.checked) {
     return t("overview.mobile.failed");
   }

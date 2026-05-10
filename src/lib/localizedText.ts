@@ -43,5 +43,20 @@ export function resolveApiErrorMessage(
     return fallback;
   }
 
-  return resolveLocalizedText(t, error.code, error.params, error.message || fallback);
+  const resolved = resolveLocalizedText(t, error.code, error.params, error.message || fallback);
+  const rawMessage = error.message?.trim();
+  if (
+    rawMessage
+    && error.code
+    && rawMessage !== resolved
+    && [
+      "backendErrors.httpClientCreateFailed",
+      "backendErrors.requestFailed",
+      "backendErrors.responseReadFailed",
+    ].includes(error.code)
+  ) {
+    return `${resolved}\n${rawMessage}`;
+  }
+
+  return resolved;
 }

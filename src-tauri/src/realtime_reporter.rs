@@ -251,7 +251,7 @@ fn run_reporter_loop(
     run_id: u64,
     locale: BackendLocale,
 ) {
-    let client = match build_http_client(config.use_system_proxy, locale) {
+    let client = match build_http_client(&config, locale) {
         Ok(client) => client,
         Err(error) => {
             push_background_log(

@@ -30,8 +30,11 @@ const {
   importPayload,
   isOnboarding,
   issues,
+  qrScanInProgress,
+  qrScanSupported,
   reporterContentOptions,
   reporterSupported,
+  scanImportConfigQr,
   updateField,
 } = useConnectionPanel(props, {
   onUpdateModelValue: (value) => emit("update:modelValue", value),
@@ -60,7 +63,10 @@ const {
           v-model:text="importPayload.text"
           title-key="connectionPanel.sections.onboardingImport"
           help-key="connectionPanel.help.onboardingImport"
+          :can-scan-qr="qrScanSupported"
+          :scan-qr-loading="qrScanInProgress"
           @import="importConfig"
+          @scan-qr="scanImportConfigQr"
         />
 
         <div class="settings-section">
@@ -160,7 +166,10 @@ const {
           v-model:text="importPayload.text"
           title-key="connectionPanel.sections.quickImport"
           help-key="connectionPanel.help.import"
+          :can-scan-qr="qrScanSupported"
+          :scan-qr-loading="qrScanInProgress"
           @import="importConfig"
+          @scan-qr="scanImportConfigQr"
         />
       </template>
 

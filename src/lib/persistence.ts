@@ -59,6 +59,7 @@ export const defaultClientConfig = (): ClientConfig => ({
   apiToken: "",
   generatedHashKey: "",
   useSystemProxy: true,
+  proxyUrl: "",
   device: "",
   deviceType: "desktop",
   pushMode: "realtime",

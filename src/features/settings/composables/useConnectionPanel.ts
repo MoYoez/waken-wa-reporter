@@ -1,8 +1,8 @@
-import { computed, reactive } from "vue";
+import { computed, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "primevue/usetoast";
 
-import { parseImportedIntegrationConfig, validateConfig } from "@/lib/api";
+import { parseImportedIntegrationConfig, scanImportQrCode, validateConfig } from "@/lib/api";
 import { createNotifier } from "@/lib/notify";
 import type { ClientCapabilities, ClientConfig, DeviceType } from "@/types";
 
@@ -25,11 +25,13 @@ export function useConnectionPanel(
   const toast = useToast();
 
   const importPayload = reactive({ text: "" });
+  const qrScanInProgress = ref(false);
   const isNativeNotice = computed(() => !props.capabilities.realtimeReporter);
   const { notify } = createNotifier(toast, () => isNativeNotice.value);
 
   const issues = computed(() => validateConfig(props.modelValue, props.capabilities));
   const reporterSupported = computed(() => props.capabilities.realtimeReporter);
+  const qrScanSupported = computed(() => props.capabilities.qrImport);
   const isOnboarding = computed(() => props.variant === "onboarding");
   const currentGeneratedHashKey = computed(() => props.modelValue.generatedHashKey.trim());
   const reporterContentOptions = computed(() => [
@@ -98,37 +100,61 @@ export function useConnectionPanel(
     return reportEndpoint.replace(/\/api\/activity\/?$/i, "").replace(/\/$/, "");
   }
 
-  function importConfig() {
-    parseImportedIntegrationConfig(importPayload.text)
-      .then((parsed) => {
-        callbacks.onUpdateModelValue({
-          ...props.modelValue,
-          baseUrl: toBaseUrl(parsed.reportEndpoint) ?? props.modelValue.baseUrl,
-          apiToken: parsed.token ?? props.modelValue.apiToken,
-          device: parsed.deviceName?.trim() || props.modelValue.device,
-          deviceType: reporterSupported.value ? "desktop" : inferMobileDeviceType(),
-        });
-        callbacks.onImported(
-          parsed.tokenName
-            ? t("connectionPanel.notify.importedToken", { tokenName: parsed.tokenName })
-            : t("connectionPanel.notify.importedConfig"),
-        );
-        notify({
-          severity: "success",
-          summary: t("connectionPanel.notify.importSuccess"),
-          detail: toBaseUrl(parsed.reportEndpoint) ?? t("connectionPanel.notify.importSuccessDetail"),
-          life: 3000,
-        });
-        importPayload.text = "";
-      })
-      .catch((error) => {
-        notify({
-          severity: "error",
-          summary: t("connectionPanel.notify.importFailed"),
-          detail: error instanceof Error ? error.message : t("connectionPanel.notify.importFailedDetail"),
-          life: 4000,
-        });
+  async function importConfig() {
+    try {
+      const parsed = await parseImportedIntegrationConfig(importPayload.text);
+      callbacks.onUpdateModelValue({
+        ...props.modelValue,
+        baseUrl: toBaseUrl(parsed.reportEndpoint) ?? props.modelValue.baseUrl,
+        apiToken: parsed.token ?? props.modelValue.apiToken,
+        device: parsed.deviceName?.trim() || props.modelValue.device,
+        deviceType: reporterSupported.value ? "desktop" : inferMobileDeviceType(),
       });
+      callbacks.onImported(
+        parsed.tokenName
+          ? t("connectionPanel.notify.importedToken", { tokenName: parsed.tokenName })
+          : t("connectionPanel.notify.importedConfig"),
+      );
+      notify({
+        severity: "success",
+        summary: t("connectionPanel.notify.importSuccess"),
+        detail: toBaseUrl(parsed.reportEndpoint) ?? t("connectionPanel.notify.importSuccessDetail"),
+        life: 3000,
+      });
+      importPayload.text = "";
+    } catch (error) {
+      notify({
+        severity: "error",
+        summary: t("connectionPanel.notify.importFailed"),
+        detail: error instanceof Error ? error.message : t("connectionPanel.notify.importFailedDetail"),
+        life: 4000,
+      });
+    }
+  }
+
+  async function scanImportConfigQr() {
+    if (qrScanInProgress.value) {
+      return;
+    }
+
+    qrScanInProgress.value = true;
+    try {
+      const text = await scanImportQrCode();
+      if (!text) {
+        return;
+      }
+      importPayload.text = text;
+      await importConfig();
+    } catch (error) {
+      notify({
+        severity: "error",
+        summary: t("connectionPanel.notify.qrScanFailed"),
+        detail: error instanceof Error ? error.message : t("connectionPanel.notify.qrScanFailedDetail"),
+        life: 4000,
+      });
+    } finally {
+      qrScanInProgress.value = false;
+    }
   }
 
   return {
@@ -137,8 +163,11 @@ export function useConnectionPanel(
     importPayload,
     isOnboarding,
     issues,
+    qrScanInProgress,
+    qrScanSupported,
     reporterContentOptions,
     reporterSupported,
+    scanImportConfigQr,
     updateField,
   };
 }

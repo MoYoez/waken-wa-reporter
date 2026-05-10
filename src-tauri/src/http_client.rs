@@ -1,11 +1,12 @@
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 use serde_json::{json, Value};
-use std::{sync::Mutex, time::Duration};
+use std::{error::Error as StdError, sync::Mutex, time::Duration};
 
 use crate::{backend_locale::BackendLocale, models::ApiResult};
 
 static ASYNC_CLIENT_SYSTEM_PROXY: Mutex<Option<reqwest::Client>> = Mutex::new(None);
 static ASYNC_CLIENT_DIRECT: Mutex<Option<reqwest::Client>> = Mutex::new(None);
+static ASYNC_CLIENT_EXPLICIT_PROXY: Mutex<Option<(String, reqwest::Client)>> = Mutex::new(None);
 
 fn normalize_base_url(base_url: &str) -> String {
     base_url.trim_end_matches('/').trim().to_string()
@@ -40,6 +41,7 @@ pub async fn request_json(
     path: &str,
     token: Option<&str>,
     use_system_proxy: bool,
+    proxy_url: &str,
     method: reqwest::Method,
     body: Option<Value>,
 ) -> ApiResult<Value> {
@@ -47,6 +49,7 @@ pub async fn request_json(
         "waken-wa-tauri-client/0.1.0",
         Some(Duration::from_secs(15)),
         use_system_proxy,
+        proxy_url,
     ) {
         Ok(client) => client,
         Err(error) => {
@@ -79,7 +82,7 @@ pub async fn request_json(
             return ApiResult::failure_localized(
                 0,
                 Some("backendErrors.requestFailed".to_string()),
-                format!("请求失败：{error}"),
+                format_reqwest_error(BackendLocale::ZhCn, "请求失败", "Request failed", &error),
                 None,
                 None,
             )
@@ -93,7 +96,12 @@ pub async fn request_json(
             return ApiResult::failure_localized(
                 status,
                 Some("backendErrors.responseReadFailed".to_string()),
-                format!("读取响应失败：{error}"),
+                format_reqwest_error(
+                    BackendLocale::ZhCn,
+                    "读取响应失败",
+                    "Failed to read response",
+                    &error,
+                ),
                 Some(json!({ "status": status })),
                 None,
             )
@@ -130,6 +138,7 @@ pub async fn request_json_payload(
     path: &str,
     token: Option<&str>,
     use_system_proxy: bool,
+    proxy_url: &str,
     method: reqwest::Method,
     body: Option<Value>,
 ) -> ApiResult<Value> {
@@ -137,6 +146,7 @@ pub async fn request_json_payload(
         "waken-wa-tauri-client/0.1.0",
         Some(Duration::from_secs(15)),
         use_system_proxy,
+        proxy_url,
     ) {
         Ok(client) => client,
         Err(error) => {
@@ -169,7 +179,7 @@ pub async fn request_json_payload(
             return ApiResult::failure_localized(
                 0,
                 Some("backendErrors.requestFailed".to_string()),
-                format!("请求失败：{error}"),
+                format_reqwest_error(BackendLocale::ZhCn, "请求失败", "Request failed", &error),
                 None,
                 None,
             )
@@ -183,7 +193,12 @@ pub async fn request_json_payload(
             return ApiResult::failure_localized(
                 status,
                 Some("backendErrors.responseReadFailed".to_string()),
-                format!("读取响应失败：{error}"),
+                format_reqwest_error(
+                    BackendLocale::ZhCn,
+                    "读取响应失败",
+                    "Failed to read response",
+                    &error,
+                ),
                 Some(json!({ "status": status })),
                 None,
             )
@@ -214,11 +229,141 @@ pub async fn request_json_payload(
     ApiResult::success(status, payload)
 }
 
+fn normalize_proxy_url(proxy_url: &str) -> Option<String> {
+    let normalized = proxy_url.trim();
+    (!normalized.is_empty()).then(|| normalized.to_string())
+}
+
+fn build_proxy(proxy_url: &str, locale: BackendLocale) -> Result<reqwest::Proxy, String> {
+    reqwest::Proxy::all(proxy_url).map_err(|error| {
+        format_reqwest_error(
+            locale,
+            "代理 URL 解析失败",
+            "Failed to parse proxy URL",
+            &error,
+        )
+    })
+}
+
+pub fn format_reqwest_error(
+    locale: BackendLocale,
+    zh_prefix: &str,
+    en_prefix: &str,
+    error: &reqwest::Error,
+) -> String {
+    let prefix = if locale.is_en() { en_prefix } else { zh_prefix };
+    let chain = collect_error_chain(error);
+    let chain_text = chain.join(" -> ");
+    let labels = classify_reqwest_error(error, &chain_text, locale);
+
+    if locale.is_en() {
+        let mut details = Vec::new();
+        if !labels.is_empty() {
+            details.push(format!("kind: {}", labels.join(", ")));
+        }
+        if let Some(url) = error.url() {
+            details.push(format!("url: {url}"));
+        }
+        details.push(format!("error chain: {chain_text}"));
+        format!("{prefix}: {error}; {}", details.join("; "))
+    } else {
+        let mut details = Vec::new();
+        if !labels.is_empty() {
+            details.push(format!("类型：{}", labels.join("、")));
+        }
+        if let Some(url) = error.url() {
+            details.push(format!("URL：{url}"));
+        }
+        details.push(format!("错误链：{chain_text}"));
+        format!("{prefix}：{error}；{}", details.join("；"))
+    }
+}
+
+fn collect_error_chain(error: &dyn StdError) -> Vec<String> {
+    let mut chain = vec![error.to_string()];
+    let mut source = error.source();
+    while let Some(error) = source {
+        chain.push(error.to_string());
+        source = error.source();
+    }
+    chain
+}
+
+fn classify_reqwest_error(
+    error: &reqwest::Error,
+    chain_text: &str,
+    locale: BackendLocale,
+) -> Vec<String> {
+    let lower = chain_text.to_ascii_lowercase();
+    let mut labels = Vec::new();
+
+    if lower.contains("connection reset") || lower.contains("reset by peer") {
+        labels.push(localized_error_kind(
+            locale,
+            "connection reset",
+            "连接被重置",
+        ));
+    }
+
+    if error.is_timeout() && error.is_connect() {
+        labels.push(localized_error_kind(locale, "connect timeout", "连接超时"));
+    } else if error.is_timeout() {
+        labels.push(localized_error_kind(locale, "timeout", "请求超时"));
+    } else if error.is_connect() {
+        labels.push(localized_error_kind(locale, "connect failed", "连接失败"));
+    }
+
+    if lower.contains("dns")
+        || lower.contains("failed to lookup address")
+        || lower.contains("name resolution")
+        || lower.contains("no such host")
+        || lower.contains("resolve")
+    {
+        labels.push(localized_error_kind(locale, "DNS failed", "DNS 失败"));
+    }
+
+    if lower.contains("tls")
+        || lower.contains("rustls")
+        || lower.contains("certificate")
+        || lower.contains("invalid peer certificate")
+    {
+        labels.push(localized_error_kind(locale, "TLS failed", "TLS 失败"));
+    }
+
+    labels.sort();
+    labels.dedup();
+    labels
+}
+
+fn localized_error_kind(locale: BackendLocale, en: &str, zh: &str) -> String {
+    if locale.is_en() {
+        en.into()
+    } else {
+        zh.into()
+    }
+}
+
 fn get_or_create_async_client(
     user_agent: &str,
     timeout: Option<Duration>,
     use_system_proxy: bool,
+    proxy_url: &str,
 ) -> Result<reqwest::Client, String> {
+    if let Some(proxy_url) = normalize_proxy_url(proxy_url) {
+        let mut guard = ASYNC_CLIENT_EXPLICIT_PROXY
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        if let Some((cached_url, client)) = guard.as_ref() {
+            if cached_url == &proxy_url {
+                return Ok(client.clone());
+            }
+        }
+
+        let client = build_async_client(user_agent, timeout, use_system_proxy, &proxy_url)?;
+        *guard = Some((proxy_url, client.clone()));
+        return Ok(client);
+    }
+
     let cache = if use_system_proxy {
         &ASYNC_CLIENT_SYSTEM_PROXY
     } else {
@@ -230,7 +375,7 @@ fn get_or_create_async_client(
         return Ok(client.clone());
     }
 
-    let client = build_async_client(user_agent, timeout, use_system_proxy)?;
+    let client = build_async_client(user_agent, timeout, use_system_proxy, "")?;
     *guard = Some(client.clone());
     Ok(client)
 }
@@ -239,6 +384,7 @@ pub fn build_async_client(
     user_agent: &str,
     timeout: Option<Duration>,
     use_system_proxy: bool,
+    proxy_url: &str,
 ) -> Result<reqwest::Client, String> {
     let mut builder = reqwest::Client::builder().user_agent(user_agent);
 
@@ -246,19 +392,27 @@ pub fn build_async_client(
         builder = builder.timeout(timeout);
     }
 
-    if !use_system_proxy {
+    if let Some(proxy_url) = normalize_proxy_url(proxy_url) {
+        builder = builder.proxy(build_proxy(&proxy_url, BackendLocale::ZhCn)?);
+    } else if !use_system_proxy {
         builder = builder.no_proxy();
     }
 
-    builder
-        .build()
-        .map_err(|error| format!("创建 HTTP 客户端失败：{error}"))
+    builder.build().map_err(|error| {
+        format_reqwest_error(
+            BackendLocale::ZhCn,
+            "创建 HTTP 客户端失败",
+            "Failed to create HTTP client",
+            &error,
+        )
+    })
 }
 
 pub fn build_blocking_client(
     user_agent: &str,
     timeout: Option<Duration>,
     use_system_proxy: bool,
+    proxy_url: &str,
     locale: BackendLocale,
 ) -> Result<reqwest::blocking::Client, String> {
     let mut builder = reqwest::blocking::Client::builder().user_agent(user_agent);
@@ -267,15 +421,18 @@ pub fn build_blocking_client(
         builder = builder.timeout(timeout);
     }
 
-    if !use_system_proxy {
+    if let Some(proxy_url) = normalize_proxy_url(proxy_url) {
+        builder = builder.proxy(build_proxy(&proxy_url, locale)?);
+    } else if !use_system_proxy {
         builder = builder.no_proxy();
     }
 
     builder.build().map_err(|error| {
-        if locale.is_en() {
-            format!("Failed to create HTTP client: {error}")
-        } else {
-            format!("创建 HTTP 客户端失败：{error}")
-        }
+        format_reqwest_error(
+            locale,
+            "创建 HTTP 客户端失败",
+            "Failed to create HTTP client",
+            &error,
+        )
     })
 }
