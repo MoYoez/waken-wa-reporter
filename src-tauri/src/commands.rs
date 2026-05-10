@@ -10,10 +10,12 @@ use tauri::State;
 
 #[cfg(desktop)]
 use crate::discord_presence::DiscordPresenceRuntime;
+#[cfg(desktop)]
+use crate::models::DiscordPresenceSnapshot;
 use crate::models::{
     ActivityPayload, ApiResult, AppStatePayload, ClientCapabilities, ClientConfig,
-    DiscordPresenceSnapshot, ExistingReporterConfig, ImportedIntegrationConfig,
-    InspirationEntryCreateInput, PlatformSelfTestResult, RealtimeReporterSnapshot,
+    ExistingReporterConfig, ImportedIntegrationConfig, InspirationEntryCreateInput,
+    PlatformSelfTestResult, RealtimeReporterSnapshot,
 };
 use crate::realtime_reporter::ReporterRuntime;
 

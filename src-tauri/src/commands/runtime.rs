@@ -1,6 +1,8 @@
 use tauri::{AppHandle, State};
 
-use super::helpers::{discord_start_error_code, reporter_start_error_code};
+#[cfg(desktop)]
+use super::helpers::discord_start_error_code;
+use super::helpers::reporter_start_error_code;
 use crate::{
     backend_locale::load_locale,
     models::{ApiResult, ClientConfig, RealtimeReporterSnapshot},

@@ -12,13 +12,14 @@ mod state_store;
 #[cfg(desktop)]
 mod tray;
 
+#[cfg(desktop)]
 use serde::Serialize;
-use tauri::WindowEvent;
-
+#[cfg(any(desktop, target_os = "android"))]
+use tauri::Manager;
 #[cfg(all(desktop, target_os = "macos"))]
 use tauri::RunEvent;
 #[cfg(desktop)]
-use tauri::{Emitter, Manager};
+use tauri::{Emitter, WindowEvent};
 #[cfg(desktop)]
 use tauri_plugin_autostart::MacosLauncher;
 
