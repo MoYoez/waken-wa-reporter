@@ -1,3 +1,5 @@
+#[path = "linux/app_icon.rs"]
+mod app_icon;
 #[path = "linux/command.rs"]
 mod command;
 #[path = "linux/media.rs"]
@@ -88,7 +90,7 @@ pub fn get_foreground_snapshot_for_reporting(
 }
 
 pub fn get_now_playing() -> Result<MediaInfo, String> {
-    read_now_playing()
+    read_now_playing(false)
 }
 
 pub fn get_now_playing_for_reporting(
@@ -99,14 +101,16 @@ pub fn get_now_playing_for_reporting(
         return Ok(MediaInfo::default());
     }
 
-    read_now_playing().map(|media| media.into_reporting_subset(include_media, include_play_source))
+    read_now_playing(false)
+        .map(|media| media.into_reporting_subset(include_media, include_play_source))
 }
 
 pub fn get_now_playing_artwork_for_reporting(
     include_play_source: bool,
-    _include_source_icon: bool,
+    include_source_icon: bool,
 ) -> Result<MediaInfo, String> {
-    read_now_playing().map(|media| media.into_reporting_subset(true, include_play_source))
+    read_now_playing(include_source_icon)
+        .map(|media| media.into_reporting_subset(true, include_play_source))
 }
 
 pub fn run_self_test() -> PlatformSelfTestResult {

@@ -2,11 +2,13 @@ use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 
 use crate::platform::{media_timestamps_from_position, now_unix_millis_i64, MediaInfo};
 
+use super::app_icon::read_source_app_icon_data_url;
 use super::command::{command_output_with_timeout, EmptyFallback};
 
 const ARTWORK_DOWNLOAD_TIMEOUT_MS: u64 = 5000;
+const MPRIS_BUS_PREFIX: &str = "org.mpris.MediaPlayer2.";
 
-pub(super) fn get_now_playing() -> Result<MediaInfo, String> {
+pub(super) fn get_now_playing(include_source_icon: bool) -> Result<MediaInfo, String> {
     let output = command_output_with_timeout(
         "playerctl",
         &[
@@ -41,7 +43,7 @@ pub(super) fn get_now_playing() -> Result<MediaInfo, String> {
     let source_app_name = source_app_id.clone();
     let cover_url_raw = lines.next().unwrap_or_default().to_string();
     let playback_state = normalize_playback_state(lines.next().unwrap_or_default());
-    let position_ms = parse_position_seconds_to_ms(lines.next().unwrap_or_default());
+    let position_ms = parse_microseconds_to_ms(lines.next().unwrap_or_default());
     let duration_ms = parse_mpris_length_to_ms(lines.next().unwrap_or_default());
     let reported_at_ms = now_unix_millis_i64();
     let (start_timestamp_ms, end_timestamp_ms) =
@@ -49,6 +51,18 @@ pub(super) fn get_now_playing() -> Result<MediaInfo, String> {
 
     // Convert HTTP artUrl to base64 data URL if needed
     let cover_url = resolve_artwork_data_url(&cover_url_raw);
+    let desktop_entry = if include_source_icon {
+        let player_instance = read_player_instance().unwrap_or_default();
+        read_mpris_root_string_property(&player_instance, "DesktopEntry")
+            .or_else(|| read_mpris_root_string_property(&source_app_id, "DesktopEntry"))
+    } else {
+        None
+    };
+    let source_icon_url = if include_source_icon {
+        read_source_app_icon_data_url(&source_app_id, desktop_entry.as_deref())
+    } else {
+        String::new()
+    };
 
     let media = MediaInfo {
         title,
@@ -57,7 +71,7 @@ pub(super) fn get_now_playing() -> Result<MediaInfo, String> {
         source_app_id,
         source_app_name,
         cover_url,
-        source_icon_url: String::new(),
+        source_icon_url,
         playback_state,
         position_ms,
         duration_ms,
@@ -74,6 +88,77 @@ pub(super) fn get_now_playing() -> Result<MediaInfo, String> {
     Ok(media)
 }
 
+fn read_player_instance() -> Option<String> {
+    let output =
+        command_output_with_timeout("playerctl", &["metadata", "--format", "{{playerInstance}}"])
+            .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+
+    let value = String::from_utf8_lossy(&output.stdout);
+    let value = value.lines().next().unwrap_or_default().trim();
+    (!value.is_empty()).then(|| value.to_string())
+}
+
+fn read_mpris_root_string_property(player_instance: &str, property: &str) -> Option<String> {
+    let player_instance = player_instance.trim();
+    if player_instance.is_empty() {
+        return None;
+    }
+
+    let destination = if player_instance.starts_with(MPRIS_BUS_PREFIX) {
+        player_instance.to_string()
+    } else {
+        format!("{MPRIS_BUS_PREFIX}{player_instance}")
+    };
+    let output = command_output_with_timeout(
+        "gdbus",
+        &[
+            "call",
+            "--session",
+            "--dest",
+            &destination,
+            "--object-path",
+            "/org/mpris/MediaPlayer2",
+            "--method",
+            "org.freedesktop.DBus.Properties.Get",
+            "org.mpris.MediaPlayer2",
+            property,
+        ],
+    )
+    .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    parse_gdbus_string_variant(&String::from_utf8_lossy(&output.stdout))
+}
+
+fn parse_gdbus_string_variant(output: &str) -> Option<String> {
+    let start = output.find('\'')?;
+    let mut value = String::new();
+    let mut escaped = false;
+
+    for ch in output[start + 1..].chars() {
+        if escaped {
+            value.push(ch);
+            escaped = false;
+            continue;
+        }
+
+        match ch {
+            '\\' => escaped = true,
+            '\'' => break,
+            _ => value.push(ch),
+        }
+    }
+
+    let value = value.trim();
+    (!value.is_empty()).then(|| value.to_string())
+}
+
 fn normalize_playback_state(value: &str) -> String {
     match value.trim().to_lowercase().as_str() {
         "playing" | "play" => "playing".into(),
@@ -83,12 +168,12 @@ fn normalize_playback_state(value: &str) -> String {
     }
 }
 
-fn parse_position_seconds_to_ms(value: &str) -> Option<i64> {
-    let seconds = value.trim().parse::<f64>().ok()?;
-    if !seconds.is_finite() || seconds < 0.0 {
+fn parse_microseconds_to_ms(value: &str) -> Option<i64> {
+    let micros = value.trim().parse::<i64>().ok()?;
+    if micros < 0 {
         return None;
     }
-    Some((seconds * 1000.0).round() as i64)
+    Some(micros / 1000)
 }
 
 fn parse_mpris_length_to_ms(value: &str) -> Option<i64> {
