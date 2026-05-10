@@ -188,7 +188,18 @@ jobs:
           VERSION="$(node -p "require('./package.json').version")"
           echo "PACKAGE_VERSION=$VERSION" >> "$GITHUB_ENV"
 
-      - name: build-tauri-desktop
+      - name: build-tauri-desktop-artifact
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        id: build_tauri_desktop_artifact
+        uses: tauri-apps/tauri-action@v0
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          args: ${{ matrix.tauri_args }}
+
+      - name: build-tauri-desktop-release
+        if: startsWith(github.ref, 'refs/tags/')
         id: build_tauri_desktop
         uses: tauri-apps/tauri-action@v0
         env:
@@ -197,10 +208,10 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           args: ${{ matrix.tauri_args }}
-          tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
-          releaseName: ${{ startsWith(github.ref, 'refs/tags/') && format('Waken-Wa Reporter {0}', github.ref_name) || '' }}
-          releaseBody: ${{ startsWith(github.ref, 'refs/tags/') && format('Release {0}', github.ref_name) || '' }}
-          releaseCommitish: ${{ startsWith(github.ref, 'refs/tags/') && github.sha || '' }}
+          tagName: ${{ github.ref_name }}
+          releaseName: ${{ format('Waken-Wa Reporter {0}', github.ref_name) }}
+          releaseBody: ${{ format('Release {0}', github.ref_name) }}
+          releaseCommitish: ${{ github.sha }}
           prerelease: false
           uploadUpdaterJson: true
           releaseAssetNamePattern: ${{ env.APP_BASENAME }}-[version]-${{ matrix.platform }}-${{ matrix.arch }}[ext]
