@@ -20,8 +20,7 @@ const ANDROID_SETTINGS_NOTIFICATION_LISTENER: &str =
     "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS";
 const ANDROID_SETTINGS_ACCESSIBILITY: &str = "android.settings.ACCESSIBILITY_SETTINGS";
 const ANDROID_SETTINGS_APP_NOTIFICATION: &str = "android.settings.APP_NOTIFICATION_SETTINGS";
-const ANDROID_SETTINGS_APPLICATION_DETAILS: &str =
-    "android.settings.APPLICATION_DETAILS_SETTINGS";
+const ANDROID_SETTINGS_APPLICATION_DETAILS: &str = "android.settings.APPLICATION_DETAILS_SETTINGS";
 const ANDROID_SETTINGS_EXTRA_APP_PACKAGE: &str = "android.provider.extra.APP_PACKAGE";
 
 #[derive(Debug, Default, Deserialize)]
@@ -432,7 +431,10 @@ fn open_android_app_notification_settings() -> Result<(), String> {
         &intent,
         "putExtra",
         "(Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent;",
-        &[JValue::Object(&package_extra), JValue::Object(&package_name)],
+        &[
+            JValue::Object(&package_extra),
+            JValue::Object(&package_name),
+        ],
     )
     .map_err(|error| format!("设置 Android 通知设置包名失败：{error}"))?;
     start_android_activity(&mut env, context.context().cast(), &intent)

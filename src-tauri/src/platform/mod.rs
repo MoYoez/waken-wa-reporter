@@ -370,8 +370,8 @@ pub use windows::run_self_test;
 #[cfg(target_os = "android")]
 pub use android::{
     get_permission_status, open_android_reporter_notification_settings,
-    request_android_accessibility_permission,
-    request_android_notification_access, request_android_usage_access,
+    request_android_accessibility_permission, request_android_notification_access,
+    request_android_usage_access,
 };
 #[cfg(not(target_os = "android"))]
 pub fn get_permission_status() -> Result<AndroidPermissionStatus, String> {
