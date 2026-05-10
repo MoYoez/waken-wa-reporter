@@ -2,7 +2,12 @@ import { computed, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "primevue/usetoast";
 
-import { parseImportedIntegrationConfig, scanImportQrCode, validateConfig } from "@/lib/api";
+import {
+  cancelImportQrCodeScan,
+  parseImportedIntegrationConfig,
+  scanImportQrCode,
+  validateConfig,
+} from "@/lib/api";
 import { createNotifier } from "@/lib/notify";
 import type { ClientCapabilities, ClientConfig, DeviceType } from "@/types";
 
@@ -157,7 +162,13 @@ export function useConnectionPanel(
     }
   }
 
+  async function cancelImportConfigQrScan() {
+    await cancelImportQrCodeScan();
+    qrScanInProgress.value = false;
+  }
+
   return {
+    cancelImportConfigQrScan,
     currentGeneratedHashKey,
     importConfig,
     importPayload,

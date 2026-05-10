@@ -58,6 +58,14 @@ pnpm tauri android init --ci
 pnpm tauri android dev
 ```
 
+如果 Android 设备需要通过 Clash TUN、虚拟网卡或指定局域网网卡访问开发服务器，用 `--host` 绑定到该网卡 IP：
+
+```bash
+pnpm tauri android dev --host 192.168.31.10
+```
+
+这里的 `192.168.31.10` 替换为电脑在目标网卡上的地址。Tauri 会把它传给 `TAURI_DEV_HOST`，Vite 会同时用它配置 dev server 和 HMR。
+
 如果初始化失败并提示 `Android NDK not found`，请先在 Android Studio 的 SDK Manager 安装 NDK，并设置 `NDK_HOME` 后重试。
 
 ### iOS

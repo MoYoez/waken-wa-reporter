@@ -32,6 +32,7 @@ const {
   issues,
   qrScanInProgress,
   qrScanSupported,
+  cancelImportConfigQrScan,
   reporterContentOptions,
   reporterSupported,
   scanImportConfigQr,
@@ -67,6 +68,7 @@ const {
           :scan-qr-loading="qrScanInProgress"
           @import="importConfig"
           @scan-qr="scanImportConfigQr"
+          @cancel-scan-qr="cancelImportConfigQrScan"
         />
 
         <div class="settings-section">
@@ -170,6 +172,7 @@ const {
           :scan-qr-loading="qrScanInProgress"
           @import="importConfig"
           @scan-qr="scanImportConfigQr"
+          @cancel-scan-qr="cancelImportConfigQrScan"
         />
       </template>
 

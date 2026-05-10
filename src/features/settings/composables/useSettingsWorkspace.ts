@@ -45,6 +45,9 @@ export function useSettingsWorkspace(
   const autostartSupported = computed(() => props.capabilities.autostart);
   const isNativeNotice = computed(() => !props.capabilities.realtimeReporter);
   const canRequestAccessibilityPermission = computed(() => {
+    if (!props.capabilities.platformSelfTest) {
+      return false;
+    }
     if (typeof navigator === "undefined") {
       return false;
     }

@@ -496,6 +496,11 @@ const enUS = {
     buttons: {
       import: "Import integration config",
       scanQr: "Scan QR",
+      cancelScan: "Cancel scan",
+    },
+    qrScan: {
+      title: "Scanning QR code",
+      detail: "Point the camera at the integration QR code.",
     },
     messages: {
       ready: "The current config is ready.",

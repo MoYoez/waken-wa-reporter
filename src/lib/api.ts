@@ -8,6 +8,7 @@ export {
   listInspirationEntries,
   parseImportedIntegrationConfig,
   probeConnectivity,
+  cancelImportQrCodeScan,
   requestAccessibilityPermission,
   restartApp,
   runPlatformSelfTest,

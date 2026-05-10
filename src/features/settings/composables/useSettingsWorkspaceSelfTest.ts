@@ -34,56 +34,76 @@ export function useSettingsWorkspaceSelfTest(options: UseSettingsWorkspaceSelfTe
 
   async function handleSelfTest() {
     selfTestLoading.value = true;
-    const result = await runPlatformSelfTest();
-    selfTestLoading.value = false;
+    try {
+      const result = await runPlatformSelfTest();
 
-    if (!result.success || !result.data) {
+      if (!result.success || !result.data) {
+        options.notify({
+          severity: "error",
+          summary: options.t("settings.notify.selfTestFailed"),
+          detail: options.apiErrorDetail(result.error, options.t("settings.notify.selfTestFailedDetail")),
+          life: 4000,
+        });
+        return;
+      }
+
+      selfTestResult.value = result.data;
+      options.notify({
+        severity: result.data.foreground.success && result.data.media.success ? "success" : "warn",
+        summary: options.t("settings.notify.selfTestDone"),
+        detail: options.t("settings.selfTest.platformDetail", { platform: result.data.platform }),
+        life: 3000,
+      });
+    } catch (error) {
       options.notify({
         severity: "error",
         summary: options.t("settings.notify.selfTestFailed"),
-        detail: options.apiErrorDetail(result.error, options.t("settings.notify.selfTestFailedDetail")),
+        detail: error instanceof Error ? error.message : options.t("settings.notify.selfTestFailedDetail"),
         life: 4000,
       });
-      return;
+    } finally {
+      selfTestLoading.value = false;
     }
-
-    selfTestResult.value = result.data;
-    options.notify({
-      severity: result.data.foreground.success && result.data.media.success ? "success" : "warn",
-      summary: options.t("settings.notify.selfTestDone"),
-      detail: options.t("settings.selfTest.platformDetail", { platform: result.data.platform }),
-      life: 3000,
-    });
   }
 
   async function handleRequestAccessibilityPermission() {
     accessibilityPermissionLoading.value = true;
-    const result = await requestAccessibilityPermission();
-    accessibilityPermissionLoading.value = false;
+    try {
+      const result = await requestAccessibilityPermission();
 
-    if (!result.success) {
+      if (!result.success) {
+        options.notify({
+          severity: "error",
+          summary: options.t("settings.notify.permissionFailed"),
+          detail: options.apiErrorDetail(result.error, options.t("settings.notify.permissionFailedDetail")),
+          life: 4000,
+        });
+        return;
+      }
+
+      options.notify({
+        severity: result.data ? "success" : "info",
+        summary: result.data
+          ? options.t("settings.notify.permissionGranted")
+          : options.t("settings.notify.permissionRequested"),
+        detail: result.data
+          ? options.t("settings.notify.permissionGrantedDetail")
+          : options.t("settings.notify.permissionRequestedDetail"),
+        life: 5000,
+      });
+
+      if (result.data) {
+        await handleSelfTest();
+      }
+    } catch (error) {
       options.notify({
         severity: "error",
         summary: options.t("settings.notify.permissionFailed"),
-        detail: options.apiErrorDetail(result.error, options.t("settings.notify.permissionFailedDetail")),
+        detail: error instanceof Error ? error.message : options.t("settings.notify.permissionFailedDetail"),
         life: 4000,
       });
-      return;
-    }
-
-    options.notify({
-      severity: result.data ? "success" : "info",
-      summary: result.data
-        ? options.t("settings.notify.permissionGranted")
-        : options.t("settings.notify.permissionRequested"),
-      detail: result.data
-        ? options.t("settings.notify.permissionGrantedDetail")
-        : options.t("settings.notify.permissionRequestedDetail"),
-      life: 5000,
-    });
-
-    if (result.data) {
-      await handleSelfTest();
+    } finally {
+      accessibilityPermissionLoading.value = false;
     }
   }
 

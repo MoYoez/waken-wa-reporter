@@ -496,6 +496,11 @@ const zhCN = {
     buttons: {
       import: "导入接入配置",
       scanQr: "扫码导入",
+      cancelScan: "退出扫码",
+    },
+    qrScan: {
+      title: "正在扫码",
+      detail: "请将接入二维码置于取景框内。",
     },
     messages: {
       ready: "当前配置可用。",

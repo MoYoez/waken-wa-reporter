@@ -38,43 +38,52 @@ pub async fn run_platform_self_test() -> Result<ApiResult<PlatformSelfTestResult
         ));
     }
 
-    let timeout = Duration::from_millis(PLATFORM_SELF_TEST_TIMEOUT_MS);
-    let (sender, receiver) = mpsc::channel();
+    #[cfg(target_os = "android")]
+    {
+        let _guard = PlatformSelfTestRunGuard;
+        return Ok(ApiResult::success(200, platform::run_self_test()));
+    }
 
-    std::thread::Builder::new()
-        .name("platform-self-test".to_string())
-        .spawn(move || {
-            let _guard = PlatformSelfTestRunGuard;
-            let _ = sender.send(platform::run_self_test());
-        })
-        .map_err(|error| {
-            PLATFORM_SELF_TEST_IN_FLIGHT.store(false, Ordering::Release);
-            format!("启动平台检测线程失败：{error}")
-        })?;
+    #[cfg(not(target_os = "android"))]
+    {
+        let timeout = Duration::from_millis(PLATFORM_SELF_TEST_TIMEOUT_MS);
+        let (sender, receiver) = mpsc::channel();
 
-    match tauri::async_runtime::spawn_blocking(move || receiver.recv_timeout(timeout)).await {
-        Ok(Ok(result)) => Ok(ApiResult::success(200, result)),
-        Ok(Err(mpsc::RecvTimeoutError::Timeout)) => Ok(ApiResult::failure_localized(
-            408,
-            Some("backendErrors.platformSelfTestTimedOut".to_string()),
-            "平台检测超时：某个 Windows 媒体或窗口 API 没有及时返回。",
-            None,
-            Some(json!({ "timeoutMs": PLATFORM_SELF_TEST_TIMEOUT_MS })),
-        )),
-        Ok(Err(mpsc::RecvTimeoutError::Disconnected)) => Ok(ApiResult::failure_localized(
-            500,
-            Some("backendErrors.platformSelfTestFailed".to_string()),
-            "平台检测线程在返回结果前结束。",
-            None,
-            None,
-        )),
-        Err(error) => Ok(ApiResult::failure_localized(
-            500,
-            Some("backendErrors.platformSelfTestFailed".to_string()),
-            format!("平台检测线程执行失败：{error}"),
-            None,
-            None,
-        )),
+        std::thread::Builder::new()
+            .name("platform-self-test".to_string())
+            .spawn(move || {
+                let _guard = PlatformSelfTestRunGuard;
+                let _ = sender.send(platform::run_self_test());
+            })
+            .map_err(|error| {
+                PLATFORM_SELF_TEST_IN_FLIGHT.store(false, Ordering::Release);
+                format!("启动平台检测线程失败：{error}")
+            })?;
+
+        match tauri::async_runtime::spawn_blocking(move || receiver.recv_timeout(timeout)).await {
+            Ok(Ok(result)) => Ok(ApiResult::success(200, result)),
+            Ok(Err(mpsc::RecvTimeoutError::Timeout)) => Ok(ApiResult::failure_localized(
+                408,
+                Some("backendErrors.platformSelfTestTimedOut".to_string()),
+                "平台检测超时：某个 Windows 媒体或窗口 API 没有及时返回。",
+                None,
+                Some(json!({ "timeoutMs": PLATFORM_SELF_TEST_TIMEOUT_MS })),
+            )),
+            Ok(Err(mpsc::RecvTimeoutError::Disconnected)) => Ok(ApiResult::failure_localized(
+                500,
+                Some("backendErrors.platformSelfTestFailed".to_string()),
+                "平台检测线程在返回结果前结束。",
+                None,
+                None,
+            )),
+            Err(error) => Ok(ApiResult::failure_localized(
+                500,
+                Some("backendErrors.platformSelfTestFailed".to_string()),
+                format!("平台检测线程执行失败：{error}"),
+                None,
+                None,
+            )),
+        }
     }
 }
 

@@ -68,8 +68,14 @@ const {
 </script>
 
 <template>
-  <div class="app-root" :class="{ 'has-pending-save': hasPendingSettingsChanges }">
-    <Toast v-if="!isNativeNotice" position="top-right" />
+  <div
+    class="app-root"
+    :class="{ 'has-pending-save': hasPendingSettingsChanges, 'phone-mode': isPhone }"
+  >
+    <Toast
+      v-if="!isNativeNotice"
+      :position="isPhone ? 'bottom-center' : 'top-right'"
+    />
 
     <OnboardingDialog
       :visible="shouldShowOnboarding"

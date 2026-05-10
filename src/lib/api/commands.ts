@@ -1,5 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
-import { Format, scan } from "@tauri-apps/plugin-barcode-scanner";
+import {
+  Format,
+  cancel as cancelBarcodeScan,
+  checkPermissions as checkBarcodeScanPermissions,
+  openAppSettings as openBarcodeScanAppSettings,
+  requestPermissions as requestBarcodeScanPermissions,
+  scan,
+} from "@tauri-apps/plugin-barcode-scanner";
 
 import { translate } from "../../i18n";
 import { resolveApiErrorMessage } from "../localizedText";
@@ -92,9 +99,19 @@ export async function parseImportedIntegrationConfig(
 
 export async function scanImportQrCode(): Promise<string | null> {
   try {
+    const permissionState = await checkBarcodeScanPermissions();
+    if (permissionState !== "granted") {
+      const requestedState = await requestBarcodeScanPermissions();
+      if (requestedState !== "granted") {
+        await openBarcodeScanAppSettings();
+        return null;
+      }
+    }
+
     const result = await scan({
       cameraDirection: "back",
       formats: [Format.QRCode],
+      windowed: true,
     });
 
     return result.content.trim() || null;
@@ -110,6 +127,14 @@ export async function scanImportQrCode(): Promise<string | null> {
     }
 
     throw new Error(message || translate("connectionPanel.notify.qrScanFailedDetail"));
+  }
+}
+
+export async function cancelImportQrCodeScan(): Promise<void> {
+  try {
+    await cancelBarcodeScan();
+  } catch {
+    // Ignore cancel errors so the mobile overlay can close cleanly.
   }
 }
 
