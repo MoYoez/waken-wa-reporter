@@ -3,10 +3,11 @@ use tauri::{AppHandle, State};
 use super::helpers::{discord_start_error_code, reporter_start_error_code};
 use crate::{
     backend_locale::load_locale,
-    discord_presence::DiscordPresenceRuntime,
-    models::{ApiResult, ClientConfig, DiscordPresenceSnapshot, RealtimeReporterSnapshot},
+    models::{ApiResult, ClientConfig, RealtimeReporterSnapshot},
     realtime_reporter::{snapshot_result, ReporterRuntime},
 };
+#[cfg(desktop)]
+use crate::{discord_presence::DiscordPresenceRuntime, models::DiscordPresenceSnapshot};
 
 pub fn start_realtime_reporter(
     app: AppHandle,
@@ -37,6 +38,7 @@ pub fn get_realtime_reporter_snapshot(
     Ok(snapshot_result(&reporter))
 }
 
+#[cfg(desktop)]
 pub fn start_discord_presence_sync(
     app: AppHandle,
     discord_presence_runtime: State<'_, DiscordPresenceRuntime>,
@@ -54,12 +56,14 @@ pub fn start_discord_presence_sync(
     }
 }
 
+#[cfg(desktop)]
 pub fn stop_discord_presence_sync(
     discord_presence_runtime: State<'_, DiscordPresenceRuntime>,
 ) -> Result<ApiResult<DiscordPresenceSnapshot>, String> {
     Ok(ApiResult::success(200, discord_presence_runtime.stop()))
 }
 
+#[cfg(desktop)]
 pub fn get_discord_presence_snapshot(
     discord_presence_runtime: State<'_, DiscordPresenceRuntime>,
 ) -> Result<ApiResult<DiscordPresenceSnapshot>, String> {

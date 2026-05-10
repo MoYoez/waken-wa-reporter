@@ -2,21 +2,20 @@ mod app_state;
 mod helpers;
 mod http;
 mod platform;
-#[cfg(desktop)]
 mod runtime;
 
 use serde_json::Value;
 use tauri::AppHandle;
-#[cfg(desktop)]
 use tauri::State;
 
+#[cfg(desktop)]
+use crate::discord_presence::DiscordPresenceRuntime;
 use crate::models::{
     ActivityPayload, ApiResult, AppStatePayload, ClientCapabilities, ClientConfig,
     DiscordPresenceSnapshot, ExistingReporterConfig, ImportedIntegrationConfig,
     InspirationEntryCreateInput, PlatformSelfTestResult, RealtimeReporterSnapshot,
 };
-#[cfg(desktop)]
-use crate::{discord_presence::DiscordPresenceRuntime, realtime_reporter::ReporterRuntime};
+use crate::realtime_reporter::ReporterRuntime;
 
 #[tauri::command]
 pub fn load_app_state(app: AppHandle) -> Result<AppStatePayload, String> {
@@ -91,7 +90,6 @@ pub async fn upload_inspiration_asset(
     http::upload_inspiration_asset(config, image_data_url).await
 }
 
-#[cfg(desktop)]
 #[tauri::command]
 pub fn start_realtime_reporter(
     app: AppHandle,
@@ -101,7 +99,6 @@ pub fn start_realtime_reporter(
     runtime::start_realtime_reporter(app, reporter, config)
 }
 
-#[cfg(desktop)]
 #[tauri::command]
 pub fn stop_realtime_reporter(
     reporter: State<'_, ReporterRuntime>,
@@ -109,7 +106,6 @@ pub fn stop_realtime_reporter(
     runtime::stop_realtime_reporter(reporter)
 }
 
-#[cfg(desktop)]
 #[tauri::command]
 pub fn get_realtime_reporter_snapshot(
     reporter: State<'_, ReporterRuntime>,

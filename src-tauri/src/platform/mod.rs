@@ -1,8 +1,15 @@
+#[cfg(target_os = "android")]
+mod android;
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
-#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+#[cfg(not(any(
+    target_os = "windows",
+    target_os = "macos",
+    target_os = "linux",
+    target_os = "android"
+)))]
 mod stub;
 #[cfg(target_os = "windows")]
 mod windows;
@@ -46,6 +53,12 @@ pub struct MediaInfo {
     pub reported_at_ms: Option<i64>,
     /// Genre / category info (e.g. NCM-{id} from inflink-rs)
     pub genre: String,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct DevicePowerInfo {
+    pub battery_level: Option<i64>,
+    pub is_charging: Option<bool>,
 }
 
 pub(super) fn image_bytes_to_png_data_url(bytes: &[u8]) -> Option<String> {
@@ -297,6 +310,12 @@ pub fn media_timestamps_from_position(
 }
 
 #[allow(unused_imports)]
+#[cfg(target_os = "android")]
+pub use android::{
+    get_device_power_info_for_reporting, get_foreground_snapshot_for_reporting, get_now_playing,
+    get_now_playing_artwork_for_reporting, get_now_playing_for_reporting,
+};
+#[allow(unused_imports)]
 #[cfg(target_os = "linux")]
 pub use linux::{
     get_foreground_snapshot_for_reporting, get_now_playing, get_now_playing_artwork_for_reporting,
@@ -309,10 +328,15 @@ pub use macos::{
     get_now_playing_for_reporting,
 };
 #[allow(unused_imports)]
-#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+#[cfg(not(any(
+    target_os = "windows",
+    target_os = "macos",
+    target_os = "linux",
+    target_os = "android"
+)))]
 pub use stub::{
-    get_foreground_snapshot_for_reporting, get_now_playing, get_now_playing_artwork_for_reporting,
-    get_now_playing_for_reporting,
+    get_device_power_info_for_reporting, get_foreground_snapshot_for_reporting, get_now_playing,
+    get_now_playing_artwork_for_reporting, get_now_playing_for_reporting,
 };
 #[allow(unused_imports)]
 #[cfg(target_os = "windows")]
@@ -321,20 +345,39 @@ pub use windows::{
     get_now_playing_for_reporting,
 };
 
+#[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+pub fn get_device_power_info_for_reporting() -> Result<DevicePowerInfo, String> {
+    Ok(DevicePowerInfo::default())
+}
+
+#[cfg(target_os = "android")]
+pub use android::run_self_test;
 #[cfg(target_os = "linux")]
 pub use linux::run_self_test;
 #[cfg(target_os = "macos")]
 pub use macos::run_self_test;
-#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+#[cfg(not(any(
+    target_os = "windows",
+    target_os = "macos",
+    target_os = "linux",
+    target_os = "android"
+)))]
 pub use stub::run_self_test;
 #[cfg(target_os = "windows")]
 pub use windows::run_self_test;
 
+#[cfg(target_os = "android")]
+pub use android::request_accessibility_permission;
 #[cfg(target_os = "linux")]
 pub use linux::request_accessibility_permission;
 #[cfg(target_os = "macos")]
 pub use macos::request_accessibility_permission;
-#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+#[cfg(not(any(
+    target_os = "windows",
+    target_os = "macos",
+    target_os = "linux",
+    target_os = "android"
+)))]
 pub use stub::request_accessibility_permission;
 #[cfg(target_os = "windows")]
 pub use windows::request_accessibility_permission;
@@ -352,7 +395,16 @@ pub fn platform_name() -> &'static str {
     {
         "macos"
     }
-    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    #[cfg(target_os = "android")]
+    {
+        "android"
+    }
+    #[cfg(not(any(
+        target_os = "windows",
+        target_os = "macos",
+        target_os = "linux",
+        target_os = "android"
+    )))]
     {
         "unsupported"
     }

@@ -92,6 +92,7 @@ pub(super) fn build_payload(
     media: &MediaInfo,
     mut metadata: Map<String, Value>,
 ) -> ActivityPayload {
+    let power_info = crate::platform::get_device_power_info_for_reporting().unwrap_or_default();
     let play_source = media.source_app_id.trim().to_string();
     let source_rule_match = (!play_source.is_empty())
         .then(|| find_media_source_rule(config, &play_source))
@@ -156,8 +157,8 @@ pub(super) fn build_payload(
             None
         },
         persist_minutes: None,
-        battery_level: None,
-        is_charging: None,
+        battery_level: power_info.battery_level,
+        is_charging: power_info.is_charging,
         device_type: Some(config.device_type.trim().to_string()).filter(|value| !value.is_empty()),
         push_mode: Some(config.push_mode.trim().to_string()).filter(|value| !value.is_empty()),
         metadata: (!metadata.is_empty()).then_some(Value::Object(metadata)),

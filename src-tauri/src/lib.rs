@@ -63,10 +63,10 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_device_info::init());
 
+    let builder = builder.manage(ReporterRuntime::new());
+
     #[cfg(desktop)]
-    let builder = builder
-        .manage(ReporterRuntime::new())
-        .manage(DiscordPresenceRuntime::new());
+    let builder = builder.manage(DiscordPresenceRuntime::new());
 
     let builder = builder
         .setup(|app| {
@@ -126,6 +126,20 @@ pub fn run() {
                 }
             }
 
+            #[cfg(target_os = "android")]
+            {
+                let saved_state = state_store::load_app_state(app.handle())
+                    .map_err(|error| -> Box<dyn std::error::Error> { error.into() })?;
+
+                if saved_state.config.reporter_enabled && config_is_ready(&saved_state.config) {
+                    let reporter = app.state::<ReporterRuntime>();
+                    let _ = reporter.start(
+                        saved_state.config.clone(),
+                        backend_locale::BackendLocale::from_preference(&saved_state.locale),
+                    );
+                }
+            }
+
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -179,6 +193,9 @@ pub fn run() {
         commands::probe_connectivity,
         commands::create_inspiration_entry,
         commands::upload_inspiration_asset,
+        commands::start_realtime_reporter,
+        commands::stop_realtime_reporter,
+        commands::get_realtime_reporter_snapshot,
         commands::run_platform_self_test,
         commands::request_accessibility_permission,
         commands::discover_existing_reporter_config

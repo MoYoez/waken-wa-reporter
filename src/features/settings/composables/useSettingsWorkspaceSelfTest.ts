@@ -82,7 +82,9 @@ export function useSettingsWorkspaceSelfTest(options: UseSettingsWorkspaceSelfTe
       life: 5000,
     });
 
-    await handleSelfTest();
+    if (result.data) {
+      await handleSelfTest();
+    }
   }
 
   return {

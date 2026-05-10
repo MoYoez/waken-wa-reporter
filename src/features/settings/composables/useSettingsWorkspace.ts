@@ -48,7 +48,7 @@ export function useSettingsWorkspace(
     if (typeof navigator === "undefined") {
       return false;
     }
-    return /mac/i.test(navigator.userAgent);
+    return /mac|android/i.test(navigator.userAgent);
   });
   const { notify } = createNotifier(toast, () => isNativeNotice.value);
   const discordConfigIssues = computed(() =>

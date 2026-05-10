@@ -1,4 +1,7 @@
-use super::{build_self_test_result, localized_text, make_probe, ForegroundSnapshot, MediaInfo};
+use super::{
+    build_self_test_result, localized_text, make_probe, DevicePowerInfo, ForegroundSnapshot,
+    MediaInfo,
+};
 use crate::models::PlatformSelfTestResult;
 
 pub fn get_foreground_snapshot() -> Result<ForegroundSnapshot, String> {
@@ -28,6 +31,10 @@ pub fn get_now_playing_artwork_for_reporting(
     _include_source_icon: bool,
 ) -> Result<MediaInfo, String> {
     Ok(MediaInfo::default())
+}
+
+pub fn get_device_power_info_for_reporting() -> Result<DevicePowerInfo, String> {
+    Ok(DevicePowerInfo::default())
 }
 
 pub fn run_self_test() -> PlatformSelfTestResult {

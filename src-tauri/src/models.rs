@@ -108,7 +108,18 @@ pub fn default_client_capabilities() -> ClientCapabilities {
     }
 }
 
-#[cfg(mobile)]
+#[cfg(target_os = "android")]
+pub fn default_client_capabilities() -> ClientCapabilities {
+    ClientCapabilities {
+        realtime_reporter: true,
+        tray: false,
+        platform_self_test: true,
+        discord_presence: false,
+        autostart: false,
+    }
+}
+
+#[cfg(all(mobile, not(target_os = "android")))]
 pub fn default_client_capabilities() -> ClientCapabilities {
     ClientCapabilities {
         realtime_reporter: false,

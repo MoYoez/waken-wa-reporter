@@ -30,6 +30,9 @@ export function buildSelfTestCardViews(
       success: result.foreground.success,
       primaryText: primaryProbeText(result.foreground, t),
       secondaryText: secondaryProbeText(result.foreground, t),
+      showAccessibilityAction:
+        result.platform === "android"
+        && !result.foreground.success,
     },
     {
       key: "windowTitle",
@@ -38,7 +41,7 @@ export function buildSelfTestCardViews(
       primaryText: primaryProbeText(result.windowTitle, t),
       secondaryText: secondaryProbeText(result.windowTitle, t),
       showAccessibilityAction:
-        result.platform === "macos"
+        (result.platform === "macos" || result.platform === "android")
         && !result.windowTitle.success,
     },
     {
@@ -47,6 +50,9 @@ export function buildSelfTestCardViews(
       success: result.media.success,
       primaryText: primaryProbeText(result.media, t),
       secondaryText: secondaryProbeText(result.media, t),
+      showAccessibilityAction:
+        result.platform === "android"
+        && !result.media.success,
     },
   ] satisfies SelfTestCardView[];
 }
@@ -57,6 +63,9 @@ export function resolveSelfTestPlatformHintKey(result: PlatformSelfTestResult | 
   }
   if (result?.platform === "linux") {
     return "settings.selfTest.linuxHint";
+  }
+  if (result?.platform === "android") {
+    return "settings.selfTest.androidHint";
   }
   return "";
 }
