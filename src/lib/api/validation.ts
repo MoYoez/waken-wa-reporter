@@ -8,6 +8,7 @@ const DEFAULT_CAPABILITIES: ClientCapabilities = {
   discordPresence: true,
   autostart: true,
   qrImport: false,
+  persistentNotification: false,
 };
 
 export function validateConfig(

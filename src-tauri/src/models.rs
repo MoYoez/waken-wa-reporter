@@ -100,6 +100,7 @@ pub struct ClientCapabilities {
     pub discord_presence: bool,
     pub autostart: bool,
     pub qr_import: bool,
+    pub persistent_notification: bool,
 }
 
 #[cfg(desktop)]
@@ -111,6 +112,7 @@ pub fn default_client_capabilities() -> ClientCapabilities {
         discord_presence: true,
         autostart: !cfg!(debug_assertions),
         qr_import: false,
+        persistent_notification: false,
     }
 }
 
@@ -123,6 +125,7 @@ pub fn default_client_capabilities() -> ClientCapabilities {
         discord_presence: false,
         autostart: false,
         qr_import: true,
+        persistent_notification: true,
     }
 }
 
@@ -135,6 +138,7 @@ pub fn default_client_capabilities() -> ClientCapabilities {
         discord_presence: false,
         autostart: false,
         qr_import: false,
+        persistent_notification: false,
     }
 }
 
@@ -147,6 +151,7 @@ pub fn default_client_capabilities() -> ClientCapabilities {
         discord_presence: false,
         autostart: false,
         qr_import: false,
+        persistent_notification: false,
     }
 }
 

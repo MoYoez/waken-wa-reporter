@@ -208,6 +208,8 @@ const zhCN = {
       pausedDetail: "{device} 暂未同步，点开启继续。",
       setupRequired: "需要完成设置",
       setupRequiredDetail: "请先完成连接设置后再开启同步。",
+      lastHeartbeat: "最近同步：{time}",
+      lastError: "最近错误：{error}",
       pauseAction: "暂停",
       startAction: "开启",
     },

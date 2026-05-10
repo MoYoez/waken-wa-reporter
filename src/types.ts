@@ -9,6 +9,7 @@ export interface ClientCapabilities {
   discordPresence: boolean;
   autostart: boolean;
   qrImport: boolean;
+  persistentNotification: boolean;
 }
 
 export interface ClientConfig {

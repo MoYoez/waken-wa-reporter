@@ -208,6 +208,8 @@ const enUS = {
       pausedDetail: "{device} is not syncing. Tap Start to continue.",
       setupRequired: "Setup required",
       setupRequiredDetail: "Finish the connection setup before starting sync.",
+      lastHeartbeat: "Last sync: {time}",
+      lastError: "Last error: {error}",
       pauseAction: "Pause",
       startAction: "Start",
     },

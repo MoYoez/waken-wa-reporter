@@ -19,6 +19,7 @@ function createDefaultCapabilities(): ClientCapabilities {
     discordPresence: true,
     autostart: true,
     qrImport: false,
+    persistentNotification: false,
   };
 }
 

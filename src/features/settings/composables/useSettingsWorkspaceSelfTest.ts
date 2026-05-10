@@ -1,5 +1,5 @@
 import { computed, ref } from "vue";
-import { isPermissionGranted } from "@tauri-apps/plugin-notification";
+import { invoke } from "@tauri-apps/api/core";
 
 import {
   getAndroidPermissionStatus,
@@ -73,7 +73,7 @@ export function useSettingsWorkspaceSelfTest(options: UseSettingsWorkspaceSelfTe
     }
 
     try {
-      androidReporterNotificationPermissionGranted.value = await isPermissionGranted();
+      androidReporterNotificationPermissionGranted.value = await readAndroidReporterNotificationPermission();
     } catch (error) {
       androidReporterNotificationPermissionGranted.value = false;
       if (!refreshOptions?.silent) {
@@ -248,7 +248,8 @@ export function useSettingsWorkspaceSelfTest(options: UseSettingsWorkspaceSelfTe
 
   async function readAndroidReporterNotificationPermission() {
     try {
-      return await isPermissionGranted();
+      const granted = await invoke<boolean | null>("plugin:notification|is_permission_granted");
+      return granted === true;
     } catch {
       return false;
     }
