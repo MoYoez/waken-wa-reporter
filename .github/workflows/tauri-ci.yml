@@ -209,7 +209,7 @@ jobs:
           VERSION="$BASE_VERSION"
 
           if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF" = "refs/heads/main" ]; then
-            VERSION="$(node -e 'const base = require("./package.json").version.split("-")[0].split(".").map(Number); base[2] = (base[2] || 0) + 1; console.log(`${base[0]}.${base[1]}.${base[2]}-nightly.${process.env.GITHUB_RUN_NUMBER}.${process.env.GITHUB_RUN_ATTEMPT}`);')"
+            VERSION="$(node -e 'const base = require("./package.json").version.split("-")[0].split(".").map(Number); const nightly = ((Number(process.env.GITHUB_RUN_NUMBER) - 1) % 65535) + 1; base[2] = (base[2] || 0) + 1; console.log(`${base[0]}.${base[1]}.${base[2]}-${nightly}`);')"
             export VERSION
             node -e 'const fs = require("fs"); for (const file of ["package.json", "src-tauri/tauri.conf.json"]) { const data = JSON.parse(fs.readFileSync(file, "utf8")); data.version = process.env.VERSION; fs.writeFileSync(file, `${JSON.stringify(data, null, 2)}\n`); }'
           fi
@@ -362,7 +362,7 @@ jobs:
           VERSION="$BASE_VERSION"
 
           if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF" = "refs/heads/main" ]; then
-            VERSION="$(node -e 'const base = require("./package.json").version.split("-")[0].split(".").map(Number); base[2] = (base[2] || 0) + 1; console.log(`${base[0]}.${base[1]}.${base[2]}-nightly.${process.env.GITHUB_RUN_NUMBER}.${process.env.GITHUB_RUN_ATTEMPT}`);')"
+            VERSION="$(node -e 'const base = require("./package.json").version.split("-")[0].split(".").map(Number); const nightly = ((Number(process.env.GITHUB_RUN_NUMBER) - 1) % 65535) + 1; base[2] = (base[2] || 0) + 1; console.log(`${base[0]}.${base[1]}.${base[2]}-${nightly}`);')"
             export VERSION
             node -e 'const fs = require("fs"); for (const file of ["package.json", "src-tauri/tauri.conf.json"]) { const data = JSON.parse(fs.readFileSync(file, "utf8")); data.version = process.env.VERSION; fs.writeFileSync(file, `${JSON.stringify(data, null, 2)}\n`); }'
           fi
