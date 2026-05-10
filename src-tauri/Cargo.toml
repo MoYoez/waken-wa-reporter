@@ -47,3 +47,4 @@ tauri-plugin-notification = "2.3.3"
 tauri-plugin-autostart = "2.5.1"
 tauri-plugin-deep-link = "2.4.9"
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+tauri-plugin-updater = "2.10.1"

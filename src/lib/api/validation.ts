@@ -9,6 +9,7 @@ const DEFAULT_CAPABILITIES: ClientCapabilities = {
   autostart: true,
   qrImport: false,
   persistentNotification: false,
+  updater: true,
 };
 
 export function validateConfig(

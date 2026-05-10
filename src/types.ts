@@ -10,6 +10,7 @@ export interface ClientCapabilities {
   autostart: boolean;
   qrImport: boolean;
   persistentNotification: boolean;
+  updater: boolean;
 }
 
 export interface ClientConfig {

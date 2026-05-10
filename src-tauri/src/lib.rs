@@ -61,6 +61,9 @@ pub fn run() {
     let builder = builder.plugin(tauri_plugin_deep_link::init());
 
     #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+
+    #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
         if has_autostart_arg(&args) {
             let _ = tray::hide_main_window(app);

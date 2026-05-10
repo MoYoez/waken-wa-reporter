@@ -14,6 +14,7 @@ import { useAppShellRuntime } from "@/app/composables/useAppShellRuntime";
 import { useAppShellViewport } from "@/app/composables/useAppShellViewport";
 import { useAppShellWatchers } from "@/app/composables/useAppShellWatchers";
 import { useAndroidReporterNotification } from "@/app/composables/useAndroidReporterNotification";
+import { useDesktopUpdater } from "@/app/composables/useDesktopUpdater";
 import { resolveApiErrorMessage } from "@/lib/localizedText";
 import { createNotifier } from "@/lib/notify";
 
@@ -184,6 +185,13 @@ export function useAppShell() {
     reporterSupported,
     handleStartReporter,
     handleStopReporter,
+  });
+
+  useDesktopUpdater({
+    t: translateText,
+    notify,
+    capabilities,
+    hydrated,
   });
 
   const { bootstrapAppShell } = useAppShellBootstrap({

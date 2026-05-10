@@ -101,6 +101,7 @@ pub struct ClientCapabilities {
     pub autostart: bool,
     pub qr_import: bool,
     pub persistent_notification: bool,
+    pub updater: bool,
 }
 
 #[cfg(desktop)]
@@ -113,6 +114,7 @@ pub fn default_client_capabilities() -> ClientCapabilities {
         autostart: !cfg!(debug_assertions),
         qr_import: false,
         persistent_notification: false,
+        updater: true,
     }
 }
 
@@ -126,6 +128,7 @@ pub fn default_client_capabilities() -> ClientCapabilities {
         autostart: false,
         qr_import: true,
         persistent_notification: true,
+        updater: false,
     }
 }
 
@@ -139,6 +142,7 @@ pub fn default_client_capabilities() -> ClientCapabilities {
         autostart: false,
         qr_import: false,
         persistent_notification: false,
+        updater: false,
     }
 }
 
@@ -152,6 +156,7 @@ pub fn default_client_capabilities() -> ClientCapabilities {
         autostart: false,
         qr_import: false,
         persistent_notification: false,
+        updater: false,
     }
 }
 

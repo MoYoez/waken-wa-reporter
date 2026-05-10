@@ -20,6 +20,7 @@ function createDefaultCapabilities(): ClientCapabilities {
     autostart: true,
     qrImport: false,
     persistentNotification: false,
+    updater: true,
   };
 }
 

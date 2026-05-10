@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Waken-Wa-Reporter Client",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "identifier": "com.waken-wa-reporter-rustc.app",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -26,6 +26,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "resources": [
       "resources/mediaremote-adapter"
     ],
@@ -58,6 +59,12 @@
       "desktop": {
         "schemes": ["waken-wa-reporter"]
       }
+    },
+    "updater": {
+      "endpoints": [
+        "https://github.com/MoYoez/waken-wa-reporter/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRDNEY1RkVDNkE0MDY2RQpSV1J1QnFURy92WEVCTUhOTHR3eUtZU0g0S2cwc3U0Y002YVRLaTRVRWs1amp1S0dWSjFkaFBJRQo="
     }
   }
 }
