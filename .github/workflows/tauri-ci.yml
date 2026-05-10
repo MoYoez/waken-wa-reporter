@@ -3,7 +3,7 @@ name: Tauri CI
 on:
   push:
     branches:
-      - tauri-desktop
+      - main
     tags:
       - "v*"
   pull_request:
@@ -28,6 +28,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         include:
           - os: windows-latest
@@ -97,10 +98,27 @@ jobs:
       - name: check-frontend-build
         run: pnpm build
 
+  prepare-nightly-release:
+    name: prepare-nightly-release
+    runs-on: ubuntu-latest
+    needs: quality-code
+    steps:
+      - name: reset-nightly-release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete nightly --cleanup-tag --yes || true
+          gh release create nightly \
+            --target "$GITHUB_SHA" \
+            --title "Waken-Wa Reporter Nightly" \
+            --notes "Nightly build from ${GITHUB_SHA}." \
+            --prerelease
+
   build-desktop:
     name: build-desktop-${{ matrix.name }}
     runs-on: ${{ matrix.os }}
-    needs: quality-code
+    needs: prepare-nightly-release
     strategy:
       fail-fast: false
       matrix:
@@ -184,7 +202,15 @@ jobs:
       - name: export-package-version
         shell: bash
         run: |
-          VERSION="$(node -p "require('./package.json').version")"
+          BASE_VERSION="$(node -p "require('./package.json').version")"
+          VERSION="$BASE_VERSION"
+
+          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            VERSION="$(node -e 'const base = require("./package.json").version.split("-")[0].split(".").map(Number); base[2] = (base[2] || 0) + 1; console.log(`${base[0]}.${base[1]}.${base[2]}-nightly.${process.env.GITHUB_RUN_NUMBER}.${process.env.GITHUB_RUN_ATTEMPT}`);')"
+            export VERSION
+            node -e 'const fs = require("fs"); for (const file of ["package.json", "src-tauri/tauri.conf.json"]) { const data = JSON.parse(fs.readFileSync(file, "utf8")); data.version = process.env.VERSION; fs.writeFileSync(file, `${JSON.stringify(data, null, 2)}\n`); }'
+          fi
+
           echo "PACKAGE_VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: build-tauri-desktop
@@ -196,9 +222,11 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           args: ${{ matrix.tauri_args }}
-          tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
-          releaseName: ${{ startsWith(github.ref, 'refs/tags/') && format('Waken-Wa Reporter {0}', github.ref_name) || '' }}
-          releaseBody: ${{ startsWith(github.ref, 'refs/tags/') && format('Release {0}', github.ref_name) || '' }}
+          tagName: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'nightly' || (startsWith(github.ref, 'refs/tags/') && github.ref_name || '') }}
+          releaseName: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'Waken-Wa Reporter Nightly' || (startsWith(github.ref, 'refs/tags/') && format('Waken-Wa Reporter {0}', github.ref_name) || '') }}
+          releaseBody: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('Nightly build from {0}.', github.sha) || (startsWith(github.ref, 'refs/tags/') && format('Release {0}', github.ref_name) || '') }}
+          releaseCommitish: ${{ github.sha }}
+          prerelease: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           uploadUpdaterJson: true
           releaseAssetNamePattern: ${{ env.APP_BASENAME }}-[version]-${{ matrix.platform }}-${{ matrix.arch }}[ext]
 
@@ -274,7 +302,7 @@ jobs:
   build-android:
     name: build-android
     runs-on: ubuntu-latest
-    needs: quality-code
+    needs: prepare-nightly-release
     env:
       ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -327,7 +355,15 @@ jobs:
       - name: export-package-version
         shell: bash
         run: |
-          VERSION="$(node -p "require('./package.json').version")"
+          BASE_VERSION="$(node -p "require('./package.json').version")"
+          VERSION="$BASE_VERSION"
+
+          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            VERSION="$(node -e 'const base = require("./package.json").version.split("-")[0].split(".").map(Number); base[2] = (base[2] || 0) + 1; console.log(`${base[0]}.${base[1]}.${base[2]}-nightly.${process.env.GITHUB_RUN_NUMBER}.${process.env.GITHUB_RUN_ATTEMPT}`);')"
+            export VERSION
+            node -e 'const fs = require("fs"); for (const file of ["package.json", "src-tauri/tauri.conf.json"]) { const data = JSON.parse(fs.readFileSync(file, "utf8")); data.version = process.env.VERSION; fs.writeFileSync(file, `${JSON.stringify(data, null, 2)}\n`); }'
+          fi
+
           echo "PACKAGE_VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: init-android-target
@@ -402,7 +438,13 @@ jobs:
           compression-level: 0
 
       - name: upload-android-release-assets
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'nightly' || github.ref_name }}
+          name: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'Waken-Wa Reporter Nightly' || format('Waken-Wa Reporter {0}', github.ref_name) }}
+          body: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('Nightly build from {0}.', github.sha) || format('Release {0}', github.ref_name) }}
+          prerelease: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          target_commitish: ${{ github.sha }}
+          overwrite_files: true
           files: dist-packages/*

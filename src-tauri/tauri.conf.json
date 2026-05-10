@@ -62,6 +62,7 @@
     },
     "updater": {
       "endpoints": [
+        "https://github.com/MoYoez/waken-wa-reporter/releases/download/nightly/latest.json",
         "https://github.com/MoYoez/waken-wa-reporter/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRDNEY1RkVDNkE0MDY2RQpSV1J1QnFURy92WEVCTUhOTHR3eUtZU0g0S2cwc3U0Y002YVRLaTRVRWs1amp1S0dWSjFkaFBJRQo="
