@@ -67,6 +67,7 @@ const { t } = useI18n();
     <div v-else class="activity-select-row">
       <Select
         v-model="selectedActivityKey"
+        class="activity-select"
         :options="activityOptions"
         option-label="label"
         option-value="value"

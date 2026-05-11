@@ -466,6 +466,7 @@ select {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
+  min-width: 0;
 }
 
 .activity-toggle-row {
@@ -489,6 +490,13 @@ select {
   color: var(--ink-soft);
   display: grid;
   gap: 2px;
+  min-width: 0;
+}
+
+.snapshot-preview span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .editor-mode-tabs {
@@ -730,6 +738,7 @@ select {
 .field-block {
   display: grid;
   gap: 8px;
+  min-width: 0;
 }
 
 .reporter-enabled-card {
@@ -915,6 +924,7 @@ select {
 .workspace-grid {
   display: grid;
   gap: 14px;
+  min-width: 0;
 }
 
 .payload-preview {
@@ -1111,6 +1121,7 @@ select {
   align-items: center;
   gap: 10px;
   margin-top: 6px;
+  min-width: 0;
 }
 
 .upload-label {
@@ -1188,6 +1199,7 @@ select {
 .entry-list {
   display: grid;
   gap: 10px;
+  min-width: 0;
 }
 
 .entry-list-actions {
@@ -1203,6 +1215,7 @@ select {
   border: 1px solid var(--line);
   display: grid;
   gap: 12px;
+  min-width: 0;
 }
 
 .entry-card-button {
@@ -1224,6 +1237,11 @@ select {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
+}
+
+.entry-header > div {
+  min-width: 0;
 }
 
 .entry-content {
@@ -1235,6 +1253,8 @@ select {
 
 .entry-preview-text {
   color: var(--ink-soft);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .entry-card-footer {
@@ -1365,6 +1385,48 @@ select {
   background: var(--accent-faint);
   color: var(--ink-soft);
   border-radius: 0 6px 6px 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.activity-select {
+  min-width: 0;
+}
+
+.activity-select .p-select-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-select .p-select-dropdown {
+  flex-shrink: 0;
+}
+
+.inspiration-compose,
+.inspiration-compose .p-card-body,
+.inspiration-compose .p-card-content,
+.inspiration-compose .panel-grid,
+.compose-live-preview,
+.compose-preview-card,
+.editor-tab-panel,
+.editor-fallback,
+.lexical-editor-shell,
+.lexical-editor-frame,
+.markdown-content {
+  min-width: 0;
+}
+
+.markdown-content,
+.markdown-content p,
+.markdown-content li,
+.markdown-content blockquote,
+.markdown-content pre,
+.markdown-content code {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .entry-detail-dialog {
