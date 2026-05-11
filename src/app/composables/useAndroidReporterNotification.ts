@@ -4,14 +4,11 @@ import {
   active,
   createChannel,
   Importance,
-  onAction,
-  registerActionTypes,
   removeActive,
   Visibility,
   type ActiveNotification,
   type Options,
 } from "@tauri-apps/plugin-notification";
-import type { PluginListener } from "@tauri-apps/api/core";
 
 import type { ClientCapabilities, ClientConfig, RealtimeReporterSnapshot } from "@/types";
 
@@ -28,25 +25,12 @@ interface UseAndroidReporterNotificationOptions {
   handleStopReporter: () => Promise<void>;
 }
 
-interface AndroidNotificationActionPayload extends Partial<Options> {
-  action?: string | { id?: string };
-  actionId?: string;
-  actionIdentifier?: string;
-  notification?: Partial<Options> | null;
-}
-
 const NOTIFICATION_ID = 408201;
 const CHANNEL_ID = "waken-wa-reporter-status-v2";
 const SMALL_ICON = "ic_launcher";
 const LARGE_ICON = "ic_launcher_foreground";
-const ACTION_TYPE_RUNNING = "waken-wa-reporter-running";
-const ACTION_TYPE_PAUSED = "waken-wa-reporter-paused";
-const ACTION_START = "start-reporter";
-const ACTION_PAUSE = "pause-reporter";
 
 export function useAndroidReporterNotification(options: UseAndroidReporterNotificationOptions) {
-  let actionListener: PluginListener | undefined;
-  let actionLabelsKey = "";
   let notificationReady = false;
   let notificationSetupInFlight: Promise<boolean> | undefined;
   let notificationSyncInFlight = false;
@@ -72,8 +56,6 @@ export function useAndroidReporterNotification(options: UseAndroidReporterNotifi
       options.config.value.device.trim(),
       options.reporterSnapshot.value.lastHeartbeatAt ?? "",
       options.reporterSnapshot.value.lastError ?? "",
-      options.t("app.androidNotification.pauseAction"),
-      options.t("app.androidNotification.startAction"),
     ].join("|"),
   );
 
@@ -111,17 +93,6 @@ export function useAndroidReporterNotification(options: UseAndroidReporterNotifi
         visibility: Visibility.Public,
       });
       logAndroidNotification("notification channel ready", { channelId: CHANNEL_ID });
-
-      await registerReporterActions();
-      logAndroidNotification("notification actions ready", {
-        actionTypeRunning: ACTION_TYPE_RUNNING,
-        actionTypePaused: ACTION_TYPE_PAUSED,
-      });
-
-      actionListener = await onAction((payload) => {
-        void handleNotificationAction(payload as AndroidNotificationActionPayload);
-      });
-      logAndroidNotification("notification action listener ready");
       return true;
     } catch (error) {
       logAndroidNotification("notification setup failed", {
@@ -145,59 +116,6 @@ export function useAndroidReporterNotification(options: UseAndroidReporterNotifi
     }
   }
 
-  async function registerReporterActions() {
-    const nextLabelsKey = [
-      options.t("app.androidNotification.pauseAction"),
-      options.t("app.androidNotification.startAction"),
-    ].join("|");
-
-    if (nextLabelsKey === actionLabelsKey) {
-      return;
-    }
-
-    await registerActionTypes([
-      {
-        id: ACTION_TYPE_RUNNING,
-        actions: [
-          {
-            id: ACTION_PAUSE,
-            title: options.t("app.androidNotification.pauseAction"),
-          },
-        ],
-      },
-      {
-        id: ACTION_TYPE_PAUSED,
-        actions: [
-          {
-            id: ACTION_START,
-            title: options.t("app.androidNotification.startAction"),
-            foreground: true,
-          },
-        ],
-      },
-    ]);
-    actionLabelsKey = nextLabelsKey;
-  }
-
-  async function handleNotificationAction(payload: AndroidNotificationActionPayload) {
-    const actionId = getNotificationActionId(payload);
-    const notification = getActionNotification(payload);
-
-    if (!isReporterAction(actionId) && !isReporterNotification(notification)) {
-      return;
-    }
-
-    if (actionId === ACTION_PAUSE) {
-      await options.handleStopReporter();
-    } else if (actionId === ACTION_START) {
-      if (options.readiness.value) {
-        await options.handleStartReporter();
-      }
-    }
-
-    await syncNotification();
-  }
-
   async function syncNotification() {
     if (notificationSyncInFlight) {
       notificationSyncQueued = true;
@@ -218,7 +136,6 @@ export function useAndroidReporterNotification(options: UseAndroidReporterNotifi
         return;
       }
 
-      await registerReporterActions();
       await notifyReporterStatus();
     } finally {
       notificationSyncInFlight = false;
@@ -253,7 +170,6 @@ export function useAndroidReporterNotification(options: UseAndroidReporterNotifi
       body: summaryLine,
       inboxLines: detailLines,
       summary: options.t(`app.androidNotification.${stateKey}`),
-      actionTypeId: running ? ACTION_TYPE_RUNNING : ACTION_TYPE_PAUSED,
       ongoing: true,
       autoCancel: false,
       silent: true,
@@ -303,7 +219,6 @@ export function useAndroidReporterNotification(options: UseAndroidReporterNotifi
       ...buildDebugState(),
       id: notification.id,
       channelId: notification.channelId,
-      actionTypeId: notification.actionTypeId,
     });
 
     await invoke("plugin:notification|notify", { options: notification });
@@ -319,47 +234,6 @@ export function useAndroidReporterNotification(options: UseAndroidReporterNotifi
         logAndroidNotification("active notification probe failed", { error: formatError(error) });
       }
     }
-  }
-
-  function isReporterNotification(notification: Partial<Options> | null | undefined) {
-    return notification?.id === NOTIFICATION_ID
-      || notification?.actionTypeId === ACTION_TYPE_RUNNING
-      || notification?.actionTypeId === ACTION_TYPE_PAUSED
-      || notification?.extra?.kind === "android-reporter-status";
-  }
-
-  function isReporterAction(actionId: string | undefined) {
-    return actionId === ACTION_PAUSE || actionId === ACTION_START;
-  }
-
-  function getActionNotification(payload: AndroidNotificationActionPayload) {
-    return payload.notification ?? payload;
-  }
-
-  function getNotificationActionId(payload: AndroidNotificationActionPayload) {
-    if (typeof payload.actionId === "string") {
-      return payload.actionId;
-    }
-    if (typeof payload.actionIdentifier === "string") {
-      return payload.actionIdentifier;
-    }
-    if (typeof payload.action === "string") {
-      return payload.action;
-    }
-    if (payload.action && typeof payload.action === "object" && typeof payload.action.id === "string") {
-      return payload.action.id;
-    }
-
-    const extraAction = payload.extra?.action;
-    if (typeof extraAction === "string") {
-      return extraAction;
-    }
-    const extraActionId = payload.extra?.actionId;
-    if (typeof extraActionId === "string") {
-      return extraActionId;
-    }
-
-    return undefined;
   }
 
   async function removeReporterNotification() {
@@ -392,7 +266,6 @@ export function useAndroidReporterNotification(options: UseAndroidReporterNotifi
   );
 
   onBeforeUnmount(() => {
-    actionListener?.unregister();
     void removeReporterNotification();
   });
 }
