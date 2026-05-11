@@ -648,14 +648,21 @@ fn call_static_string(
     let class = load_collector_class(&mut env, context.context().cast())?;
     let value = env
         .call_static_method(class, method, signature, args)
-        .map_err(|error| format!("调用 Android 采集器 {method} 失败：{error}"))?;
-    let object = value
-        .l()
-        .map_err(|error| format!("读取 Android 采集器 {method} 返回值失败：{error}"))?;
+        .map_err(|error| {
+            let _ = clear_pending_exception(&mut env);
+            format!("调用 Android 采集器 {method} 失败：{error}")
+        })?;
+    let object = value.l().map_err(|error| {
+        let _ = clear_pending_exception(&mut env);
+        format!("读取 Android 采集器 {method} 返回值失败：{error}")
+    })?;
     let string = JString::from(object);
     env.get_string(&string)
         .map(|value| value.into())
-        .map_err(|error| format!("转换 Android 采集器 {method} 返回字符串失败：{error}"))
+        .map_err(|error| {
+            let _ = clear_pending_exception(&mut env);
+            format!("转换 Android 采集器 {method} 返回字符串失败：{error}")
+        })
 }
 
 fn load_collector_class<'local>(
