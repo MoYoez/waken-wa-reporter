@@ -33,9 +33,10 @@ Both Simplified Chinese and English are available in the docs, and the app UI it
 
 | Platform | Status |
 | --- | --- |
-| Windows / macOS | Supports realtime background sync, system tray, launch on startup, platform self-checks, manual activity reporting, and inspiration publishing |
-| Linux | Supports realtime background sync, platform self-checks, manual activity reporting, and inspiration publishing; Wayland is adapted for GNOME / KDE, and media capture depends on `playerctl` |
-| Android / iOS | Provides a phone and tablet friendly UI with manual activity reporting and inspiration features; realtime background sync, tray, and Discord sync are disabled by default |
+| Windows / macOS | Supports the full current feature set, including realtime background sync, system tray, launch on startup, platform self-checks, manual activity reporting, inspiration publishing, and Discord Rich Presence sync |
+| Linux | Supports the full current feature set; Wayland is adapted for GNOME / KDE, and media capture depends on `playerctl` |
+| Android | Supports the full current feature set, with a phone and tablet friendly UI, persistent notifications, manual activity reporting, inspiration publishing, and related platform capabilities |
+| iOS | Not yet fully adapted and is currently not provided as a fully supported platform |
 
 ## Installation
 
