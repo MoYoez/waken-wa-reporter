@@ -62,11 +62,10 @@ pub fn load_app_state(app: &AppHandle) -> Result<AppStatePayload, String> {
                 match serde_json::from_value::<AppStatePayload>(raw.take()) {
                     Ok(mut parsed) => {
                         if performance_mode_missing {
-                            parsed.config.performance_mode =
-                                crate::models::detect_performance_mode(
-                                    parsed.config.poll_interval_ms,
-                                    parsed.config.heartbeat_interval_ms,
-                                );
+                            parsed.config.performance_mode = crate::models::detect_performance_mode(
+                                parsed.config.poll_interval_ms,
+                                parsed.config.heartbeat_interval_ms,
+                            );
                         }
                         parsed
                     }

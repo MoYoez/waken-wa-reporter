@@ -297,7 +297,9 @@ fn run_reporter_loop(
     let heartbeat_interval = if config.heartbeat_interval_ms == 0 {
         None
     } else {
-        Some(Duration::from_millis(config.heartbeat_interval_ms.max(1_000)))
+        Some(Duration::from_millis(
+            config.heartbeat_interval_ms.max(1_000),
+        ))
     };
 
     let mut last_signature: Option<String> = None;
