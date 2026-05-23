@@ -1,8 +1,8 @@
-package com.waken_wa_reporter_rustc.app
+package com.waken_wa_reporter.plugin.activity
 
 import android.service.notification.NotificationListenerService
 
-class WakenMediaNotificationListener : NotificationListenerService() {
+open class WakenMediaNotificationListener : NotificationListenerService() {
   override fun onListenerConnected() {
     super.onListenerConnected()
     AndroidActivityCollector.initialize(applicationContext)

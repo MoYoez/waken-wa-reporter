@@ -1,0 +1,4 @@
+<resources>
+    <string name="waken_android_activity_plugin_name">Waken-Wa-Reporter Client</string>
+    <string name="waken_accessibility_service_description">Improves foreground app title detection for realtime reporting.</string>
+</resources>

@@ -12,8 +12,9 @@ use super::{
 };
 use crate::models::{AndroidPermissionStatus, PlatformSelfTestResult};
 
-const COLLECTOR_CLASS: &str = "com/waken_wa_reporter_rustc/app/AndroidActivityCollector";
-const COLLECTOR_BINARY_NAME: &str = "com.waken_wa_reporter_rustc.app.AndroidActivityCollector";
+const COLLECTOR_CLASS: &str = "com/waken_wa_reporter/plugin/activity/AndroidActivityCollector";
+const COLLECTOR_BINARY_NAME: &str =
+    "com.waken_wa_reporter.plugin.activity.AndroidActivityCollector";
 const ANDROID_INTENT_FLAG_ACTIVITY_NEW_TASK: i32 = 0x10000000;
 const ANDROID_SETTINGS_USAGE_ACCESS: &str = "android.settings.USAGE_ACCESS_SETTINGS";
 const ANDROID_SETTINGS_NOTIFICATION_LISTENER: &str =

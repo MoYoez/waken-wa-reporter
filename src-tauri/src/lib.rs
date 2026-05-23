@@ -80,6 +80,7 @@ pub fn run() {
 
     let builder = builder
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_waken_android_activity::init())
         .plugin(tauri_plugin_device_info::init());
 
     let builder = builder.manage(ReporterRuntime::new());

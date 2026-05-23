@@ -1,0 +1,14 @@
+[package]
+name = "tauri-plugin-waken-android-activity"
+version = "0.1.0"
+edition = "2021"
+links = "tauri-plugin-waken-android-activity"
+
+[lib]
+name = "tauri_plugin_waken_android_activity"
+
+[dependencies]
+tauri = { version = "2" }
+
+[build-dependencies]
+tauri-plugin = { version = "2" }

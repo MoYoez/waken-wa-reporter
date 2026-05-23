@@ -1,4 +1,4 @@
-package com.waken_wa_reporter_rustc.app
+package com.waken_wa_reporter.plugin.activity
 
 import android.app.AppOpsManager
 import android.app.usage.UsageEvents
@@ -30,14 +30,39 @@ import kotlin.math.roundToLong
 
 object AndroidActivityCollector {
   private const val USAGE_LOOKBACK_MS = 10 * 60 * 1000L
+  private const val ACCESSIBILITY_SNAPSHOT_MAX_AGE_MS = 30 * 1000L
+  private const val LEGACY_NOTIFICATION_LISTENER_CLASS =
+    "com.waken_wa_reporter_rustc.app.WakenMediaNotificationListener"
   private const val MAX_COVER_SIZE_PX = 384
   private const val MAX_ICON_SIZE_PX = 96
+
+  private data class AccessibilityWindowSnapshot(
+    val packageName: String,
+    val title: String,
+    val observedAtMs: Long,
+  )
 
   @Volatile
   private var appContext: Context? = null
 
+  @Volatile
+  private var accessibilityWindowSnapshot: AccessibilityWindowSnapshot? = null
+
   fun initialize(context: Context) {
     appContext = context.applicationContext
+  }
+
+  fun updateAccessibilityWindow(packageName: CharSequence?, title: CharSequence?) {
+    val normalizedPackage = packageName?.toString()?.trim().orEmpty()
+    if (normalizedPackage.isBlank()) {
+      return
+    }
+
+    accessibilityWindowSnapshot = AccessibilityWindowSnapshot(
+      packageName = normalizedPackage,
+      title = title?.toString()?.trim().orEmpty(),
+      observedAtMs = System.currentTimeMillis(),
+    )
   }
 
   @JvmStatic
@@ -60,9 +85,11 @@ object AndroidActivityCollector {
 
       val packageName = findForegroundPackageName(context).orEmpty()
       val appName = if (packageName.isNotBlank()) appLabel(context, packageName) else ""
+      val accessibilityWindow = currentAccessibilityWindow(packageName)
+      val processTitle = resolveForegroundTitle(packageName, appName, accessibilityWindow)
       result
         .put("processName", if (includeProcessName) packageName else "")
-        .put("processTitle", if (includeProcessTitle) appName else "")
+        .put("processTitle", if (includeProcessTitle) processTitle else "")
         .toString()
     }
 
@@ -199,19 +226,28 @@ object AndroidActivityCollector {
     return mode == AppOpsManager.MODE_ALLOWED
   }
 
-  private fun hasNotificationListenerAccess(context: Context): Boolean {
+  private fun enabledNotificationListener(context: Context): ComponentName? {
     val enabled = Settings.Secure.getString(
       context.contentResolver,
       "enabled_notification_listeners",
-    ) ?: return false
+    ) ?: return null
+
+    val acceptedClasses = setOf(
+      WakenMediaNotificationListener::class.java.name,
+      LEGACY_NOTIFICATION_LISTENER_CLASS,
+    )
 
     return enabled
       .split(':')
       .mapNotNull { ComponentName.unflattenFromString(it) }
-      .any {
+      .firstOrNull {
         it.packageName == context.packageName
-          && it.className == WakenMediaNotificationListener::class.java.name
+          && acceptedClasses.contains(it.className)
       }
+  }
+
+  private fun hasNotificationListenerAccess(context: Context): Boolean {
+    return enabledNotificationListener(context) != null
   }
 
   private fun findForegroundPackageName(context: Context): String? {
@@ -239,7 +275,10 @@ object AndroidActivityCollector {
 
   private fun findBestMediaController(context: Context): MediaController? {
     val manager = context.getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
-    val listener = ComponentName(context, WakenMediaNotificationListener::class.java)
+    val listener = enabledNotificationListener(context) ?: ComponentName(
+      context,
+      WakenMediaNotificationListener::class.java,
+    )
     return manager
       .getActiveSessions(listener)
       .sortedByDescending { controller ->
@@ -305,10 +344,75 @@ object AndroidActivityCollector {
       return ""
     }
 
-    return runCatching {
+    val applicationLabel = runCatching {
       val info = applicationInfo(context, packageName)
       context.packageManager.getApplicationLabel(info).toString()
-    }.getOrDefault(packageName)
+    }.getOrNull()
+
+    return listOf(applicationLabel, launcherActivityLabel(context, packageName), packageName)
+      .map { it?.trim().orEmpty() }
+      .firstOrNull { it.isNotEmpty() }
+      .orEmpty()
+  }
+
+  private fun currentAccessibilityWindow(packageName: String): AccessibilityWindowSnapshot? {
+    val normalizedPackage = packageName.trim()
+    if (normalizedPackage.isBlank()) {
+      return null
+    }
+
+    val snapshot = accessibilityWindowSnapshot ?: return null
+    if (snapshot.packageName != normalizedPackage) {
+      return null
+    }
+
+    val ageMs = System.currentTimeMillis() - snapshot.observedAtMs
+    if (ageMs < 0 || ageMs > ACCESSIBILITY_SNAPSHOT_MAX_AGE_MS) {
+      return null
+    }
+
+    return snapshot
+  }
+
+  private fun resolveForegroundTitle(
+    packageName: String,
+    appName: String,
+    accessibilityWindow: AccessibilityWindowSnapshot?,
+  ): String {
+    val normalizedPackage = packageName.trim()
+    val accessibilityTitle = accessibilityWindow
+      ?.takeIf { it.packageName == normalizedPackage }
+      ?.title
+      ?.trim()
+      ?.takeIf { it.isNotEmpty() && it != normalizedPackage }
+
+    if (!accessibilityTitle.isNullOrEmpty()) {
+      return accessibilityTitle
+    }
+
+    return appName.trim()
+      .takeIf { it.isNotEmpty() && it != normalizedPackage }
+      .orEmpty()
+  }
+
+  private fun launcherActivityLabel(context: Context, packageName: String): String? {
+    val packageManager = context.packageManager
+    val intent = packageManager.getLaunchIntentForPackage(packageName) ?: return null
+    val resolveInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      packageManager.resolveActivity(
+        intent,
+        PackageManager.ResolveInfoFlags.of(0L),
+      )
+    } else {
+      @Suppress("DEPRECATION")
+      packageManager.resolveActivity(intent, 0)
+    }
+
+    return resolveInfo
+      ?.loadLabel(packageManager)
+      ?.toString()
+      ?.trim()
+      ?.takeIf { it.isNotEmpty() }
   }
 
   private fun appIcon(context: Context, packageName: String): Drawable? {

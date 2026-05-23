@@ -4921,6 +4921,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-plugin-waken-android-activity"
+version = "0.1.0"
+dependencies = [
+ "tauri",
+ "tauri-plugin",
+]
+
+[[package]]
 name = "tauri-runtime"
 version = "2.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5631,6 +5639,7 @@ dependencies = [
  "tauri-plugin-opener",
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
+ "tauri-plugin-waken-android-activity",
  "uuid 1.23.0",
  "windows 0.62.2",
  "windows-future 0.3.2",
