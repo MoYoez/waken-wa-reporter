@@ -28,7 +28,7 @@ export const REPORTER_TIMING_FIELDS: Record<ReporterTimingField, ReporterTimingM
   pollIntervalMs: {
     labelKey: "connectionPanel.fields.pollInterval",
     min: 1_000,
-    defaultValue: 5_000,
+    defaultValue: 30_000,
   },
   heartbeatIntervalMs: {
     labelKey: "connectionPanel.fields.heartbeatInterval",
@@ -36,6 +36,8 @@ export const REPORTER_TIMING_FIELDS: Record<ReporterTimingField, ReporterTimingM
     defaultValue: 60_000,
   },
 };
+
+export const HEARTBEAT_SOFT_CEILING_MS = 240_000;
 
 function timingPath(field: ReporterTimingField) {
   return `config.${field}`;

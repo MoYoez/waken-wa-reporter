@@ -459,6 +459,30 @@ const enUS = {
       eyebrow: "Connection",
       title: "Finish setup to sync this device to Waken-Wa",
     },
+    performance: {
+      label: "Performance mode",
+      showAdvanced: "Show advanced timing",
+      hideAdvanced: "Hide advanced timing",
+      heartbeatCeilingHint: "Heartbeat exceeds {ceiling}s — the server may flag this device as offline. Confirm server timeout settings.",
+      options: {
+        realtime: {
+          label: "Realtime (high power)",
+          description: "Polls every second for instant updates. Best for desktops on AC power.",
+        },
+        balanced: {
+          label: "Balanced (recommended)",
+          description: "Polls every 30s with a 60s heartbeat. Good tradeoff between responsiveness and power.",
+        },
+        powersave: {
+          label: "Power saver",
+          description: "Polls every 60s with a 120s heartbeat. Lowest power; activity updates are slower.",
+        },
+        custom: {
+          label: "Custom",
+          description: "Manually tune poll and heartbeat intervals (advanced).",
+        },
+      },
+    },
     status: {
       ready: "Ready",
       pending: "Needs attention",

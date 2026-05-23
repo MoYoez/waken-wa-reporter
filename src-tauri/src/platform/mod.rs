@@ -405,6 +405,24 @@ pub use stub::request_accessibility_permission;
 #[cfg(target_os = "windows")]
 pub use windows::request_accessibility_permission;
 
+pub fn invalidate_accessibility_permission_cache() {
+    #[cfg(target_os = "macos")]
+    macos::invalidate_accessibility_permission_cache();
+}
+
+pub fn subscribe_foreground_changes() -> Option<std::sync::mpsc::Receiver<()>> {
+    #[cfg(target_os = "macos")]
+    {
+        return Some(macos::subscribe_foreground_changes());
+    }
+    #[cfg(target_os = "windows")]
+    {
+        return Some(windows::subscribe_foreground_changes());
+    }
+    #[allow(unreachable_code)]
+    None
+}
+
 pub fn platform_name() -> &'static str {
     #[cfg(target_os = "windows")]
     {

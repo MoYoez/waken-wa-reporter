@@ -162,6 +162,26 @@ bool waken_request_accessibility_permission(void) {
     return AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)options);
 }
 
+static waken_foreground_change_callback g_foreground_callback = NULL;
+static dispatch_once_t g_foreground_observer_once;
+
+void waken_register_foreground_change_observer(waken_foreground_change_callback callback) {
+    g_foreground_callback = callback;
+    dispatch_once(&g_foreground_observer_once, ^{
+        NSNotificationCenter *center = [[NSWorkspace sharedWorkspace] notificationCenter];
+        void (^handler)(NSNotification *) = ^(NSNotification *_Nonnull __unused note) {
+            waken_foreground_change_callback fn = g_foreground_callback;
+            if (fn != NULL) {
+                fn();
+            }
+        };
+        [center addObserverForName:NSWorkspaceDidActivateApplicationNotification
+                            object:nil
+                             queue:[NSOperationQueue mainQueue]
+                        usingBlock:handler];
+    });
+}
+
 void waken_string_free(char *value) {
     if (value != NULL) {
         free(value);

@@ -1,16 +1,23 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import InputText from "primevue/inputtext";
+import Select from "primevue/select";
 import ToggleSwitch from "primevue/toggleswitch";
 import { useI18n } from "vue-i18n";
 
 import {
   formatReporterTimingIssueBrief,
   formatReporterTimingIssue,
+  HEARTBEAT_SOFT_CEILING_MS,
   validateReporterTimingInput,
   type ReporterTimingIssue,
 } from "@/lib/reporterTimingValidation";
-import type { ClientConfig } from "@/types";
+import {
+  detectPerformanceMode,
+  PERFORMANCE_PRESETS,
+  type ClientConfig,
+  type PerformanceMode,
+} from "@/types";
 
 interface ReporterContentOption {
   key:
@@ -38,6 +45,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   updateField: [key: keyof ClientConfig, value: ClientConfig[keyof ClientConfig]];
+  updateFields: [patch: Partial<ClientConfig>];
 }>();
 
 const { t } = useI18n();
@@ -105,6 +113,58 @@ function timingIssueBrief(issue?: ReporterTimingIssue) {
   return issue ? formatReporterTimingIssueBrief(issue, t) : "";
 }
 
+const performanceMode = computed<PerformanceMode>(() => props.modelValue.performanceMode);
+
+const performanceOptions = computed(() =>
+  (["realtime", "balanced", "powersave", "custom"] as PerformanceMode[]).map((value) => ({
+    value,
+    label: t(`connectionPanel.performance.options.${value}.label`),
+    description: t(`connectionPanel.performance.options.${value}.description`),
+  })),
+);
+
+const showAdvancedTimings = ref(performanceMode.value === "custom");
+watch(performanceMode, (mode) => {
+  if (mode === "custom") {
+    showAdvancedTimings.value = true;
+  }
+});
+
+function applyPerformanceMode(next: PerformanceMode) {
+  if (next === "custom") {
+    emit("updateField", "performanceMode", next);
+    showAdvancedTimings.value = true;
+    return;
+  }
+  const preset = PERFORMANCE_PRESETS[next];
+  emit("updateFields", {
+    pollIntervalMs: preset.pollIntervalMs,
+    heartbeatIntervalMs: preset.heartbeatIntervalMs,
+    performanceMode: next,
+  });
+  pollIntervalInput.value = String(preset.pollIntervalMs);
+  heartbeatIntervalInput.value = String(preset.heartbeatIntervalMs);
+}
+
+watch(
+  () => [props.modelValue.pollIntervalMs, props.modelValue.heartbeatIntervalMs] as const,
+  ([poll, heartbeat]) => {
+    const detected = detectPerformanceMode(poll, heartbeat);
+    if (detected !== props.modelValue.performanceMode) {
+      emit("updateField", "performanceMode", detected);
+    }
+  },
+);
+
+const heartbeatCeilingHint = computed(() => {
+  if (props.modelValue.heartbeatIntervalMs > HEARTBEAT_SOFT_CEILING_MS) {
+    return t("connectionPanel.performance.heartbeatCeilingHint", {
+      ceiling: HEARTBEAT_SOFT_CEILING_MS / 1000,
+    });
+  }
+  return "";
+});
+
 </script>
 
 <template>
@@ -113,6 +173,35 @@ function timingIssueBrief(issue?: ReporterTimingIssue) {
     <span>{{ t(props.helpKey) }}</span>
   </div>
   <div class="panel-grid">
+    <label class="field-block field-span-2 performance-mode-field">
+      <span class="field-label">{{ t("connectionPanel.performance.label") }}</span>
+      <Select
+        :model-value="performanceMode"
+        :options="performanceOptions"
+        option-label="label"
+        option-value="value"
+        @update:model-value="applyPerformanceMode($event as PerformanceMode)"
+      />
+      <small class="field-help">
+        {{ performanceOptions.find((o) => o.value === performanceMode)?.description }}
+      </small>
+    </label>
+
+    <div class="field-span-2 performance-advanced-toggle">
+      <button
+        type="button"
+        class="link-button"
+        @click="showAdvancedTimings = !showAdvancedTimings"
+      >
+        {{
+          showAdvancedTimings
+            ? t("connectionPanel.performance.hideAdvanced")
+            : t("connectionPanel.performance.showAdvanced")
+        }}
+      </button>
+    </div>
+
+    <template v-if="showAdvancedTimings">
     <label class="field-block">
       <span class="field-label">{{ t("connectionPanel.fields.pollInterval") }}</span>
       <InputText
@@ -147,7 +236,11 @@ function timingIssueBrief(issue?: ReporterTimingIssue) {
       >
         {{ timingIssueBrief(heartbeatIntervalIssue) || "\u00A0" }}
       </small>
+      <small v-if="heartbeatCeilingHint" class="field-help field-help-warn">
+        {{ heartbeatCeilingHint }}
+      </small>
     </label>
+    </template>
 
     <div class="reporter-enabled-card field-span-2">
       <div class="reporter-enabled-copy">

@@ -2,6 +2,38 @@ export type DeviceType = "desktop" | "tablet" | "mobile";
 
 export type PushMode = "realtime" | "active";
 
+export type PerformanceMode = "realtime" | "balanced" | "powersave" | "custom";
+
+export interface PerformancePresetValues {
+  pollIntervalMs: number;
+  heartbeatIntervalMs: number;
+}
+
+export const PERFORMANCE_PRESETS: Record<
+  Exclude<PerformanceMode, "custom">,
+  PerformancePresetValues
+> = {
+  realtime: { pollIntervalMs: 1_000, heartbeatIntervalMs: 60_000 },
+  balanced: { pollIntervalMs: 30_000, heartbeatIntervalMs: 60_000 },
+  powersave: { pollIntervalMs: 60_000, heartbeatIntervalMs: 120_000 },
+};
+
+export function detectPerformanceMode(
+  pollIntervalMs: number,
+  heartbeatIntervalMs: number,
+): PerformanceMode {
+  for (const mode of ["realtime", "balanced", "powersave"] as const) {
+    const preset = PERFORMANCE_PRESETS[mode];
+    if (
+      preset.pollIntervalMs === pollIntervalMs &&
+      preset.heartbeatIntervalMs === heartbeatIntervalMs
+    ) {
+      return mode;
+    }
+  }
+  return "custom";
+}
+
 export interface ClientCapabilities {
   realtimeReporter: boolean;
   tray: boolean;
@@ -24,6 +56,7 @@ export interface ClientConfig {
   pushMode: PushMode;
   pollIntervalMs: number;
   heartbeatIntervalMs: number;
+  performanceMode: PerformanceMode;
   reporterMetadataJson: string;
   reporterEnabled: boolean;
   reportForegroundApp: boolean;

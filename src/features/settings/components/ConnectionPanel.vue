@@ -37,6 +37,7 @@ const {
   reporterSupported,
   scanImportConfigQr,
   updateField,
+  updateFields,
 } = useConnectionPanel(props, {
   onUpdateModelValue: (value) => emit("update:modelValue", value),
   onImported: (message) => emit("imported", message),
@@ -99,6 +100,7 @@ const {
                   head-class="settings-section-head settings-disclosure-subhead"
                   :reporter-content-options="reporterContentOptions"
                   @update-field="updateField"
+                  @update-fields="updateFields"
                 />
               </template>
               <div v-else class="settings-section-head settings-disclosure-subhead">
@@ -155,6 +157,7 @@ const {
             :reporter-content-options="reporterContentOptions"
             head-class="settings-section-head"
             @update-field="updateField"
+            @update-fields="updateFields"
           />
         </div>
         <div v-else class="settings-section">

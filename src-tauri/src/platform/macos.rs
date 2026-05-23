@@ -32,12 +32,43 @@ pub fn get_foreground_snapshot() -> Result<ForegroundSnapshot, String> {
     })
 }
 
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+
+const PERMISSION_CACHE_TTL: Duration = Duration::from_secs(300);
+
+static ACCESSIBILITY_CACHE: Mutex<Option<(Instant, bool)>> = Mutex::new(None);
+
+fn cached_accessibility_permission() -> bool {
+    if let Ok(mut cache) = ACCESSIBILITY_CACHE.lock() {
+        if let Some((checked_at, granted)) = *cache {
+            if checked_at.elapsed() < PERMISSION_CACHE_TTL {
+                return granted;
+            }
+        }
+        let granted = accessibility_permission_granted();
+        *cache = Some((Instant::now(), granted));
+        return granted;
+    }
+    accessibility_permission_granted()
+}
+
+pub fn invalidate_accessibility_permission_cache() {
+    if let Ok(mut cache) = ACCESSIBILITY_CACHE.lock() {
+        *cache = None;
+    }
+}
+
 pub fn get_foreground_snapshot_for_reporting(
     include_process_name: bool,
     include_process_title: bool,
 ) -> Result<ForegroundSnapshot, String> {
     if !include_process_name && !include_process_title {
         return Ok(ForegroundSnapshot::default());
+    }
+
+    if !cached_accessibility_permission() {
+        return Err("ACCESSIBILITY_PERMISSION_DENIED".to_string());
     }
 
     if include_process_name {
@@ -88,5 +119,11 @@ pub fn run_self_test() -> PlatformSelfTestResult {
 }
 
 pub fn request_accessibility_permission() -> Result<bool, String> {
-    Ok(bridge::request_accessibility_permission())
+    let granted = bridge::request_accessibility_permission();
+    invalidate_accessibility_permission_cache();
+    Ok(granted)
+}
+
+pub fn subscribe_foreground_changes() -> std::sync::mpsc::Receiver<()> {
+    bridge::subscribe_foreground_changes()
 }

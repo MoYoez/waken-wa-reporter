@@ -36,11 +36,51 @@ pub fn default_use_system_proxy() -> bool {
 }
 
 pub fn default_poll_interval_ms() -> u64 {
-    5_000
+    30_000
 }
 
 pub fn default_heartbeat_interval_ms() -> u64 {
     60_000
+}
+
+pub fn default_performance_mode() -> String {
+    "balanced".into()
+}
+
+pub struct PerformancePreset {
+    pub poll_interval_ms: u64,
+    pub heartbeat_interval_ms: u64,
+}
+
+pub fn performance_preset(mode: &str) -> Option<PerformancePreset> {
+    match mode {
+        "realtime" => Some(PerformancePreset {
+            poll_interval_ms: 1_000,
+            heartbeat_interval_ms: 60_000,
+        }),
+        "balanced" => Some(PerformancePreset {
+            poll_interval_ms: 30_000,
+            heartbeat_interval_ms: 60_000,
+        }),
+        "powersave" => Some(PerformancePreset {
+            poll_interval_ms: 60_000,
+            heartbeat_interval_ms: 120_000,
+        }),
+        _ => None,
+    }
+}
+
+pub fn detect_performance_mode(poll_interval_ms: u64, heartbeat_interval_ms: u64) -> String {
+    for mode in ["realtime", "balanced", "powersave"] {
+        if let Some(preset) = performance_preset(mode) {
+            if preset.poll_interval_ms == poll_interval_ms
+                && preset.heartbeat_interval_ms == heartbeat_interval_ms
+            {
+                return mode.into();
+            }
+        }
+    }
+    "custom".into()
 }
 
 pub fn default_reporter_metadata_json() -> String {
@@ -202,6 +242,8 @@ pub struct ClientConfig {
     pub poll_interval_ms: u64,
     #[serde(default = "default_heartbeat_interval_ms")]
     pub heartbeat_interval_ms: u64,
+    #[serde(default = "default_performance_mode")]
+    pub performance_mode: String,
     #[serde(default = "default_reporter_metadata_json")]
     pub reporter_metadata_json: String,
     #[serde(default)]
@@ -249,6 +291,7 @@ impl Default for ClientConfig {
             push_mode: default_push_mode(),
             poll_interval_ms: default_poll_interval_ms(),
             heartbeat_interval_ms: default_heartbeat_interval_ms(),
+            performance_mode: default_performance_mode(),
             reporter_metadata_json: default_reporter_metadata_json(),
             reporter_enabled: false,
             report_foreground_app: default_report_foreground_app(),

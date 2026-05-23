@@ -91,6 +91,13 @@ export function useConnectionPanel(
     });
   }
 
+  function updateFields(patch: Partial<ClientConfig>) {
+    callbacks.onUpdateModelValue({
+      ...props.modelValue,
+      ...patch,
+    });
+  }
+
   function inferMobileDeviceType(): DeviceType {
     if (typeof window === "undefined") {
       return "mobile";
@@ -180,5 +187,6 @@ export function useConnectionPanel(
     reporterSupported,
     scanImportConfigQr,
     updateField,
+    updateFields,
   };
 }

@@ -53,8 +53,31 @@ pub fn load_app_state(app: &AppHandle) -> Result<AppStatePayload, String> {
     let path = app_state_path(app)?;
     let mut payload = match fs::read_to_string(&path) {
         Ok(content) if content.trim().is_empty() => AppStatePayload::default(),
-        Ok(content) => match serde_json::from_str(&content) {
-            Ok(parsed) => parsed,
+        Ok(content) => match serde_json::from_str::<serde_json::Value>(&content) {
+            Ok(mut raw) => {
+                let performance_mode_missing = raw
+                    .get("config")
+                    .and_then(|config| config.get("performanceMode"))
+                    .is_none();
+                match serde_json::from_value::<AppStatePayload>(raw.take()) {
+                    Ok(mut parsed) => {
+                        if performance_mode_missing {
+                            parsed.config.performance_mode =
+                                crate::models::detect_performance_mode(
+                                    parsed.config.poll_interval_ms,
+                                    parsed.config.heartbeat_interval_ms,
+                                );
+                        }
+                        parsed
+                    }
+                    Err(error) => {
+                        let backup = path.with_extension("json.corrupt");
+                        let _ = fs::copy(&path, &backup);
+                        eprintln!("客户端状态文件损坏，已备份到 {}：{error}", backup.display());
+                        AppStatePayload::default()
+                    }
+                }
+            }
             Err(error) => {
                 let backup = path.with_extension("json.corrupt");
                 let _ = fs::copy(&path, &backup);

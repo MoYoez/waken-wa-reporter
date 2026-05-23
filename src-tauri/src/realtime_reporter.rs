@@ -25,7 +25,9 @@ use crate::{
         get_foreground_snapshot_for_reporting, get_now_playing_artwork_for_reporting,
         get_now_playing_for_reporting, ForegroundSnapshot, MediaInfo,
     },
-    runtime_utils::{now_iso_string, now_unix_millis, sleep_with_stop, wait_for_worker_exit},
+    runtime_utils::{
+        now_iso_string, now_unix_millis, sleep_with_stop_and_wakeup, wait_for_worker_exit,
+    },
 };
 
 use logging::{build_log_detail, fallback_text, localized_text, LogTextSpec};
@@ -295,18 +297,26 @@ fn run_reporter_loop(
     let heartbeat_interval = if config.heartbeat_interval_ms == 0 {
         None
     } else {
-        Some(Duration::from_millis(config.heartbeat_interval_ms))
+        Some(Duration::from_millis(config.heartbeat_interval_ms.max(1_000)))
     };
 
     let mut last_signature: Option<String> = None;
     let mut last_report_at: Option<SystemTime> = None;
     let mut consecutive_errors: u32 = 0;
+    let mut permission_denied_logged: bool = false;
     let mut last_media_error: Option<String> = None;
     let mut cached_media = MediaInfo::default();
     let mut last_media_poll_at: Option<SystemTime> = None;
 
+    let foreground_wakeup = if config.report_foreground_app || config.report_window_title {
+        crate::platform::subscribe_foreground_changes()
+    } else {
+        None
+    };
+
     while !stop_flag.load(Ordering::SeqCst) {
         let mut iteration_had_error = false;
+        let mut iteration_permission_denied = false;
 
         let collect_foreground = config.report_foreground_app || config.report_window_title;
         let collect_media =
@@ -542,20 +552,30 @@ fn run_reporter_loop(
                 }
             }
             Err(error) => {
-                push_background_log(
-                    &state,
-                    &mut sequence_seed,
-                    "error",
-                    localized_text(
-                        "reporterLogs.foregroundCaptureFailed.title",
+                let permission_denied = error == "ACCESSIBILITY_PERMISSION_DENIED";
+                if !permission_denied || !permission_denied_logged {
+                    push_background_log(
+                        &state,
+                        &mut sequence_seed,
+                        "error",
+                        localized_text(
+                            "reporterLogs.foregroundCaptureFailed.title",
+                            None,
+                            "采集前台窗口失败",
+                        ),
+                        fallback_text(error.clone()),
                         None,
-                        "采集前台窗口失败",
-                    ),
-                    fallback_text(error.clone()),
-                    None,
-                );
+                    );
+                    if permission_denied {
+                        permission_denied_logged = true;
+                    }
+                }
                 set_last_error(&state, Some(error));
                 iteration_had_error = true;
+                iteration_permission_denied = permission_denied;
+                if !permission_denied {
+                    permission_denied_logged = false;
+                }
             }
         }
 
@@ -563,9 +583,12 @@ fn run_reporter_loop(
             consecutive_errors = consecutive_errors.saturating_add(1);
         } else {
             consecutive_errors = 0;
+            permission_denied_logged = false;
         }
 
-        let effective_sleep = if consecutive_errors > 1 {
+        let effective_sleep = if iteration_permission_denied {
+            Duration::from_secs(60)
+        } else if consecutive_errors > 1 {
             let backoff_ms =
                 (poll_interval.as_millis() as u64).saturating_mul(1 << consecutive_errors.min(4));
             Duration::from_millis(backoff_ms.min(MAX_ERROR_BACKOFF_MS))
@@ -573,7 +596,18 @@ fn run_reporter_loop(
             poll_interval
         };
 
-        sleep_with_stop(effective_sleep, &stop_flag);
+        let bounded_sleep = match (heartbeat_interval, last_report_at) {
+            (Some(interval), Some(last)) => {
+                let elapsed = SystemTime::now()
+                    .duration_since(last)
+                    .unwrap_or(Duration::ZERO);
+                let remaining = interval.saturating_sub(elapsed);
+                effective_sleep.min(remaining.max(Duration::from_millis(250)))
+            }
+            _ => effective_sleep,
+        };
+
+        sleep_with_stop_and_wakeup(bounded_sleep, &stop_flag, foreground_wakeup.as_ref());
     }
 
     mark_stopped(&state, None, run_id);

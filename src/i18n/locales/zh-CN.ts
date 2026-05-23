@@ -459,6 +459,30 @@ const zhCN = {
       eyebrow: "连接设置",
       title: "完成连接后即可同步到 Waken-Wa",
     },
+    performance: {
+      label: "性能模式",
+      showAdvanced: "显示高级时序设置",
+      hideAdvanced: "收起高级时序设置",
+      heartbeatCeilingHint: "心跳间隔超过 {ceiling} 秒，可能被服务端判定为离线，请确认服务端超时阈值",
+      options: {
+        realtime: {
+          label: "实时（高耗电）",
+          description: "每秒采集一次，活动变化最及时；适合台式机或常电源用户",
+        },
+        balanced: {
+          label: "平衡（推荐）",
+          description: "30 秒采集一次 + 60 秒心跳，兼顾响应速度和省电",
+        },
+        powersave: {
+          label: "省电",
+          description: "60 秒采集一次 + 120 秒心跳，最省电但活动反馈延迟更高",
+        },
+        custom: {
+          label: "自定义",
+          description: "手动调整轮询和心跳间隔（高级用户）",
+        },
+      },
+    },
     status: {
       ready: "已就绪",
       pending: "待完善",

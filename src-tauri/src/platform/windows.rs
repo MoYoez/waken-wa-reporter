@@ -1295,3 +1295,91 @@ fn encode_wide(value: &str) -> Vec<u16> {
 pub fn request_accessibility_permission() -> Result<bool, String> {
     Err("当前平台不支持辅助功能权限申请。".into())
 }
+
+#[cfg(target_os = "windows")]
+mod foreground_events {
+    use std::sync::{
+        mpsc::{channel, Receiver, Sender},
+        Mutex, OnceLock,
+    };
+
+    use windows::Win32::{
+        Foundation::HWND,
+        UI::{
+            Accessibility::{SetWinEventHook, HWINEVENTHOOK},
+            WindowsAndMessaging::{
+                DispatchMessageW, GetMessageW, TranslateMessage, EVENT_SYSTEM_FOREGROUND, MSG,
+                WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS,
+            },
+        },
+    };
+
+    static SUBSCRIBERS: OnceLock<Mutex<Vec<Sender<()>>>> = OnceLock::new();
+
+    unsafe extern "system" fn win_event_proc(
+        _hook: HWINEVENTHOOK,
+        _event: u32,
+        _hwnd: HWND,
+        _id_object: i32,
+        _id_child: i32,
+        _id_thread: u32,
+        _time: u32,
+    ) {
+        if let Some(lock) = SUBSCRIBERS.get() {
+            if let Ok(mut subscribers) = lock.lock() {
+                subscribers.retain(|sender| sender.send(()).is_ok());
+            }
+        }
+    }
+
+    fn ensure_hook_thread() {
+        SUBSCRIBERS.get_or_init(|| {
+            std::thread::Builder::new()
+                .name("waken-foreground-hook".into())
+                .spawn(|| unsafe {
+                    let hook = SetWinEventHook(
+                        EVENT_SYSTEM_FOREGROUND,
+                        EVENT_SYSTEM_FOREGROUND,
+                        None,
+                        Some(win_event_proc),
+                        0,
+                        0,
+                        WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
+                    );
+                    if hook.0.is_null() {
+                        eprintln!("SetWinEventHook 失败，前台事件订阅不可用");
+                        return;
+                    }
+                    let mut msg = MSG::default();
+                    while GetMessageW(&mut msg, None, 0, 0).into() {
+                        let _ = TranslateMessage(&msg);
+                        DispatchMessageW(&msg);
+                    }
+                })
+                .expect("无法启动前台事件监听线程");
+            Mutex::new(Vec::new())
+        });
+    }
+
+    pub fn subscribe() -> Receiver<()> {
+        ensure_hook_thread();
+        let (tx, rx) = channel();
+        if let Some(lock) = SUBSCRIBERS.get() {
+            if let Ok(mut subscribers) = lock.lock() {
+                subscribers.push(tx);
+            }
+        }
+        rx
+    }
+}
+
+#[cfg(target_os = "windows")]
+pub fn subscribe_foreground_changes() -> std::sync::mpsc::Receiver<()> {
+    foreground_events::subscribe()
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn subscribe_foreground_changes() -> std::sync::mpsc::Receiver<()> {
+    let (_tx, rx) = std::sync::mpsc::channel();
+    rx
+}

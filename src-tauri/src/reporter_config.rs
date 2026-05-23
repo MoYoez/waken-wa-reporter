@@ -59,6 +59,15 @@ pub fn discover_existing_reporter_config(
         .and_then(|value| serde_json::to_string_pretty(&value).ok())
         .unwrap_or_else(crate::models::default_reporter_metadata_json);
 
+    let poll_interval_ms = parsed
+        .poll_interval_ms
+        .unwrap_or_else(crate::models::default_poll_interval_ms);
+    let heartbeat_interval_ms = parsed
+        .heartbeat_interval_ms
+        .unwrap_or_else(crate::models::default_heartbeat_interval_ms);
+    let performance_mode =
+        crate::models::detect_performance_mode(poll_interval_ms, heartbeat_interval_ms);
+
     Ok(ExistingReporterConfig {
         found: true,
         path: Some(path.display().to_string()),
@@ -79,13 +88,9 @@ pub fn discover_existing_reporter_config(
             },
             device_type: crate::models::default_device_type(),
             push_mode: crate::models::default_push_mode(),
-            poll_interval_ms: parsed
-                .poll_interval_ms
-                .filter(|value| *value >= 1)
-                .unwrap_or_else(crate::models::default_poll_interval_ms),
-            heartbeat_interval_ms: parsed
-                .heartbeat_interval_ms
-                .unwrap_or_else(crate::models::default_heartbeat_interval_ms),
+            poll_interval_ms,
+            heartbeat_interval_ms,
+            performance_mode,
             reporter_metadata_json: metadata_json,
             reporter_enabled: false,
             report_foreground_app: crate::models::default_report_foreground_app(),

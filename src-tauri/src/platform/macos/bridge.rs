@@ -1,4 +1,6 @@
 use std::ffi::{c_char, CStr, CString};
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::{Mutex, OnceLock};
 
 unsafe extern "C" {
     fn waken_frontmost_app_name() -> *mut c_char;
@@ -7,7 +9,30 @@ unsafe extern "C" {
     fn waken_bundle_app_icon_data_url(bundle_identifier: *const c_char) -> *mut c_char;
     fn waken_accessibility_is_trusted() -> bool;
     fn waken_request_accessibility_permission() -> bool;
+    fn waken_register_foreground_change_observer(callback: extern "C" fn());
     fn waken_string_free(value: *mut c_char);
+}
+
+static FOREGROUND_SUBSCRIBERS: OnceLock<Mutex<Vec<Sender<()>>>> = OnceLock::new();
+
+extern "C" fn foreground_change_trampoline() {
+    if let Some(lock) = FOREGROUND_SUBSCRIBERS.get() {
+        if let Ok(mut subscribers) = lock.lock() {
+            subscribers.retain(|sender| sender.send(()).is_ok());
+        }
+    }
+}
+
+pub(super) fn subscribe_foreground_changes() -> Receiver<()> {
+    let lock = FOREGROUND_SUBSCRIBERS.get_or_init(|| {
+        unsafe { waken_register_foreground_change_observer(foreground_change_trampoline) };
+        Mutex::new(Vec::new())
+    });
+    let (tx, rx) = channel();
+    if let Ok(mut subscribers) = lock.lock() {
+        subscribers.push(tx);
+    }
+    rx
 }
 
 fn read_bridge_string(fetch: unsafe extern "C" fn() -> *mut c_char) -> Option<String> {
