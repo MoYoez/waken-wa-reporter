@@ -1,7 +1,7 @@
 {
   "name": "waken-wa-reporter",
   "private": true,
-  "version": "0.7.0",
+  "version": "0.8.5",
   "type": "module",
   "scripts": {
     "prepare:mediaremote-adapter": "node scripts/prepare-mediaremote-adapter.mjs",
