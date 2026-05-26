@@ -13,10 +13,33 @@ open class BuildTask : DefaultTask() {
     var target: String? = null
     @Input
     var release: Boolean? = null
+    // looks like tauri itself cannot find pnpm. oh my god.
+    private fun findPnpm(): String {
+        val candidates = listOf(
+            "/opt/homebrew/bin/pnpm",
+            "/usr/local/bin/pnpm",
+            System.getenv("HOME") + "/.nvm/versions/node/*/bin/pnpm",
+            "pnpm"
+        )
+        for (candidate in candidates) {
+            if (candidate.contains("*")) {
+                val expanded = project.fileTree(mapOf("dir" to candidate.substringBeforeLast("/"), "include" to candidate.substringAfterLast("/")))
+                if (!expanded.isEmpty) {
+                    return expanded.singleFile.absolutePath
+                }
+            } else {
+                val file = File(candidate)
+                if (file.exists() && file.canExecute()) {
+                    return file.absolutePath
+                }
+            }
+        }
+        return "pnpm"
+    }
 
     @TaskAction
     fun assemble() {
-        val executable = """pnpm""";
+        val executable = findPnpm()
         try {
             runTauriCli(executable)
         } catch (e: Exception) {

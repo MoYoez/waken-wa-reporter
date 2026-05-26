@@ -17,3 +17,7 @@ key.properties
 
 /.tauri
 /tauri.settings.gradle
+
+# Build-time copied resources
+/app/src/main/assets/resources/mediaremote-adapter/*
+!/app/src/main/assets/resources/mediaremote-adapter/.gitkeep

@@ -187,60 +187,66 @@ const heartbeatCeilingHint = computed(() => {
       </small>
     </label>
 
-    <div class="field-span-2 performance-advanced-toggle">
+    <div class="advanced-timings-card field-span-2">
       <button
         type="button"
-        class="link-button"
+        class="advanced-toggle-button"
         @click="showAdvancedTimings = !showAdvancedTimings"
       >
-        {{
-          showAdvancedTimings
-            ? t("connectionPanel.performance.hideAdvanced")
-            : t("connectionPanel.performance.showAdvanced")
-        }}
+        <i :class="showAdvancedTimings ? 'pi pi-chevron-up' : 'pi pi-chevron-down'" />
+        <span>
+          {{
+            showAdvancedTimings
+              ? t("connectionPanel.performance.hideAdvanced")
+              : t("connectionPanel.performance.showAdvanced")
+          }}
+        </span>
       </button>
+
+      <div class="advanced-timings-content" :class="{ 'advanced-timings-content--expanded': showAdvancedTimings }">
+        <label class="field-block">
+          <span class="field-label">{{ t("connectionPanel.fields.pollInterval") }}</span>
+          <InputText
+            :model-value="pollIntervalInput"
+            :invalid="Boolean(pollIntervalIssue)"
+            :placeholder="t('connectionPanel.placeholders.pollInterval')"
+            @update:model-value="updateTimingField('pollIntervalMs', $event)"
+          />
+          <small
+            class="field-help field-help-error timing-field-error"
+            :class="{ 'timing-field-error-empty': !pollIntervalIssue }"
+            :title="timingIssueMessage(pollIntervalIssue)"
+            aria-live="polite"
+          >
+            <i v-if="pollIntervalIssue" class="pi pi-exclamation-circle" />
+            {{ timingIssueBrief(pollIntervalIssue) || "\u00A0" }}
+          </small>
+        </label>
+
+        <label class="field-block">
+          <span class="field-label">{{ t("connectionPanel.fields.heartbeatInterval") }}</span>
+          <InputText
+            :model-value="heartbeatIntervalInput"
+            :invalid="Boolean(heartbeatIntervalIssue)"
+            :placeholder="t('connectionPanel.placeholders.heartbeatInterval')"
+            @update:model-value="updateTimingField('heartbeatIntervalMs', $event)"
+          />
+          <small
+            class="field-help field-help-error timing-field-error"
+            :class="{ 'timing-field-error-empty': !heartbeatIntervalIssue }"
+            :title="timingIssueMessage(heartbeatIntervalIssue)"
+            aria-live="polite"
+          >
+            <i v-if="heartbeatIntervalIssue" class="pi pi-exclamation-circle" />
+            {{ timingIssueBrief(heartbeatIntervalIssue) || "\u00A0" }}
+          </small>
+          <small v-if="heartbeatCeilingHint" class="field-help field-help-warn">
+            <i class="pi pi-info-circle" />
+            {{ heartbeatCeilingHint }}
+          </small>
+        </label>
+      </div>
     </div>
-
-    <template v-if="showAdvancedTimings">
-    <label class="field-block">
-      <span class="field-label">{{ t("connectionPanel.fields.pollInterval") }}</span>
-      <InputText
-        :model-value="pollIntervalInput"
-        :invalid="Boolean(pollIntervalIssue)"
-        :placeholder="t('connectionPanel.placeholders.pollInterval')"
-        @update:model-value="updateTimingField('pollIntervalMs', $event)"
-      />
-      <small
-        class="field-help field-help-error timing-field-error"
-        :class="{ 'timing-field-error-empty': !pollIntervalIssue }"
-        :title="timingIssueMessage(pollIntervalIssue)"
-        aria-live="polite"
-      >
-        {{ timingIssueBrief(pollIntervalIssue) || "\u00A0" }}
-      </small>
-    </label>
-
-    <label class="field-block">
-      <span class="field-label">{{ t("connectionPanel.fields.heartbeatInterval") }}</span>
-      <InputText
-        :model-value="heartbeatIntervalInput"
-        :invalid="Boolean(heartbeatIntervalIssue)"
-        :placeholder="t('connectionPanel.placeholders.heartbeatInterval')"
-        @update:model-value="updateTimingField('heartbeatIntervalMs', $event)"
-      />
-      <small
-        class="field-help field-help-error timing-field-error"
-        :class="{ 'timing-field-error-empty': !heartbeatIntervalIssue }"
-        :title="timingIssueMessage(heartbeatIntervalIssue)"
-        aria-live="polite"
-      >
-        {{ timingIssueBrief(heartbeatIntervalIssue) || "\u00A0" }}
-      </small>
-      <small v-if="heartbeatCeilingHint" class="field-help field-help-warn">
-        {{ heartbeatCeilingHint }}
-      </small>
-    </label>
-    </template>
 
     <div class="reporter-enabled-card field-span-2">
       <div class="reporter-enabled-copy">

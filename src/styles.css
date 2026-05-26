@@ -835,7 +835,9 @@ select {
 }
 
 .field-help-error {
-  color: #b91c1c;
+  color: #d97706;
+  display: flex;
+  align-items: center;
 }
 
 .timing-field-error {
@@ -849,6 +851,80 @@ select {
 
 .timing-field-error-empty {
   visibility: hidden;
+}
+
+.advanced-timings-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line-soft);
+  background: var(--surface-soft);
+  transition: border-color 0.2s ease;
+}
+
+.advanced-timings-card:hover {
+  border-color: var(--line);
+}
+
+.advanced-timings-card .p-inputtext {
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.advanced-timings-card .p-inputtext:focus {
+  box-shadow: 0 0 0 3px var(--accent-faint);
+}
+
+.advanced-toggle-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  text-align: left;
+}
+
+.advanced-toggle-button:hover {
+  background: var(--accent-faint);
+  color: var(--ink);
+}
+
+.advanced-toggle-button i {
+  font-size: 0.8rem;
+  transition: transform 0.2s ease;
+}
+
+.advanced-timings-content {
+  display: grid;
+  gap: 14px;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.3s ease, opacity 0.2s ease;
+}
+
+.advanced-timings-content--expanded {
+  max-height: 300px;
+  opacity: 1;
+}
+
+.timing-field-error i {
+  margin-right: 4px;
+  font-size: 0.85rem;
+}
+
+.field-help-warn i {
+  margin-right: 4px;
+  font-size: 0.85rem;
+  color: var(--sky-600);
 }
 
 .actions-row {
