@@ -8,6 +8,7 @@ import {
   scanImportQrCode,
   validateConfig,
 } from "@/lib/api";
+import { readDevicePlatform } from "@/lib/deviceInfo";
 import { createNotifier } from "@/lib/notify";
 import type { ClientCapabilities, ClientConfig, DeviceType } from "@/types";
 
@@ -115,12 +116,17 @@ export function useConnectionPanel(
   async function importConfig() {
     try {
       const parsed = await parseImportedIntegrationConfig(importPayload.text);
+      // On Android, use inferred mobile device type even if reporter is supported
+      const platform = await readDevicePlatform();
+      const deviceType = (reporterSupported.value && platform !== "android")
+        ? "desktop"
+        : inferMobileDeviceType();
       callbacks.onUpdateModelValue({
         ...props.modelValue,
         baseUrl: toBaseUrl(parsed.reportEndpoint) ?? props.modelValue.baseUrl,
         apiToken: parsed.token ?? props.modelValue.apiToken,
         device: parsed.deviceName?.trim() || props.modelValue.device,
-        deviceType: reporterSupported.value ? "desktop" : inferMobileDeviceType(),
+        deviceType,
       });
       callbacks.onImported(
         parsed.tokenName

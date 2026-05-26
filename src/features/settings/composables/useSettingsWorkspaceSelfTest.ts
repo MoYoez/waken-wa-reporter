@@ -9,6 +9,7 @@ import {
   requestAndroidUsageAccess,
   runPlatformSelfTest,
 } from "@/lib/api";
+import { readDevicePlatform } from "@/lib/deviceInfo";
 import type { NotifyPayload } from "@/lib/notify";
 import type { AndroidPermissionStatus, PlatformSelfTestResult } from "@/types";
 import {
@@ -33,6 +34,12 @@ export function useSettingsWorkspaceSelfTest(options: UseSettingsWorkspaceSelfTe
   const androidPermissionStatus = ref<AndroidPermissionStatus | null>(null);
   const androidReporterNotificationPermissionGranted = ref(false);
   const selfTestResult = ref<PlatformSelfTestResult | null>(null);
+  const isAndroid = ref(false);
+
+  // Check device platform on initialization
+  readDevicePlatform().then((platform) => {
+    isAndroid.value = platform === "android";
+  });
 
   const selfTestCards = computed(() =>
     buildSelfTestCardViews(selfTestResult.value, options.t, androidPermissionStatus.value),
@@ -67,7 +74,7 @@ export function useSettingsWorkspaceSelfTest(options: UseSettingsWorkspaceSelfTe
   }
 
   async function refreshAndroidReporterNotificationPermission(refreshOptions?: { silent?: boolean }) {
-    if (!isAndroidRuntime()) {
+    if (!isAndroid.value) {
       androidReporterNotificationPermissionGranted.value = false;
       return;
     }
@@ -88,7 +95,7 @@ export function useSettingsWorkspaceSelfTest(options: UseSettingsWorkspaceSelfTe
   }
 
   async function handleRequestAndroidReporterNotificationPermission() {
-    if (!isAndroidRuntime()) {
+    if (!isAndroid.value) {
       return;
     }
 
@@ -280,8 +287,4 @@ export function useSettingsWorkspaceSelfTest(options: UseSettingsWorkspaceSelfTe
     selfTestResult,
     refreshAndroidPermissionStatus,
   };
-}
-
-function isAndroidRuntime() {
-  return typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
 }

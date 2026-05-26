@@ -4,6 +4,7 @@ import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 
 import type { AppSection } from "@/app/types";
 import { parseImportedIntegrationConfig } from "@/lib/api";
+import { readDevicePlatform } from "@/lib/deviceInfo";
 import {
   extractImportPayloadFromDeepLink,
   isImportDeepLink,
@@ -68,7 +69,8 @@ export function useAppShellDeepLinks(options: UseAppShellDeepLinksOptions) {
 
     try {
       const parsed = await parseImportedIntegrationConfig(payload);
-      applyImportedConfig(parsed);
+      const platform = await readDevicePlatform();
+      applyImportedConfig(parsed, platform === "android");
     } catch (error) {
       options.notify({
         severity: "error",
@@ -79,17 +81,21 @@ export function useAppShellDeepLinks(options: UseAppShellDeepLinksOptions) {
     }
   }
 
-  function applyImportedConfig(parsed: ImportedIntegrationConfig) {
+  function applyImportedConfig(parsed: ImportedIntegrationConfig, isAndroid: boolean) {
     const importingOnboarding = !options.onboardingDismissed.value;
     const currentConfig = importingOnboarding
       ? options.onboardingDraftConfig.value
       : options.config.value;
+    // On Android, use inferred mobile device type even if reporter is supported
+    const deviceType = (options.reporterSupported.value && !isAndroid)
+      ? "desktop"
+      : options.inferMobileDeviceType();
     const nextConfig = options.normalizeConfigByCapabilities({
       ...currentConfig,
       baseUrl: toBaseUrl(parsed.reportEndpoint) ?? currentConfig.baseUrl,
       apiToken: parsed.token ?? currentConfig.apiToken,
       device: parsed.deviceName?.trim() || currentConfig.device,
-      deviceType: options.reporterSupported.value ? "desktop" : options.inferMobileDeviceType(),
+      deviceType,
     });
 
     if (importingOnboarding) {

@@ -1,5 +1,6 @@
 import { computed, ref, type ComputedRef, type Ref } from "vue";
 
+import { readDevicePlatform } from "@/lib/deviceInfo";
 import type { ClientConfig, DeviceType } from "@/types";
 
 interface UseAppShellViewportOptions {
@@ -11,13 +12,22 @@ interface UseAppShellViewportOptions {
 export function useAppShellViewport(options: UseAppShellViewportOptions) {
   const viewportWidth = ref(1200);
   const isPhone = computed(() => viewportWidth.value < 900);
+  const isAndroid = ref(false);
+
+  // Check device platform on initialization
+  readDevicePlatform().then((platform) => {
+    isAndroid.value = platform === "android";
+  });
 
   function inferMobileDeviceType(): DeviceType {
     return isPhone.value ? "mobile" : "tablet";
   }
 
   function syncDeviceTypeByViewport() {
-    const nextType = options.reporterSupported.value ? "desktop" : inferMobileDeviceType();
+    // On Android, always use inferred mobile device type even if reporter is supported
+    const nextType = (options.reporterSupported.value && !isAndroid.value)
+      ? "desktop"
+      : inferMobileDeviceType();
 
     if (options.config.value.deviceType !== nextType) {
       options.config.value = { ...options.config.value, deviceType: nextType };

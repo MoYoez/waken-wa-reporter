@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted } from "vue";
+import { onBeforeUnmount, onMounted, ref } from "vue";
 
 import ConnectionPanel from "@/features/settings/components/ConnectionPanel.vue";
 import SettingsAndroidNotificationCard from "@/features/settings/components/SettingsAndroidNotificationCard.vue";
@@ -10,6 +10,7 @@ import SettingsMobileCard from "@/features/settings/components/SettingsMobileCar
 import SettingsReporterCard from "@/features/settings/components/SettingsReporterCard.vue";
 import SettingsStartupCard from "@/features/settings/components/SettingsStartupCard.vue";
 import { useSettingsWorkspace } from "@/features/settings/composables/useSettingsWorkspace";
+import { readDevicePlatform } from "@/lib/deviceInfo";
 import type { SupportedLocale } from "@/i18n";
 import type {
   ClientCapabilities,
@@ -69,11 +70,14 @@ const {
   onRestartApp: () => emit("restartApp"),
 });
 
-let permissionRefreshTimer: number | undefined;
+const isAndroid = ref(false);
 
-function isAndroidRuntime() {
-  return typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
-}
+// Check device platform on initialization
+readDevicePlatform().then((platform) => {
+  isAndroid.value = platform === "android";
+});
+
+let permissionRefreshTimer: number | undefined;
 
 function refreshPermissionStateAfterReturn() {
   window.clearTimeout(permissionRefreshTimer);
@@ -85,19 +89,19 @@ function refreshPermissionStateAfterReturn() {
 }
 
 function handleVisibilityChange() {
-  if (document.visibilityState === "visible" && isAndroidRuntime()) {
+  if (document.visibilityState === "visible" && isAndroid.value) {
     refreshPermissionStateAfterReturn();
   }
 }
 
 function handleWindowFocus() {
-  if (isAndroidRuntime()) {
+  if (isAndroid.value) {
     refreshPermissionStateAfterReturn();
   }
 }
 
 onMounted(() => {
-  if (isAndroidRuntime()) {
+  if (isAndroid.value) {
     void refreshAndroidReporterNotificationPermission({ silent: true });
   }
   document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -158,7 +162,7 @@ onBeforeUnmount(() => {
     />
 
     <SettingsAndroidNotificationCard
-      v-if="isAndroidRuntime()"
+      v-if="isAndroid"
       :enabled="modelValue.androidReporterNotificationEnabled"
       :permission-granted="androidReporterNotificationPermissionGranted"
       :permission-loading="androidNotificationPermissionLoading"

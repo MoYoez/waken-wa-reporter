@@ -3,7 +3,7 @@ import {
   restartApp as requestAppRestart,
   setAutostartEnabled,
 } from "@/lib/api";
-import { readDeviceName } from "@/lib/deviceInfo";
+import { readDeviceName, readDevicePlatform } from "@/lib/deviceInfo";
 import {
   AppStateSaveError,
   AppStateSaveTransportError,
@@ -72,10 +72,16 @@ export function useAppShellSettingsPersistence(options: UseAppShellPersistenceOp
     const launchOnStartup = options.autostartSupported.value ? normalizedBase.launchOnStartup : false;
 
     if (options.reporterSupported.value) {
+      // On Android, use inferred mobile device type even if reporter is supported
+      // Note: This is synchronous fallback, actual platform check happens async
+      const isAndroid = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+      const deviceType = isAndroid
+        ? options.inferMobileDeviceType()
+        : "desktop";
       return {
         ...normalizedBase,
         device: normalizedDevice,
-        deviceType: "desktop",
+        deviceType,
         launchOnStartup,
       };
     }

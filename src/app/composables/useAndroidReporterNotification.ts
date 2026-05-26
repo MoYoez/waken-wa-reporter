@@ -10,6 +10,7 @@ import {
   type Options,
 } from "@tauri-apps/plugin-notification";
 
+import { readDevicePlatform } from "@/lib/deviceInfo";
 import type { ClientCapabilities, ClientConfig, RealtimeReporterSnapshot } from "@/types";
 
 interface UseAndroidReporterNotificationOptions {
@@ -35,6 +36,12 @@ export function useAndroidReporterNotification(options: UseAndroidReporterNotifi
   let notificationSetupInFlight: Promise<boolean> | undefined;
   let notificationSyncInFlight = false;
   let notificationSyncQueued = false;
+  let isAndroid = false;
+
+  // Check device platform on initialization
+  readDevicePlatform().then((platform) => {
+    isAndroid = platform === "android";
+  });
 
   const shouldUseNotification = computed(
     () =>
@@ -42,7 +49,7 @@ export function useAndroidReporterNotification(options: UseAndroidReporterNotifi
       && options.reporterSupported.value
       && options.config.value.androidReporterNotificationEnabled
       && options.capabilities.value.persistentNotification
-      && isAndroidRuntime(),
+      && isAndroid,
   );
 
   const notificationSignature = computed(() =>
@@ -259,7 +266,7 @@ export function useAndroidReporterNotification(options: UseAndroidReporterNotifi
       readiness: options.readiness.value,
       reporterRunning: options.reporterSnapshot.value.running,
       reporterBusy: options.reporterBusy.value,
-      androidRuntime: isAndroidRuntime(),
+      androidRuntime: isAndroid,
     };
   }
 
@@ -274,10 +281,6 @@ export function useAndroidReporterNotification(options: UseAndroidReporterNotifi
   onBeforeUnmount(() => {
     void removeReporterNotification();
   });
-}
-
-function isAndroidRuntime() {
-  return typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
 }
 
 function formatNotificationTime(value?: string | null) {
