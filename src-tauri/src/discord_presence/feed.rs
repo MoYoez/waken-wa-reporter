@@ -79,8 +79,7 @@ pub(super) fn fetch_public_activity_feed_blocking(
             .get("error")
             .and_then(Value::as_str)
             .or_else(|| payload.get("message").and_then(Value::as_str))
-            .map(str::to_string)
-            .unwrap_or_else(|| default_public_feed_failure(locale)));
+            .map_or_else(|| default_public_feed_failure(locale), str::to_string));
     }
 
     let data = payload.get("data").cloned().unwrap_or(payload);

@@ -135,7 +135,7 @@ fn get_now_playing_via_mediaremote_adapter(
     if !output.status.success() {
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
-        let combined = format!("{}\n{}", stdout, stderr).to_lowercase();
+        let combined = format!("{stdout}\n{stderr}").to_lowercase();
         if combined.contains("null")
             || combined.contains("no media")
             || combined.contains("no now playing")
@@ -292,9 +292,7 @@ fn resolve_position_ms(raw: &RawNowPlayingInfo) -> Option<i64> {
         return Some(value);
     }
 
-    let Some(elapsed_micros) = raw.elapsed_time_micros else {
-        return None;
-    };
+    let elapsed_micros = raw.elapsed_time_micros?;
 
     if raw.playing != Some(true) {
         return micros_to_ms(Some(elapsed_micros));
@@ -370,8 +368,7 @@ fn decode_base64_image_payload(value: &str) -> Option<Vec<u8>> {
 
     let encoded = trimmed
         .split_once(',')
-        .map(|(_, payload)| payload)
-        .unwrap_or(trimmed);
+        .map_or(trimmed, |(_, payload)| payload);
     BASE64_STANDARD
         .decode(encoded.trim())
         .ok()

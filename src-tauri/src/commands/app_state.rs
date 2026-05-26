@@ -252,6 +252,5 @@ fn suggested_timing_value(value: Option<&Value>, min: u64, default_value: u64) -
 
     number
         .as_u64()
-        .map(|value| value.max(min))
-        .unwrap_or(default_value)
+        .map_or(default_value, |value| value.max(min))
 }

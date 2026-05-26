@@ -24,8 +24,7 @@ pub(super) fn build_activity_report_body(config: &ClientConfig, payload: Activit
         .as_deref()
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .map(str::to_string)
-        .unwrap_or_else(|| effective_device_name(&config.device));
+        .map_or_else(|| effective_device_name(&config.device), str::to_string);
 
     json!({
         "generatedHashKey": generated_hash_key,

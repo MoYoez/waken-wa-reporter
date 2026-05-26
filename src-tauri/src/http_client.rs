@@ -352,7 +352,7 @@ fn get_or_create_async_client(
     if let Some(proxy_url) = normalize_proxy_url(proxy_url) {
         let mut guard = ASYNC_CLIENT_EXPLICIT_PROXY
             .lock()
-            .unwrap_or_else(|error| error.into_inner());
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         if let Some((cached_url, client)) = guard.as_ref() {
             if cached_url == &proxy_url {
                 return Ok(client.clone());
@@ -370,7 +370,9 @@ fn get_or_create_async_client(
         &ASYNC_CLIENT_DIRECT
     };
 
-    let mut guard = cache.lock().unwrap_or_else(|error| error.into_inner());
+    let mut guard = cache
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     if let Some(client) = guard.as_ref() {
         return Ok(client.clone());
     }

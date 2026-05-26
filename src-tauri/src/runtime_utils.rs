@@ -41,7 +41,7 @@ pub fn sleep_with_stop_and_wakeup(
 
         let step = remaining.min(Duration::from_millis(200));
         match rx.recv_timeout(step) {
-            Ok(_) => {
+            Ok(()) => {
                 while rx.try_recv().is_ok() {}
                 return true;
             }

@@ -71,7 +71,10 @@ impl ReporterRuntime {
     }
 
     pub fn snapshot(&self) -> RealtimeReporterSnapshot {
-        let inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let inner = self
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         snapshot_from_inner(&inner)
     }
 
@@ -85,7 +88,10 @@ impl ReporterRuntime {
         let stop_flag = Arc::new(AtomicBool::new(false));
         let run_id = self.sequence.fetch_add(1, Ordering::SeqCst);
         let previous_worker = {
-            let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+            let mut inner = self
+                .inner
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             if inner.running {
                 return Ok(snapshot_from_inner(&inner));
             }
@@ -101,14 +107,20 @@ impl ReporterRuntime {
             if let Err(handle) =
                 wait_for_worker_exit(handle, WORKER_JOIN_WAIT_TIMEOUT, WORKER_JOIN_POLL_STEP)
             {
-                let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+                let mut inner = self
+                    .inner
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
                 inner.worker = Some(handle);
                 return Err(reporter_worker_stopping(locale));
             }
         }
 
         {
-            let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+            let mut inner = self
+                .inner
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             inner.running = true;
             inner.active_run_id = Some(run_id);
             inner.stop_flag = Some(stop_flag.clone());
@@ -135,7 +147,10 @@ impl ReporterRuntime {
         });
 
         {
-            let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+            let mut inner = self
+                .inner
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             inner.worker = Some(worker);
         }
 
@@ -144,7 +159,10 @@ impl ReporterRuntime {
 
     pub fn stop(&self) -> RealtimeReporterSnapshot {
         let worker = {
-            let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+            let mut inner = self
+                .inner
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             if let Some(flag) = inner.stop_flag.take() {
                 flag.store(true, Ordering::SeqCst);
             }
@@ -157,7 +175,10 @@ impl ReporterRuntime {
             if let Err(handle) =
                 wait_for_worker_exit(handle, WORKER_JOIN_WAIT_TIMEOUT, WORKER_JOIN_POLL_STEP)
             {
-                let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+                let mut inner = self
+                    .inner
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
                 inner.worker = Some(handle);
                 (
                     localized_text(
@@ -181,7 +202,10 @@ impl ReporterRuntime {
         };
 
         if stopped_cleanly {
-            let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+            let mut inner = self
+                .inner
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             inner.worker = None;
         }
 
@@ -219,7 +243,10 @@ impl ReporterRuntime {
             payload,
         };
 
-        let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let mut inner = self
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         inner.logs.insert(0, entry);
         if inner.logs.len() > MAX_LOGS {
             inner.logs.truncate(MAX_LOGS);
@@ -341,8 +368,7 @@ fn run_reporter_loop(
                     let media_poll_interval = poll_interval.max(MIN_MEDIA_POLL_INTERVAL);
                     let should_poll_media = last_media_poll_at
                         .and_then(|last| SystemTime::now().duration_since(last).ok())
-                        .map(|elapsed| elapsed >= media_poll_interval)
-                        .unwrap_or(true);
+                        .is_none_or(|elapsed| elapsed >= media_poll_interval);
 
                     if should_poll_media {
                         last_media_poll_at = Some(SystemTime::now());
@@ -369,10 +395,7 @@ fn run_reporter_loop(
                                 media
                             }
                             Err(error) => {
-                                let should_log = last_media_error
-                                    .as_ref()
-                                    .map(|last| last != &error)
-                                    .unwrap_or(true);
+                                let should_log = last_media_error.as_ref() != Some(&error);
                                 last_media_error = Some(error.clone());
                                 if should_log {
                                     push_background_log(
@@ -412,18 +435,14 @@ fn run_reporter_loop(
                 );
                 let same_as_last = last_signature
                     .as_ref()
-                    .map(|last| last == &signature)
-                    .unwrap_or(false);
+                    .is_some_and(|last| last == &signature);
 
                 let should_send = if same_as_last {
-                    heartbeat_interval
-                        .map(|interval| {
-                            last_report_at
-                                .and_then(|last| SystemTime::now().duration_since(last).ok())
-                                .map(|elapsed| elapsed >= interval)
-                                .unwrap_or(false)
-                        })
-                        .unwrap_or(false)
+                    heartbeat_interval.is_some_and(|interval| {
+                        last_report_at
+                            .and_then(|last| SystemTime::now().duration_since(last).ok())
+                            .is_some_and(|elapsed| elapsed >= interval)
+                    })
                 } else {
                     true
                 };
@@ -664,7 +683,9 @@ fn update_snapshot(
     last_heartbeat_at: Option<String>,
     media_cover_url: Option<String>,
 ) {
-    let mut inner = state.lock().unwrap_or_else(|e| e.into_inner());
+    let mut inner = state
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     inner.current_activity = Some(ReporterActivity {
         process_name: snapshot.process_name.clone(),
         process_title: Some(snapshot.process_title.clone()),
@@ -684,7 +705,9 @@ fn update_snapshot(
 }
 
 fn set_last_error(state: &Arc<Mutex<ReporterInner>>, error: Option<String>) {
-    let mut inner = state.lock().unwrap_or_else(|e| e.into_inner());
+    let mut inner = state
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     inner.last_error = error;
 }
 
@@ -693,13 +716,17 @@ fn set_pending_approval(
     message: Option<String>,
     approval_url: Option<String>,
 ) {
-    let mut inner = state.lock().unwrap_or_else(|e| e.into_inner());
+    let mut inner = state
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     inner.last_pending_approval_message = message;
     inner.last_pending_approval_url = approval_url;
 }
 
 fn mark_stopped(state: &Arc<Mutex<ReporterInner>>, error: Option<String>, run_id: u64) {
-    let mut inner = state.lock().unwrap_or_else(|e| e.into_inner());
+    let mut inner = state
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     if inner.active_run_id != Some(run_id) {
         return;
     }
@@ -734,7 +761,9 @@ fn push_background_log(
     };
     *sequence += 1;
 
-    let mut inner = state.lock().unwrap_or_else(|e| e.into_inner());
+    let mut inner = state
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     inner.logs.insert(0, entry);
     if inner.logs.len() > MAX_LOGS {
         inner.logs.truncate(MAX_LOGS);

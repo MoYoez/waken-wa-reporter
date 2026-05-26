@@ -256,8 +256,7 @@ pub(super) fn post_activity_blocking(
             .get("error")
             .and_then(Value::as_str)
             .or_else(|| parsed.get("message").and_then(Value::as_str))
-            .map(str::to_string)
-            .unwrap_or_else(|| pending_approval_default(locale));
+            .map_or_else(|| pending_approval_default(locale), str::to_string);
         let approval_url = parsed
             .get("approvalUrl")
             .and_then(Value::as_str)
@@ -274,8 +273,7 @@ pub(super) fn post_activity_blocking(
             .get("error")
             .and_then(Value::as_str)
             .or_else(|| parsed.get("message").and_then(Value::as_str))
-            .map(str::to_string)
-            .unwrap_or_else(|| server_failure_default(locale)));
+            .map_or_else(|| server_failure_default(locale), str::to_string));
     }
 
     Ok(PostActivityResult::Success {

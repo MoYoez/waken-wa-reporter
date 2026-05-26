@@ -22,8 +22,7 @@ pub(super) fn map_activity_to_presence(item: &PublicActivityItem) -> DiscordPres
         .as_deref()
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .map(str::to_string)
-        .unwrap_or_else(|| fallback_details(item));
+        .map_or_else(|| fallback_details(item), str::to_string);
     let details = normalize_presence_line(&details_source);
 
     let state = item

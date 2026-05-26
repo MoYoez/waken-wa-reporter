@@ -61,7 +61,10 @@ impl DiscordPresenceRuntime {
     }
 
     pub fn snapshot(&self) -> DiscordPresenceSnapshot {
-        let inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let inner = self
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         snapshot_from_inner(&inner)
     }
 
@@ -75,7 +78,10 @@ impl DiscordPresenceRuntime {
         let stop_flag = Arc::new(AtomicBool::new(false));
         let run_id = self.sequence.fetch_add(1, Ordering::SeqCst);
         let previous_worker = {
-            let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+            let mut inner = self
+                .inner
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             if inner.running {
                 return Ok(snapshot_from_inner(&inner));
             }
@@ -91,14 +97,20 @@ impl DiscordPresenceRuntime {
             if let Err(handle) =
                 wait_for_worker_exit(handle, WORKER_JOIN_WAIT_TIMEOUT, WORKER_JOIN_POLL_STEP)
             {
-                let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+                let mut inner = self
+                    .inner
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
                 inner.worker = Some(handle);
                 return Err(discord_worker_stopping(locale));
             }
         }
 
         {
-            let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+            let mut inner = self
+                .inner
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             inner.running = true;
             inner.active_run_id = Some(run_id);
             inner.connected = false;
@@ -112,7 +124,10 @@ impl DiscordPresenceRuntime {
         });
 
         {
-            let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+            let mut inner = self
+                .inner
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             inner.worker = Some(worker);
         }
 
@@ -121,7 +136,10 @@ impl DiscordPresenceRuntime {
 
     pub fn stop(&self) -> DiscordPresenceSnapshot {
         let worker = {
-            let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+            let mut inner = self
+                .inner
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             if let Some(flag) = inner.stop_flag.take() {
                 flag.store(true, Ordering::SeqCst);
             }
@@ -135,10 +153,16 @@ impl DiscordPresenceRuntime {
             if let Err(handle) =
                 wait_for_worker_exit(handle, WORKER_JOIN_WAIT_TIMEOUT, WORKER_JOIN_POLL_STEP)
             {
-                let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+                let mut inner = self
+                    .inner
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
                 inner.worker = Some(handle);
             } else {
-                let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+                let mut inner = self
+                    .inner
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
                 inner.worker = None;
             }
         }
@@ -271,7 +295,9 @@ fn update_presence_snapshot(
     current_summary: Option<String>,
     run_id: u64,
 ) {
-    let mut inner = state.lock().unwrap_or_else(|e| e.into_inner());
+    let mut inner = state
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     if inner.active_run_id != Some(run_id) {
         return;
     }
@@ -288,7 +314,9 @@ fn set_discord_error(
     connected: bool,
     run_id: u64,
 ) {
-    let mut inner = state.lock().unwrap_or_else(|e| e.into_inner());
+    let mut inner = state
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     if inner.active_run_id != Some(run_id) {
         return;
     }
@@ -302,7 +330,9 @@ fn set_discord_error_preserving_connection(
     error: Option<String>,
     run_id: u64,
 ) {
-    let mut inner = state.lock().unwrap_or_else(|e| e.into_inner());
+    let mut inner = state
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     if inner.active_run_id != Some(run_id) {
         return;
     }
@@ -311,7 +341,9 @@ fn set_discord_error_preserving_connection(
 }
 
 fn mark_stopped(state: &Arc<Mutex<DiscordPresenceInner>>, run_id: u64) {
-    let mut inner = state.lock().unwrap_or_else(|e| e.into_inner());
+    let mut inner = state
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     if inner.active_run_id != Some(run_id) {
         return;
     }

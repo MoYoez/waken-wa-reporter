@@ -53,7 +53,7 @@ fn cached_accessibility_permission() -> bool {
     accessibility_permission_granted()
 }
 
-pub fn invalidate_accessibility_permission_cache() {
+fn invalidate_accessibility_permission_cache() {
     if let Ok(mut cache) = ACCESSIBILITY_CACHE.lock() {
         *cache = None;
     }
