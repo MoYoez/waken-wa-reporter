@@ -66,38 +66,44 @@ const effectiveModeLabel = computed(() => {
       </div>
     </header>
 
-    <OverviewSummaryCard
-      :config="config"
-      :reporter-supported="reporterSupported"
-      :effective-mode-label="effectiveModeLabel"
-      :last-heartbeat-at="reporterSnapshot.lastHeartbeatAt"
-    />
+    <div class="overview-grid">
+      <div class="overview-main">
+        <OverviewSummaryCard
+          :config="config"
+          :reporter-supported="reporterSupported"
+          :effective-mode-label="effectiveModeLabel"
+          :last-heartbeat-at="reporterSnapshot.lastHeartbeatAt"
+        />
 
-    <OverviewReporterCard
-      v-if="reporterSupported"
-      :config="config"
-      :readiness="readiness"
-      :snapshot="reporterSnapshot"
-      :reporter-busy="reporterBusy"
-      @start-reporter="$emit('startReporter')"
-      @stop-reporter="$emit('stopReporter')"
-    />
+        <OverviewReporterCard
+          v-if="reporterSupported"
+          :config="config"
+          :readiness="readiness"
+          :snapshot="reporterSnapshot"
+          :reporter-busy="reporterBusy"
+          @start-reporter="$emit('startReporter')"
+          @stop-reporter="$emit('stopReporter')"
+        />
 
-    <OverviewMobileCard
-      v-else
-      :readiness="readiness"
-      :mobile-connectivity="mobileConnectivity"
-      @retry-mobile-connectivity="$emit('retryMobileConnectivity')"
-    />
+        <OverviewMobileCard
+          v-else
+          :readiness="readiness"
+          :mobile-connectivity="mobileConnectivity"
+          @retry-mobile-connectivity="$emit('retryMobileConnectivity')"
+        />
+      </div>
 
-    <OverviewLogsCard
-      v-if="reporterSupported"
-      :logs="latestLogs"
-    />
+      <aside class="overview-side">
+        <OverviewLogsCard
+          v-if="reporterSupported"
+          :logs="latestLogs"
+        />
 
-    <OverviewDiscordCard
-      v-if="discordSupported"
-      :snapshot="discordPresenceSnapshot"
-    />
+        <OverviewDiscordCard
+          v-if="discordSupported"
+          :snapshot="discordPresenceSnapshot"
+        />
+      </aside>
+    </div>
   </div>
 </template>

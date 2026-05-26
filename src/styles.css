@@ -1,44 +1,112 @@
 :root {
-  --sky-50: #eef7f7;
-  --sky-100: #dff1f1;
-  --sky-200: #c4e5e5;
-  --sky-300: #9bd2d3;
-  --sky-400: #63b9bb;
-  --sky-500: #2d9fa3;
-  --sky-600: #0f8b8d;
-  --sky-700: #0b6f72;
-  --ink-strong: #1c2430;
-  --ink: #2f3a49;
-  --ink-soft: #566273;
-  --ink-muted: #747f8f;
-  --ink-faint: #a4acb8;
+  --sky-50: #eef4fb;
+  --sky-100: #dce8f6;
+  --sky-200: #b6cdec;
+  --sky-300: #86acdf;
+  --sky-400: #5b8bd0;
+  --sky-500: #3a6cbe;
+  --sky-600: #2755a4;
+  --sky-700: #1d4385;
+  --ink-strong: #161d28;
+  --ink: #25303f;
+  --ink-soft: #4a5566;
+  --ink-muted: #6f7a8a;
+  --ink-faint: #9aa4b3;
   --surface-0: #ffffff;
-  --surface-50: #f7f8fa;
-  --surface-100: #f1f3f5;
-  --surface-150: #e9edf1;
-  --surface-200: #dfe4ea;
-  --surface-glass: #ffffff;
+  --surface-50: #f6f8fb;
+  --surface-100: #eef2f7;
+  --surface-150: #e3eaf2;
+  --surface-200: #dde3ec;
+  --surface-glass: rgba(255, 255, 255, 0.78);
+  --surface-glass-strong: rgba(255, 255, 255, 0.92);
   --surface-card: #ffffff;
-  --surface-soft: #f6f8fa;
-  --surface-soft-strong: #eef2f5;
-  --line-subtle: #eef1f4;
-  --line-soft: #e3e7ec;
-  --line: #d8dee5;
-  --line-strong: #c7d0da;
-  --accent-faint: rgba(15, 139, 141, 0.08);
-  --accent-soft: rgba(15, 139, 141, 0.14);
-  --shadow-soft: rgba(28, 36, 48, 0.04);
-  --shadow-medium: rgba(28, 36, 48, 0.08);
-  --shadow-strong: rgba(28, 36, 48, 0.12);
+  --surface-soft: #f5f8fc;
+  --surface-soft-strong: #eaf0f8;
+  --line-subtle: #ecf0f5;
+  --line-soft: #dde4ed;
+  --line: #ccd5e0;
+  --line-strong: #b3bfcd;
+  --accent-faint: rgba(39, 85, 164, 0.08);
+  --accent-soft: rgba(39, 85, 164, 0.16);
+  --accent-ring: rgba(39, 85, 164, 0.28);
+  --shadow-soft: rgba(20, 32, 58, 0.05);
+  --shadow-medium: rgba(20, 32, 58, 0.09);
+  --shadow-strong: rgba(20, 32, 58, 0.14);
+  --card-inset-highlight: rgba(255, 255, 255, 0.65);
+  --bg-base: #eef3fa;
   color: var(--ink-strong);
-  background: #f4f6f8;
-  font-family: "Inter", "Segoe UI", "Noto Sans SC", sans-serif;
-  line-height: 1.5;
+  background: var(--bg-base);
+  font-family: "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  line-height: 1.55;
   font-weight: 400;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.font-mono {
+  font-family: "Cascadia Code", "Consolas", "Ubuntu Mono", monospace;
+}
+
+.ambient-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 45% at 20% 0%, rgba(91, 139, 208, 0.10), transparent 70%),
+    radial-gradient(ellipse 55% 45% at 100% 90%, rgba(58, 108, 190, 0.07), transparent 70%),
+    linear-gradient(180deg, #f1f5fb 0%, #ecf1f8 100%);
+}
+
+.site-reveal {
+  animation: site-reveal 520ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@keyframes site-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.gradient-divider {
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--line), transparent);
+  border: 0;
+  margin: 0;
+}
+
+.app-main > *,
+.workspace-grid > * {
+  animation: site-reveal 520ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.app-main > *:nth-child(1),
+.workspace-grid > *:nth-child(1) { animation-delay: 0.04s; }
+.app-main > *:nth-child(2),
+.workspace-grid > *:nth-child(2) { animation-delay: 0.10s; }
+.app-main > *:nth-child(3),
+.workspace-grid > *:nth-child(3) { animation-delay: 0.16s; }
+.app-main > *:nth-child(4),
+.workspace-grid > *:nth-child(4) { animation-delay: 0.22s; }
+.app-main > *:nth-child(5),
+.workspace-grid > *:nth-child(5) { animation-delay: 0.28s; }
+.app-main > *:nth-child(n + 6),
+.workspace-grid > *:nth-child(n + 6) { animation-delay: 0.34s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .site-reveal,
+  .app-main > *,
+  .workspace-grid > *,
+  .floating-orb {
+    animation: none;
+  }
 }
 
 * {
@@ -65,6 +133,7 @@ body {
 #app {
   height: 100vh;
   overflow: hidden;
+  position: relative;
 }
 
 button,
@@ -77,19 +146,31 @@ select {
 .app-shell {
   height: 100%;
   display: grid;
-  grid-template-columns: 248px minmax(0, 1fr);
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px;
   color: var(--ink-strong);
   overflow: hidden;
+  position: relative;
+  z-index: 1;
 }
 
 .app-shell.phone-nav {
   grid-template-columns: 1fr;
+  gap: 0;
+  padding: 0;
 }
 
 .app-sidebar {
   padding: 18px 14px;
-  border-right: 1px solid var(--line);
-  background: #fbfcfd;
+  border: 1px solid var(--line-soft);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 250, 254, 0.82));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow:
+    0 1px 0 var(--card-inset-highlight) inset,
+    0 6px 22px var(--shadow-soft);
   color: var(--ink-strong);
   display: flex;
   flex-direction: column;
@@ -108,7 +189,7 @@ select {
 .panel-heading h3,
 .entry-header h4 {
   margin: 0;
-  font-family: "Segoe UI", "Noto Sans SC", sans-serif;
+  font-family: inherit;
   letter-spacing: 0;
 }
 
@@ -116,6 +197,7 @@ select {
   font-size: 1.18rem;
   line-height: 1.2;
   font-weight: 700;
+  color: var(--ink-strong);
 }
 
 .page-copy,
@@ -132,7 +214,7 @@ select {
   border: 1px solid transparent;
   background: transparent;
   color: inherit;
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 10px 12px;
   text-align: left;
   display: flex;
@@ -140,15 +222,23 @@ select {
   align-items: center;
   cursor: pointer;
   transition:
-    border-color 180ms ease,
-    background 180ms ease,
-    color 180ms ease;
+    border-color 200ms ease,
+    background 200ms ease,
+    color 200ms ease,
+    box-shadow 200ms ease;
 }
 
-.nav-item:hover,
+.nav-item:hover {
+  border-color: var(--line-soft);
+  background: rgba(255, 255, 255, 0.7);
+}
+
 .nav-item.active {
-  border-color: var(--line);
-  background: var(--surface-100);
+  border-color: var(--accent-ring);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), var(--accent-faint));
+  box-shadow:
+    0 1px 0 var(--card-inset-highlight) inset,
+    0 4px 12px var(--shadow-soft);
 }
 
 .nav-item i {
@@ -172,9 +262,10 @@ select {
 }
 
 .app-main {
-  padding: 18px 22px;
+  padding: 6px 8px 8px;
   display: grid;
-  gap: 16px;
+  gap: 12px;
+  align-content: start;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
@@ -191,8 +282,10 @@ select {
   grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 8px;
   padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
-  border-top: 1px solid var(--line);
-  background: #ffffff;
+  border-top: 1px solid var(--line-soft);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.94));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .pending-save-float {
@@ -201,11 +294,13 @@ select {
   bottom: 24px;
   z-index: 40;
   width: min(420px, calc(100vw - 32px));
-  padding: 14px 16px;
-  border-radius: 8px;
-  border: 1px solid var(--line-strong);
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--line-soft);
   background: #ffffff;
-  box-shadow: 0 8px 18px var(--shadow-soft);
+  box-shadow:
+    0 1px 0 var(--card-inset-highlight) inset,
+    0 12px 28px var(--shadow-medium);
   display: grid;
   gap: 14px;
 }
@@ -247,7 +342,7 @@ select {
 
 .mobile-tab-item {
   border: 0;
-  border-radius: 8px;
+  border-radius: 10px;
   background: transparent;
   color: var(--ink-soft);
   min-height: 56px;
@@ -257,6 +352,7 @@ select {
   justify-items: center;
   align-content: center;
   cursor: pointer;
+  transition: background 200ms ease, color 200ms ease;
 }
 
 .mobile-tab-item i {
@@ -269,8 +365,8 @@ select {
 }
 
 .mobile-tab-item.active {
-  background: var(--surface-100);
-  color: var(--ink-strong);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), var(--accent-faint));
+  color: var(--sky-700);
 }
 
 .app-main::-webkit-scrollbar {
@@ -278,16 +374,44 @@ select {
 }
 
 .page-header {
-  border-radius: 8px;
-  padding: 14px 16px;
+  border-radius: 12px;
+  padding: 8px 14px;
   background: #ffffff;
   color: var(--ink-strong);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  border: 1px solid var(--line);
-  box-shadow: none;
+  gap: 12px;
+  min-height: 0;
+  max-height: 64px;
+  border: 1px solid var(--line-soft);
+  box-shadow:
+    0 1px 0 var(--card-inset-highlight) inset,
+    0 1px 2px var(--shadow-soft);
+}
+
+.page-header > div:first-child {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  align-content: center;
+}
+
+.page-header h2 {
+  font-size: 0.98rem;
+  line-height: 1.25;
+  font-weight: 700;
+  margin: 0;
+}
+
+.page-header .page-copy {
+  font-size: 0.78rem;
+  line-height: 1.35;
+  margin: 0;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .overview-summary-card .p-card-body {
@@ -301,12 +425,18 @@ select {
 }
 
 .overview-item {
-  padding: 10px 12px;
-  border-radius: 6px;
+  padding: 12px 14px;
+  border-radius: 10px;
   background: var(--surface-soft);
   border: 1px solid var(--line-soft);
   display: grid;
-  gap: 3px;
+  gap: 4px;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+
+.overview-item:hover {
+  border-color: var(--accent-ring);
+  box-shadow: 0 1px 4px var(--shadow-soft);
 }
 
 .overview-item span {
@@ -325,12 +455,14 @@ select {
 }
 
 .onboarding-panel {
-  padding: 20px;
+  padding: 22px;
   max-height: min(88vh, 920px);
-  border-radius: 8px;
+  border-radius: 14px;
   background: #ffffff;
-  border: 1px solid var(--line);
-  box-shadow: 0 10px 24px var(--shadow-soft);
+  border: 1px solid var(--line-soft);
+  box-shadow:
+    0 1px 0 var(--card-inset-highlight) inset,
+    0 18px 40px var(--shadow-medium);
   display: grid;
   gap: 16px;
   overflow-y: auto;
@@ -360,9 +492,9 @@ select {
 
 .onboarding-step {
   padding: 12px 14px;
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--surface-soft);
-  border: 1px solid var(--line-subtle);
+  border: 1px solid var(--line-soft);
   display: grid;
   gap: 4px;
 }
@@ -378,7 +510,7 @@ select {
 
 .onboarding-highlight {
   background: var(--accent-faint);
-  border-color: rgba(15, 139, 141, 0.24);
+  border-color: var(--accent-ring);
 }
 
 .onboarding-highlight small {
@@ -386,23 +518,28 @@ select {
   word-break: break-word;
 }
 
-.page-header h2 {
-  font-size: 1.18rem;
-  margin-top: 2px;
-  font-weight: 700;
-}
-
 .page-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  flex-shrink: 0;
+  gap: 8px;
 }
 
 .glass-card {
-  border-radius: 8px;
-  border: 1px solid var(--line);
+  border-radius: 12px;
+  border: 1px solid var(--line-soft);
   background: #ffffff;
-  box-shadow: none;
+  box-shadow:
+    0 1px 0 var(--card-inset-highlight) inset,
+    0 1px 2px var(--shadow-soft);
+  transition: border-color 220ms ease, box-shadow 220ms ease;
+}
+
+.glass-card:hover {
+  border-color: var(--line);
+  box-shadow:
+    0 1px 0 var(--card-inset-highlight) inset,
+    0 4px 14px var(--shadow-soft);
 }
 
 .glass-card .p-card-body {
@@ -483,9 +620,9 @@ select {
 
 .snapshot-preview {
   margin-top: 6px;
-  padding: 8px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--line);
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line-soft);
   background: var(--surface-soft);
   color: var(--ink-soft);
   display: grid;
@@ -505,9 +642,10 @@ select {
   gap: 2px;
   padding: 3px;
   margin-bottom: 8px;
-  border-radius: 8px;
-  background: var(--surface-100);
+  border-radius: 10px;
+  background: var(--surface-glass);
   border: 1px solid var(--line-soft);
+  box-shadow: inset 0 1px 0 0 var(--card-inset-highlight);
 }
 
 .editor-mode-tab {
@@ -515,18 +653,18 @@ select {
   background: transparent;
   color: var(--ink-soft);
   padding: 7px 12px;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   transition:
-    background 180ms ease,
-    color 180ms ease,
-    box-shadow 180ms ease;
+    background 200ms ease,
+    color 200ms ease,
+    box-shadow 200ms ease;
 }
 
 .editor-mode-tab.active {
   background: #ffffff;
-  color: var(--ink-strong);
-  box-shadow: none;
+  color: var(--sky-700);
+  box-shadow: 0 1px 6px var(--shadow-soft);
 }
 
 .lexical-editor-shell {
@@ -561,9 +699,12 @@ select {
 .lexical-editor-frame {
   position: relative;
   min-height: 240px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
+  border-radius: 10px;
+  border: 1px solid var(--line-soft);
+  border-top: 0;
+  border-right: 0;
   background: #ffffff;
+  box-shadow: inset 0 1px 0 0 var(--card-inset-highlight);
   overflow: hidden;
   cursor: text;
 }
@@ -591,7 +732,7 @@ select {
 
 .lexical-heading {
   margin: 6px 0 10px;
-  font-family: "Segoe UI", "Noto Sans SC", sans-serif;
+  font-family: inherit;
   color: var(--ink-strong);
 }
 
@@ -610,9 +751,9 @@ select {
 .lexical-quote {
   margin: 0 0 12px;
   padding: 10px 14px;
-  border-left: 3px solid var(--sky-600);
-  background: var(--surface-soft);
-  border-radius: 0 6px 6px 0;
+  border-left: 3px solid var(--sky-500);
+  background: var(--accent-faint);
+  border-radius: 0 8px 8px 0;
   color: var(--ink-soft);
 }
 
@@ -683,10 +824,22 @@ select {
 }
 
 .settings-disclosure {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #ffffff;
+  border: 1px solid var(--line-soft);
+  border-top: 0;
+  border-right: 0;
+  border-radius: 12px;
+  background: var(--surface-glass-strong);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow:
+    inset 0 1px 0 0 var(--card-inset-highlight),
+    0 2px 10px var(--shadow-soft);
   overflow: hidden;
+  transition: border-color 220ms ease, box-shadow 220ms ease;
+}
+
+.settings-disclosure:hover {
+  border-color: var(--accent-ring);
 }
 
 .settings-disclosure-summary {
@@ -746,10 +899,15 @@ select {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  padding: 12px 14px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: var(--surface-soft);
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--line-soft);
+  border-top: 0;
+  border-right: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), var(--accent-faint));
+  box-shadow:
+    inset 0 1px 0 0 var(--card-inset-highlight),
+    0 2px 10px var(--shadow-soft);
 }
 
 .discord-autostart-card {
@@ -791,10 +949,23 @@ select {
   justify-content: space-between;
   gap: 12px;
   min-height: 64px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: #ffffff;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line-soft);
+  border-top: 0;
+  border-right: 0;
+  background: var(--surface-glass-strong);
+  box-shadow:
+    inset 0 1px 0 0 var(--card-inset-highlight),
+    0 2px 8px var(--shadow-soft);
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+
+.compact-toggle-card:hover {
+  border-color: var(--accent-ring);
+  box-shadow:
+    inset 0 1px 0 0 var(--card-inset-highlight),
+    0 6px 16px var(--shadow-soft);
 }
 
 .compact-toggle-copy {
@@ -857,14 +1028,17 @@ select {
   display: grid;
   gap: 12px;
   padding: 14px;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid var(--line-soft);
-  background: var(--surface-soft);
-  transition: border-color 0.2s ease;
+  border-top: 0;
+  border-right: 0;
+  background: var(--surface-glass);
+  box-shadow: inset 0 1px 0 0 var(--card-inset-highlight);
+  transition: border-color 200ms ease;
 }
 
 .advanced-timings-card:hover {
-  border-color: var(--line);
+  border-color: var(--accent-ring);
 }
 
 .advanced-timings-card .p-inputtext {
@@ -999,15 +1173,16 @@ select {
 
 .workspace-grid {
   display: grid;
-  gap: 14px;
+  gap: 12px;
+  align-content: start;
   min-width: 0;
 }
 
 .payload-preview {
   margin: 0;
-  padding: 12px;
-  border-radius: 8px;
-  background: #f8fafc;
+  padding: 14px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #f7fafd, #eef3fa);
   color: var(--ink-strong);
   overflow: auto;
   max-width: 100%;
@@ -1015,24 +1190,34 @@ select {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: break-word;
-  font-family: "Cascadia Code", "Consolas", monospace;
+  font-family: "Cascadia Code", "Consolas", "Ubuntu Mono", monospace;
   font-size: 0.9rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-soft);
+  border-top: 0;
+  border-right: 0;
+  box-shadow: inset 0 1px 0 0 var(--card-inset-highlight);
 }
 
 .log-list {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .log-item {
-  padding: 12px;
-  border-radius: 8px;
-  background: #ffffff;
-  border: 1px solid var(--line);
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--surface-glass-strong);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--line-soft);
+  border-top: 0;
+  border-right: 0;
   display: grid;
   gap: 10px;
   min-width: 0;
+  box-shadow:
+    inset 0 1px 0 0 var(--card-inset-highlight),
+    0 2px 10px var(--shadow-soft);
 }
 
 .log-item-button {
@@ -1041,15 +1226,17 @@ select {
   text-align: left;
   cursor: pointer;
   transition:
-    transform 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+    border-color 200ms ease,
+    box-shadow 200ms ease,
+    transform 200ms ease;
 }
 
 .log-item-button:hover {
   transform: none;
-  border-color: var(--sky-600);
-  box-shadow: none;
+  border-color: var(--accent-ring);
+  box-shadow:
+    inset 0 1px 0 0 var(--card-inset-highlight),
+    0 8px 22px var(--shadow-medium);
 }
 
 .log-header,
@@ -1111,13 +1298,18 @@ select {
 }
 
 .self-test-card {
-  padding: 12px;
-  border-radius: 8px;
-  background: #ffffff;
-  border: 1px solid var(--line);
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--surface-glass-strong);
+  border: 1px solid var(--line-soft);
+  border-top: 0;
+  border-right: 0;
   display: grid;
   gap: 8px;
   min-width: 0;
+  box-shadow:
+    inset 0 1px 0 0 var(--card-inset-highlight),
+    0 2px 8px var(--shadow-soft);
 }
 
 .self-test-head {
@@ -1165,14 +1357,27 @@ select {
 }
 
 .preset-card {
-  border: 1px solid var(--line);
-  background: #ffffff;
-  border-radius: 8px;
-  padding: 12px;
+  border: 1px solid var(--line-soft);
+  border-top: 0;
+  border-right: 0;
+  background: var(--surface-glass-strong);
+  border-radius: 12px;
+  padding: 14px;
   display: grid;
   gap: 6px;
   text-align: left;
   cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 0 var(--card-inset-highlight),
+    0 2px 8px var(--shadow-soft);
+  transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
+}
+
+.preset-card:hover {
+  border-color: var(--accent-ring);
+  box-shadow:
+    inset 0 1px 0 0 var(--card-inset-highlight),
+    0 8px 20px var(--shadow-medium);
 }
 
 .preset-card strong {
@@ -1204,10 +1409,16 @@ select {
   position: relative;
   overflow: hidden;
   border: 1px dashed var(--line-strong);
-  border-radius: 8px;
-  padding: 10px 12px;
+  border-radius: 10px;
+  padding: 12px 14px;
   cursor: pointer;
-  background: var(--surface-soft);
+  background: var(--surface-glass);
+  transition: border-color 200ms ease, background 200ms ease;
+}
+
+.upload-label:hover {
+  border-color: var(--sky-500);
+  background: var(--accent-faint);
 }
 
 .upload-label input {
@@ -1225,23 +1436,29 @@ select {
 }
 
 .asset-preview {
-  border-radius: 8px;
-  padding: 12px;
-  background: var(--surface-soft);
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--surface-glass);
   border: 1px solid var(--line-soft);
+  border-top: 0;
+  border-right: 0;
   display: flex;
   justify-content: space-between;
   gap: 16px;
   align-items: center;
+  box-shadow: inset 0 1px 0 0 var(--card-inset-highlight);
 }
 
 .compose-live-preview {
   display: grid;
   gap: 10px;
-  padding: 12px;
-  border-radius: 8px;
-  background: var(--surface-soft);
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--surface-glass);
   border: 1px solid var(--line-soft);
+  border-top: 0;
+  border-right: 0;
+  box-shadow: inset 0 1px 0 0 var(--card-inset-highlight);
 }
 
 .compose-preview-card {
@@ -1285,27 +1502,37 @@ select {
 }
 
 .entry-card {
-  padding: 12px;
-  border-radius: 8px;
-  background: #ffffff;
-  border: 1px solid var(--line);
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--surface-glass-strong);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--line-soft);
+  border-top: 0;
+  border-right: 0;
   display: grid;
   gap: 12px;
   min-width: 0;
+  box-shadow:
+    inset 0 1px 0 0 var(--card-inset-highlight),
+    0 2px 10px var(--shadow-soft);
 }
 
 .entry-card-button {
   cursor: pointer;
   transition:
-    border-color 180ms ease,
-    background 180ms ease;
+    border-color 200ms ease,
+    background 200ms ease,
+    box-shadow 200ms ease;
 }
 
 .entry-card-button:hover {
   transform: none;
-  border-color: var(--sky-600);
-  box-shadow: none;
-  background: #ffffff;
+  border-color: var(--accent-ring);
+  box-shadow:
+    inset 0 1px 0 0 var(--card-inset-highlight),
+    0 8px 22px var(--shadow-medium);
+  background: var(--surface-glass-strong);
 }
 
 .entry-header {
@@ -1374,7 +1601,7 @@ select {
   margin: 6px 0 10px;
   color: var(--ink-strong);
   line-height: 1.35;
-  font-family: "Segoe UI", "Noto Sans SC", sans-serif;
+  font-family: inherit;
 }
 
 .markdown-content h1 {
@@ -1399,19 +1626,20 @@ select {
 
 .markdown-content blockquote {
   padding: 10px 14px;
-  border-left: 3px solid var(--sky-600);
-  background: var(--surface-soft);
-  border-radius: 0 6px 6px 0;
+  border-left: 3px solid var(--sky-500);
+  background: var(--accent-faint);
+  border-radius: 0 8px 8px 0;
   color: var(--ink-soft);
 }
 
 .markdown-content pre {
-  padding: 12px 14px;
-  border-radius: 8px;
-  background: var(--surface-150);
+  padding: 14px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #f7fafd, #eef3fa);
+  border: 1px solid var(--line-soft);
   color: var(--ink-strong);
   overflow-x: auto;
-  font-family: "Cascadia Code", "Consolas", monospace;
+  font-family: "Cascadia Code", "Consolas", "Ubuntu Mono", monospace;
   font-size: 0.88rem;
   scrollbar-width: none;
 }
@@ -1456,14 +1684,15 @@ select {
 
 .status-snapshot {
   margin: 0;
-  padding: 10px 12px;
-  border-left: 4px solid var(--sky-600);
-  background: var(--accent-faint);
+  padding: 12px 14px;
+  border-left: 4px solid var(--sky-500);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.86), var(--accent-faint));
   color: var(--ink-soft);
-  border-radius: 0 6px 6px 0;
+  border-radius: 0 8px 8px 0;
   min-width: 0;
   overflow-wrap: anywhere;
   word-break: break-word;
+  box-shadow: inset 0 1px 0 0 var(--card-inset-highlight);
 }
 
 .activity-select {
@@ -1582,8 +1811,9 @@ select {
   }
 
   .page-header {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: nowrap;
   }
 
   .glass-card .p-card-body {
@@ -1777,9 +2007,10 @@ select {
   }
 
   .page-header {
-    padding: 20px 18px;
-    border-radius: 8px;
-    gap: 14px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    gap: 10px;
+    max-height: 60px;
   }
 
   .page-actions,
@@ -1940,7 +2171,7 @@ select {
   }
 
   .page-header {
-    padding: 18px 16px;
+    padding: 10px 14px;
   }
 
   .glass-card .p-card-body {
@@ -1985,3 +2216,266 @@ select {
   }
 }
 
+/* ===== Settings document layout (Plan B) =====
+ * Wraps all Settings cards as one document. Strips child glass-card chrome,
+ * uses hairline dividers between sections. Mobile (<= 760px) falls back to
+ * the original card-stack layout for readability on narrow screens.
+ */
+.settings-document {
+  border-radius: 14px;
+  border: 1px solid var(--line-soft);
+  background: #ffffff;
+  box-shadow:
+    0 1px 0 var(--card-inset-highlight) inset,
+    0 4px 20px var(--shadow-soft);
+  overflow: hidden;
+}
+
+.settings-document > * + * {
+  border-top: 1px solid var(--line);
+}
+
+/* Strip the inner card chrome so each child looks like a section, not a card. */
+.settings-document > .glass-card,
+.settings-document > .p-card {
+  border-radius: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.settings-document > .glass-card:hover,
+.settings-document > .p-card:hover {
+  border: 0;
+  box-shadow: none;
+}
+
+/* Two-column layout inside each section: label column on the left, controls
+ * on the right. This is the GitHub-style "settings document" feel. */
+.settings-document .p-card-body {
+  padding: 22px 26px;
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 22px 28px;
+  align-items: start;
+}
+
+.settings-document .p-card-caption {
+  display: grid;
+  gap: 6px;
+  position: sticky;
+  top: 0;
+}
+
+.settings-document .panel-heading {
+  display: block;
+}
+
+.settings-document .panel-heading h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink-strong);
+  margin: 0;
+}
+
+.settings-document .panel-heading > div {
+  display: contents;
+}
+
+.settings-document .panel-heading::after {
+  content: attr(data-hint);
+  display: block;
+  margin-top: 6px;
+  color: var(--ink-muted);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+/* Move PrimeVue Tag inside panel-heading down to the right column visually. */
+.settings-document .panel-heading .p-tag {
+  margin-top: 10px;
+}
+
+.settings-document .p-card-content {
+  padding: 0;
+}
+
+/* Tighten the section-internal disclosure cards so they don't look like
+ * cards-within-cards. */
+.settings-document .settings-disclosure {
+  border-radius: 8px;
+  background: var(--surface-soft);
+  box-shadow: none;
+}
+
+.settings-document .settings-disclosure:hover {
+  border-color: var(--line);
+}
+
+@media (max-width: 960px) {
+  /* Below ~960px the two-column layout starts to crush controls; collapse
+   * to single-column but keep the document frame. */
+  .settings-document .p-card-body {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 22px 22px;
+  }
+
+  .settings-document .p-card-caption {
+    position: static;
+  }
+}
+
+@media (max-width: 760px) {
+  .settings-document {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
+    overflow: visible;
+    display: grid;
+    gap: 14px;
+  }
+
+  .settings-document > * + * {
+    border-top: 0;
+  }
+
+  /* Restore individual card chrome on mobile so each section reads as a
+   * standalone card again. */
+  .settings-document > .glass-card,
+  .settings-document > .p-card {
+    border-radius: 12px;
+    border: 1px solid var(--line-soft);
+    background: #ffffff;
+    box-shadow:
+      0 1px 0 var(--card-inset-highlight) inset,
+      0 1px 2px var(--shadow-soft);
+  }
+
+  .settings-document .p-card-body {
+    padding: 18px;
+    gap: 12px;
+    grid-template-columns: 1fr;
+  }
+
+  .settings-document .p-card-caption {
+    position: static;
+  }
+
+  .settings-document .panel-heading h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--ink-strong);
+  }
+
+  .settings-document .panel-heading::after {
+    display: none;
+  }
+}
+
+/* ===== Overview two-column layout (Plan A) =====
+ * Main column = primary monitoring (Summary + Reporter / Mobile).
+ * Side column = secondary panels (Logs + Discord).
+ * Collapses to single column on narrow screens.
+ */
+.overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.overview-main,
+.overview-side {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  align-content: start;
+}
+
+/* The workspace-grid stagger animation already covers the page-header and
+ * the overview-grid; suppress the inner cards' inherited stagger so all
+ * cards in the two columns reveal together. */
+.overview-main > *,
+.overview-side > * {
+  animation: none;
+}
+
+@media (max-width: 1100px) {
+  .overview-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .overview-grid {
+    gap: 14px;
+  }
+}
+
+/* ===== Settings About card ===== */
+.about-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.about-row {
+  display: grid;
+  grid-template-columns: minmax(120px, max-content) minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--line-subtle);
+}
+
+.about-row:first-child {
+  border-top: 0;
+}
+
+.about-label {
+  color: var(--ink-muted);
+  font-size: 0.88rem;
+}
+
+.about-value {
+  color: var(--ink-strong);
+  font-weight: 600;
+}
+
+.about-value--mono {
+  font-family: "Cascadia Code", "Consolas", "Ubuntu Mono", monospace;
+  font-size: 0.92rem;
+}
+
+.about-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--sky-600);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  word-break: break-all;
+}
+
+.about-link:hover {
+  color: var(--sky-700);
+  text-decoration: underline;
+}
+
+.about-link i {
+  font-size: 0.78rem;
+  opacity: 0.7;
+}
+
+@media (max-width: 520px) {
+  .about-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}

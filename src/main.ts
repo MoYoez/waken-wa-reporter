@@ -6,6 +6,11 @@ import ToastService from "primevue/toastservice";
 import App from "@/App.vue";
 import { i18n } from "@/i18n";
 import { WakenWaPreset } from "@/theme/primePreset";
+
+import "@fontsource/noto-sans-sc/300.css";
+import "@fontsource/noto-sans-sc/400.css";
+import "@fontsource/noto-sans-sc/500.css";
+
 import "@/styles.css";
 import "primeicons/primeicons.css";
 

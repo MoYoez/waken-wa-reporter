@@ -375,6 +375,15 @@ const zhCN = {
       none: "暂无",
       noneResult: "暂无结果。",
     },
+    about: {
+      title: "关于",
+      version: "版本",
+      client: "客户端仓库",
+      server: "服务端仓库",
+      checkUpdate: "检查更新",
+      upToDate: "已是最新版本。",
+      installing: "正在下载并安装 {version}…",
+    },
   },
   overview: {
     hero: { eyebrow: "概览", title: "概览", description: "查看连接、设备和同步状态。", mobileMode: "移动端模式" },

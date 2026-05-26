@@ -375,6 +375,15 @@ const enUS = {
       none: "None",
       noneResult: "No result yet.",
     },
+    about: {
+      title: "About",
+      version: "Version",
+      client: "Client repository",
+      server: "Server repository",
+      checkUpdate: "Check for update",
+      upToDate: "You're on the latest version.",
+      installing: "Downloading and installing {version}…",
+    },
   },
   overview: {
     hero: { eyebrow: "Overview", title: "Overview", description: "View the connection, device, and sync state.", mobileMode: "Mobile mode" },

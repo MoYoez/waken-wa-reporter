@@ -2,6 +2,7 @@
 import { onBeforeUnmount, onMounted, ref } from "vue";
 
 import ConnectionPanel from "@/features/settings/components/ConnectionPanel.vue";
+import SettingsAboutCard from "@/features/settings/components/SettingsAboutCard.vue";
 import SettingsAndroidNotificationCard from "@/features/settings/components/SettingsAndroidNotificationCard.vue";
 import SettingsDiscordCard from "@/features/settings/components/SettingsDiscordCard.vue";
 import SettingsHeaderPanel from "@/features/settings/components/SettingsHeaderPanel.vue";
@@ -122,68 +123,72 @@ onBeforeUnmount(() => {
       :reporter-running="reporterSnapshot.running"
     />
 
-    <SettingsLanguageCard
-      :locale="props.locale"
-      :locale-restart-required="localeRestartRequired"
-      :restarting="restarting"
-      @update-locale="emit('update:locale', $event)"
-      @restart-app="handleRestartApp"
-    />
+    <div class="settings-document">
+      <SettingsLanguageCard
+        :locale="props.locale"
+        :locale-restart-required="localeRestartRequired"
+        :restarting="restarting"
+        @update-locale="emit('update:locale', $event)"
+        @restart-app="handleRestartApp"
+      />
 
-    <SettingsStartupCard
-      v-if="autostartSupported"
-      :enabled="modelValue.launchOnStartup"
-      @update-enabled="updateField('launchOnStartup', $event)"
-    />
+      <SettingsStartupCard
+        v-if="autostartSupported"
+        :enabled="modelValue.launchOnStartup"
+        @update-enabled="updateField('launchOnStartup', $event)"
+      />
 
-    <ConnectionPanel
-      :model-value="modelValue"
-      :capabilities="capabilities"
-      :verified-generated-hash-key="verifiedGeneratedHashKey"
-      @update:model-value="$emit('update:modelValue', $event)"
-      @imported="$emit('imported', $event)"
-    />
+      <ConnectionPanel
+        :model-value="modelValue"
+        :capabilities="capabilities"
+        :verified-generated-hash-key="verifiedGeneratedHashKey"
+        @update:model-value="$emit('update:modelValue', $event)"
+        @imported="$emit('imported', $event)"
+      />
 
-    <SettingsReporterCard
-      v-if="reporterSupported"
-      :config-ready="configReady"
-      :snapshot="reporterSnapshot"
-      :reporter-busy="reporterBusy"
-      :self-test-supported="selfTestSupported"
-      :self-test-loading="selfTestLoading"
-      :accessibility-permission-loading="accessibilityPermissionLoading"
-      :self-test-platform="selfTestResult?.platform || ''"
-      :self-test-cards="selfTestCards"
-      :self-test-hint-key="selfTestPlatformHintKey"
-      @start="$emit('startReporter')"
-      @stop="$emit('stopReporter')"
-      @self-test="handleSelfTest"
-      @request-permission="handleRequestPermission"
-    />
+      <SettingsReporterCard
+        v-if="reporterSupported"
+        :config-ready="configReady"
+        :snapshot="reporterSnapshot"
+        :reporter-busy="reporterBusy"
+        :self-test-supported="selfTestSupported"
+        :self-test-loading="selfTestLoading"
+        :accessibility-permission-loading="accessibilityPermissionLoading"
+        :self-test-platform="selfTestResult?.platform || ''"
+        :self-test-cards="selfTestCards"
+        :self-test-hint-key="selfTestPlatformHintKey"
+        @start="$emit('startReporter')"
+        @stop="$emit('stopReporter')"
+        @self-test="handleSelfTest"
+        @request-permission="handleRequestPermission"
+      />
 
-    <SettingsAndroidNotificationCard
-      v-if="isAndroid"
-      :enabled="modelValue.androidReporterNotificationEnabled"
-      :permission-granted="androidReporterNotificationPermissionGranted"
-      :permission-loading="androidNotificationPermissionLoading"
-      @update-enabled="updateField('androidReporterNotificationEnabled', $event)"
-      @request-permission="handleRequestAndroidReporterNotificationPermission"
-    />
+      <SettingsAndroidNotificationCard
+        v-if="isAndroid"
+        :enabled="modelValue.androidReporterNotificationEnabled"
+        :permission-granted="androidReporterNotificationPermissionGranted"
+        :permission-loading="androidNotificationPermissionLoading"
+        @update-enabled="updateField('androidReporterNotificationEnabled', $event)"
+        @request-permission="handleRequestAndroidReporterNotificationPermission"
+      />
 
-    <SettingsMobileCard v-if="!reporterSupported" />
+      <SettingsMobileCard v-if="!reporterSupported" />
 
-    <SettingsDiscordCard
-      v-if="discordSupported"
-      :application-id="modelValue.discordApplicationId"
-      :enabled="modelValue.discordEnabled"
-      :snapshot="discordPresenceSnapshot"
-      :discord-busy="discordBusy"
-      :issues="discordConfigIssues"
-      :can-start="discordConfigReady"
-      @update-application-id="updateField('discordApplicationId', $event)"
-      @update-enabled="updateField('discordEnabled', $event)"
-      @start="$emit('startDiscordPresence')"
-      @stop="$emit('stopDiscordPresence')"
-    />
+      <SettingsDiscordCard
+        v-if="discordSupported"
+        :application-id="modelValue.discordApplicationId"
+        :enabled="modelValue.discordEnabled"
+        :snapshot="discordPresenceSnapshot"
+        :discord-busy="discordBusy"
+        :issues="discordConfigIssues"
+        :can-start="discordConfigReady"
+        @update-application-id="updateField('discordApplicationId', $event)"
+        @update-enabled="updateField('discordEnabled', $event)"
+        @start="$emit('startDiscordPresence')"
+        @stop="$emit('stopDiscordPresence')"
+      />
+
+      <SettingsAboutCard :updater-supported="capabilities.updater" />
+    </div>
   </div>
 </template>
