@@ -215,13 +215,18 @@ export function useAndroidReporterNotification(options: UseAndroidReporterNotifi
 
   async function notifyReporterStatus() {
     const notification = buildReporterNotification();
-    logAndroidNotification("sending reporter notification", {
+    logAndroidNotification("sending reporter notification via foreground service", {
       ...buildDebugState(),
       id: notification.id,
       channelId: notification.channelId,
     });
 
-    await invoke("plugin:notification|notify", { options: notification });
+    // Use foreground service for persistent notification
+    await invoke("plugin:waken-android-activity|start_foreground_service", {
+      title: notification.title,
+      body: notification.body,
+      summary: notification.summary,
+    });
 
     if (import.meta.env.DEV) {
       try {
@@ -238,7 +243,8 @@ export function useAndroidReporterNotification(options: UseAndroidReporterNotifi
 
   async function removeReporterNotification() {
     try {
-      await removeActive([{ id: NOTIFICATION_ID }]);
+      // Stop foreground service
+      await invoke("plugin:waken-android-activity|stop_foreground_service");
     } catch {
       // Removing an already-cleared Android notification can fail harmlessly.
     }

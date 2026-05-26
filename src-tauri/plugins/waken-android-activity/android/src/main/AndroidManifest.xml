@@ -4,6 +4,8 @@
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <queries>
         <intent>
@@ -24,16 +26,6 @@
         </service>
 
         <service
-            android:name="com.waken_wa_reporter_rustc.app.WakenMediaNotificationListener"
-            android:exported="true"
-            android:label="@string/waken_android_activity_plugin_name"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
-            <intent-filter>
-                <action android:name="android.service.notification.NotificationListenerService" />
-            </intent-filter>
-        </service>
-
-        <service
             android:name="com.waken_wa_reporter.plugin.activity.WakenAccessibilityService"
             android:exported="true"
             android:label="@string/waken_android_activity_plugin_name"
@@ -45,5 +37,10 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/waken_accessibility_service" />
         </service>
+
+        <service
+            android:name="com.waken_wa_reporter.plugin.activity.WakenForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 </manifest>
