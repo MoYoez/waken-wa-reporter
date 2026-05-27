@@ -2013,9 +2013,29 @@ select {
     max-height: 60px;
   }
 
-  .page-actions,
   .panel-heading {
     width: 100%;
+  }
+
+  .page-header {
+    max-height: none;
+  }
+
+  .page-header .page-actions {
+    flex: 0 1 auto;
+    max-width: 56%;
+    min-width: 0;
+    justify-content: flex-end;
+  }
+
+  .page-header .p-tag {
+    max-width: 100%;
+  }
+
+  .page-header .p-tag-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .panel-heading {
