@@ -2,10 +2,18 @@ package com.waken_wa_reporter.plugin.activity
 
 import android.app.Activity
 import app.tauri.annotation.Command
+import app.tauri.annotation.InvokeArg
 import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.Invoke
 import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
+
+@InvokeArg
+class StartForegroundServiceArgs {
+  var title: String? = null
+  var body: String? = null
+  var summary: String? = null
+}
 
 @TauriPlugin
 class WakenAndroidActivityPlugin(private val activity: Activity) : Plugin(activity) {
@@ -15,9 +23,10 @@ class WakenAndroidActivityPlugin(private val activity: Activity) : Plugin(activi
 
   @Command
   fun startForegroundService(invoke: Invoke) {
-    val title = invoke.getString("title") ?: "Waken-Wa Reporter"
-    val body = invoke.getString("body") ?: ""
-    val summary = invoke.getString("summary") ?: ""
+    val args = invoke.parseArgs(StartForegroundServiceArgs::class.java)
+    val title = args.title ?: "Waken-Wa Reporter"
+    val body = args.body ?: ""
+    val summary = args.summary ?: ""
 
     try {
       WakenForegroundService.startService(activity.applicationContext, title, body, summary)
