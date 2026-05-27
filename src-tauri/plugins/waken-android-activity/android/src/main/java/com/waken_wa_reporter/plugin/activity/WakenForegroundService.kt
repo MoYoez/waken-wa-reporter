@@ -90,12 +90,21 @@ class WakenForegroundService : Service() {
 
     private fun startForegroundNotification(title: String, body: String, summary: String) {
         val notification = buildNotification(title, body, summary)
-        startForeground(NOTIFICATION_ID, notification)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            startForeground(NOTIFICATION_ID, notification, 0)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
         isRunning = true
     }
 
     private fun stopForegroundService() {
-        stopForeground(true)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+        }
         stopSelf()
         isRunning = false
     }

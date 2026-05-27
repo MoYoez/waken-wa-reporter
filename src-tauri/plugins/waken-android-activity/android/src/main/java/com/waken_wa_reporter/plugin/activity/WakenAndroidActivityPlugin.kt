@@ -5,6 +5,7 @@ import app.tauri.annotation.Command
 import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
+import app.tauri.plugin.PluginCall
 
 @TauriPlugin
 class WakenAndroidActivityPlugin(private val activity: Activity) : Plugin(activity) {
@@ -13,7 +14,7 @@ class WakenAndroidActivityPlugin(private val activity: Activity) : Plugin(activi
   }
 
   @Command
-  fun startForegroundService(call: app.tauri.plugin.PluginCall) {
+  fun startForegroundService(call: PluginCall) {
     val title = call.getString("title") ?: "Waken-Wa Reporter"
     val body = call.getString("body") ?: ""
     val summary = call.getString("summary") ?: ""
@@ -29,7 +30,7 @@ class WakenAndroidActivityPlugin(private val activity: Activity) : Plugin(activi
   }
 
   @Command
-  fun stopForegroundService(call: app.tauri.plugin.PluginCall) {
+  fun stopForegroundService(call: PluginCall) {
     try {
       WakenForegroundService.stopService(activity.applicationContext)
       val result = JSObject()
