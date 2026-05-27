@@ -157,8 +157,8 @@ watch(
             :first="first"
             :rows="rows"
             :total-records="snapshot.logs.length"
-            template="PrevPageLink CurrentPageReport NextPageLink"
-            :current-page-report-template="t('realtime.pagination.report')"
+            template="PrevPageLink PageLinks CurrentPageReport NextPageLink"
+            current-page-report-template="{first} - {last} / {totalRecords}"
             @page="first = $event.first"
           />
         </div>
