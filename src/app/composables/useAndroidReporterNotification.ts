@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, watch, type ComputedRef, type Ref } from "vue";
+import { computed, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import {
   active,
@@ -35,11 +35,11 @@ export function useAndroidReporterNotification(options: UseAndroidReporterNotifi
   let notificationSetupInFlight: Promise<boolean> | undefined;
   let notificationSyncInFlight = false;
   let notificationSyncQueued = false;
-  let isAndroid = false;
+  const isAndroid = ref(false);
 
   // Check device platform on initialization
   readDevicePlatform().then((platform) => {
-    isAndroid = platform === "android";
+    isAndroid.value = platform === "android";
   });
 
   const shouldUseNotification = computed(
@@ -48,7 +48,7 @@ export function useAndroidReporterNotification(options: UseAndroidReporterNotifi
       && options.reporterSupported.value
       && options.config.value.androidReporterNotificationEnabled
       && options.capabilities.value.persistentNotification
-      && isAndroid,
+      && isAndroid.value,
   );
 
   const notificationSignature = computed(() =>
@@ -265,7 +265,7 @@ export function useAndroidReporterNotification(options: UseAndroidReporterNotifi
       readiness: options.readiness.value,
       reporterRunning: options.reporterSnapshot.value.running,
       reporterBusy: options.reporterBusy.value,
-      androidRuntime: isAndroid,
+      androidRuntime: isAndroid.value,
     };
   }
 

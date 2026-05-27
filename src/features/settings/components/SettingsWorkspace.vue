@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 import ConnectionPanel from "@/features/settings/components/ConnectionPanel.vue";
 import SettingsAboutCard from "@/features/settings/components/SettingsAboutCard.vue";
@@ -102,12 +102,22 @@ function handleWindowFocus() {
 }
 
 onMounted(() => {
-  if (isAndroid.value) {
-    void refreshAndroidReporterNotificationPermission({ silent: true });
-  }
   document.addEventListener("visibilitychange", handleVisibilityChange);
   window.addEventListener("focus", handleWindowFocus);
 });
+
+// Trigger the initial Android-only permission refresh as soon as the platform
+// detection promise resolves. Using onMounted alone races against the async
+// readDevicePlatform() IPC and would skip the initial refresh.
+watch(
+  isAndroid,
+  (value) => {
+    if (value) {
+      void refreshAndroidReporterNotificationPermission({ silent: true });
+    }
+  },
+  { immediate: true },
+);
 
 onBeforeUnmount(() => {
   window.clearTimeout(permissionRefreshTimer);
