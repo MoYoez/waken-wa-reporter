@@ -125,7 +125,6 @@ class WakenForegroundService : Service() {
             .setContentText(body)
             .setSubText(summary)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setLargeIcon(android.R.drawable.ic_dialog_info)
             .setOngoing(true)
             .setAutoCancel(false)
             .setSilent(true)
