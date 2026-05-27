@@ -4,7 +4,6 @@ import {
   active,
   createChannel,
   Importance,
-  removeActive,
   Visibility,
   type ActiveNotification,
   type Options,

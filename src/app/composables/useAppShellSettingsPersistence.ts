@@ -3,7 +3,7 @@ import {
   restartApp as requestAppRestart,
   setAutostartEnabled,
 } from "@/lib/api";
-import { readDeviceName, readDevicePlatform } from "@/lib/deviceInfo";
+import { readDeviceName } from "@/lib/deviceInfo";
 import {
   AppStateSaveError,
   AppStateSaveTransportError,
