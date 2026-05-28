@@ -1,0 +1,6 @@
+# Cargo build artifacts
+/target/
+/Cargo.lock
+
+# Tauri-generated transient files
+/android/.tauri/

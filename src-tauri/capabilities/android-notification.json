@@ -4,5 +4,10 @@
   "description": "Android-only persistent notification access for realtime reporter controls",
   "windows": ["main"],
   "platforms": ["android"],
-  "permissions": ["notification:default"]
+  "permissions": [
+    "notification:default",
+    "waken-android-activity:allow-start-foreground-service",
+    "waken-android-activity:allow-stop-foreground-service",
+    "waken-android-activity:allow-register-listener"
+  ]
 }

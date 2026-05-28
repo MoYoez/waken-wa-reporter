@@ -1,5 +1,5 @@
 import { computed, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from "vue";
-import { invoke } from "@tauri-apps/api/core";
+import { addPluginListener, invoke, type PluginListener } from "@tauri-apps/api/core";
 import {
   active,
   createChannel,
@@ -29,6 +29,12 @@ const NOTIFICATION_ID = 408201;
 const CHANNEL_ID = "waken-wa-reporter-status-v2";
 const SMALL_ICON = "ic_launcher";
 const LARGE_ICON = "ic_launcher_foreground";
+const PLUGIN_NAME = "waken-android-activity";
+const REPORTER_ACTION_EVENT = "reporter-action";
+
+interface ReporterActionPayload {
+  action?: "pause" | "resume" | string;
+}
 
 export function useAndroidReporterNotification(options: UseAndroidReporterNotificationOptions) {
   let notificationReady = false;
@@ -221,10 +227,12 @@ export function useAndroidReporterNotification(options: UseAndroidReporterNotifi
 
   async function notifyReporterStatus() {
     const notification = buildReporterNotification();
+    const running = options.reporterSnapshot.value.running;
     logAndroidNotification("sending reporter notification via foreground service", {
       ...buildDebugState(),
       id: notification.id,
       channelId: notification.channelId,
+      running,
     });
 
     // Use foreground service for persistent notification
@@ -232,6 +240,9 @@ export function useAndroidReporterNotification(options: UseAndroidReporterNotifi
       title: notification.title,
       body: notification.body,
       summary: notification.summary,
+      running,
+      pauseLabel: options.t("app.androidNotification.pauseAction"),
+      resumeLabel: options.t("app.androidNotification.startAction"),
     });
 
     if (import.meta.env.DEV) {
@@ -277,8 +288,68 @@ export function useAndroidReporterNotification(options: UseAndroidReporterNotifi
     { immediate: true },
   );
 
+  let reporterActionListener: PluginListener | undefined;
+  let reporterActionInFlight = false;
+
+  watch(
+    isAndroid,
+    async (value) => {
+      if (!value || reporterActionListener) {
+        return;
+      }
+      try {
+        reporterActionListener = await addPluginListener<ReporterActionPayload>(
+          PLUGIN_NAME,
+          REPORTER_ACTION_EVENT,
+          (payload) => {
+            void handleReporterActionEvent(payload);
+          },
+        );
+        logAndroidNotification("reporter-action listener registered");
+      } catch (error) {
+        logAndroidNotification("reporter-action listener register failed", {
+          error: formatError(error),
+        });
+      }
+    },
+    { immediate: true },
+  );
+
+  async function handleReporterActionEvent(payload: ReporterActionPayload) {
+    const action = payload?.action;
+    if (action !== "pause" && action !== "resume") {
+      return;
+    }
+    if (reporterActionInFlight || options.reporterBusy.value) {
+      logAndroidNotification("reporter-action ignored (busy)", { action });
+      return;
+    }
+    reporterActionInFlight = true;
+    try {
+      if (action === "pause") {
+        await options.handleStopReporter();
+      } else {
+        await options.handleStartReporter();
+      }
+      logAndroidNotification("reporter-action handled", { action });
+    } catch (error) {
+      logAndroidNotification("reporter-action failed", {
+        action,
+        error: formatError(error),
+      });
+    } finally {
+      reporterActionInFlight = false;
+    }
+  }
+
   onBeforeUnmount(() => {
     void removeReporterNotification();
+    if (reporterActionListener) {
+      void reporterActionListener.unregister().catch(() => {
+        // listener may already be torn down with the webview
+      });
+      reporterActionListener = undefined;
+    }
   });
 }
 
