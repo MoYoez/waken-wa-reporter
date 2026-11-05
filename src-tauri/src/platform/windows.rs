@@ -107,6 +107,8 @@ pub fn get_foreground_snapshot() -> Result<ForegroundSnapshot, String> {
     Ok(ForegroundSnapshot {
         process_name,
         process_title,
+        screen_locked: None,
+        screen_interactive: None,
     })
 }
 
@@ -152,6 +154,8 @@ pub fn get_foreground_snapshot_for_reporting(
     Ok(ForegroundSnapshot {
         process_name,
         process_title,
+        screen_locked: None,
+        screen_interactive: None,
     })
 }
 

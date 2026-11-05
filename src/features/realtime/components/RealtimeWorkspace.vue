@@ -21,6 +21,12 @@ const first = ref(0);
 const rows = 10;
 
 const pagedLogs = computed(() => props.snapshot.logs.slice(first.value, first.value + rows));
+const currentProcess = computed(() => {
+  const activity = props.snapshot.currentActivity;
+  if (activity?.screenLocked === true) return t("realtime.summary.screenLocked");
+  if (activity?.screenInteractive === false) return t("realtime.summary.screenInactive");
+  return activity?.processName || t("realtime.summary.none");
+});
 const currentPlaySource = computed(() =>
   String(props.snapshot.currentActivity?.metadata?.play_source_name ?? props.snapshot.currentActivity?.metadata?.play_source ?? "").trim()
   || t("realtime.summary.none"),
@@ -105,7 +111,7 @@ watch(
         <div class="overview-summary">
           <div class="overview-item">
             <span>{{ t("realtime.summary.currentProcess") }}</span>
-            <strong>{{ snapshot.currentActivity?.processName || t("realtime.summary.none") }}</strong>
+            <strong>{{ currentProcess }}</strong>
           </div>
           <div class="overview-item">
             <span>{{ t("realtime.summary.windowTitle") }}</span>

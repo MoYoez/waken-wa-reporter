@@ -93,6 +93,17 @@ pub(super) fn build_payload(
     media: &MediaInfo,
     mut metadata: Map<String, Value>,
 ) -> ActivityPayload {
+    const SCREEN_LOCKED_METADATA_KEY: &str = "screen_locked";
+    const SCREEN_INTERACTIVE_METADATA_KEY: &str = "screen_interactive";
+
+    if let (Some(locked), Some(interactive)) = (snapshot.screen_locked, snapshot.screen_interactive)
+    {
+        metadata.insert(SCREEN_LOCKED_METADATA_KEY.into(), Value::Bool(locked));
+        metadata.insert(
+            SCREEN_INTERACTIVE_METADATA_KEY.into(),
+            Value::Bool(interactive),
+        );
+    }
     let power_info = crate::platform::get_device_power_info_for_reporting().unwrap_or_default();
     let play_source = media.source_app_id.trim().to_string();
     let source_rule_match = (!play_source.is_empty())
@@ -315,6 +326,8 @@ mod tests {
         ForegroundSnapshot {
             process_name: "player.exe".into(),
             process_title: "Player".into(),
+            screen_locked: None,
+            screen_interactive: None,
         }
     }
 

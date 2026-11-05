@@ -41,6 +41,8 @@ pub(super) fn get_foreground_snapshot_x11_for_reporting(
     Ok(ForegroundSnapshot {
         process_name,
         process_title,
+        screen_locked: None,
+        screen_interactive: None,
     })
 }
 

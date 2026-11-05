@@ -461,6 +461,10 @@ pub struct ReporterActivity {
     pub process_name: String,
     #[serde(default)]
     pub process_title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub screen_locked: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub screen_interactive: Option<bool>,
     #[serde(default)]
     pub updated_at: Option<String>,
     #[serde(default)]

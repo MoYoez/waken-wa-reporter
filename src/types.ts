@@ -129,6 +129,8 @@ export interface ActivityFeedItem {
   device?: string;
   processName?: string;
   processTitle?: string | null;
+  screenLocked?: boolean;
+  screenInteractive?: boolean;
   statusText?: string;
   startedAt?: string;
   updatedAt?: string;

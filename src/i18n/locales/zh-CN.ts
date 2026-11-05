@@ -299,6 +299,8 @@ const zhCN = {
       title: "管理同步状态",
       runtimeStatus: "运行状态",
       currentProcess: "当前进程",
+      screenLocked: "屏幕已锁定",
+      screenInactive: "屏幕不可交互",
       playSource: "播放来源",
       lastHeartbeat: "最近心跳",
       lastError: "最近错误",

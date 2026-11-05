@@ -299,6 +299,8 @@ const enUS = {
       title: "Background sync",
       runtimeStatus: "Runtime status",
       currentProcess: "Current process",
+      screenLocked: "Screen locked",
+      screenInactive: "Screen inactive",
       playSource: "Playback source",
       lastHeartbeat: "Last heartbeat",
       lastError: "Last error",

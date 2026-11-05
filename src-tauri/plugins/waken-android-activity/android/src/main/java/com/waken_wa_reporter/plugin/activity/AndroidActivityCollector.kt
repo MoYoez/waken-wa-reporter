@@ -1,6 +1,7 @@
 package com.waken_wa_reporter.plugin.activity
 
 import android.app.AppOpsManager
+import android.app.KeyguardManager
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.ComponentName
@@ -21,6 +22,7 @@ import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Process
+import android.os.PowerManager
 import android.os.SystemClock
 import android.provider.Settings
 import android.util.Base64
@@ -76,10 +78,24 @@ object AndroidActivityCollector {
   @JvmStatic
   fun getForegroundSnapshot(includeProcessName: Boolean, includeProcessTitle: Boolean): String =
     withContextJson { context ->
+      val keyguard = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+      val power = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+      val screenLocked = keyguard.isKeyguardLocked
+      val screenInteractive = power.isInteractive
+      val usageAccessGranted = hasUsageAccess(context)
       val result = JSONObject()
-        .put("usageAccessGranted", hasUsageAccess(context))
+        .put("usageAccessGranted", usageAccessGranted)
+        .put("screenLocked", screenLocked)
+        .put("screenInteractive", screenInteractive)
+        .put("processName", "")
+        .put("processTitle", "")
 
-      if (!hasUsageAccess(context)) {
+      if (screenLocked || !screenInteractive) {
+        accessibilityWindowSnapshot = null
+        return@withContextJson result.toString()
+      }
+
+      if (!usageAccessGranted || (!includeProcessName && !includeProcessTitle)) {
         return@withContextJson result.toString()
       }
 

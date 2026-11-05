@@ -29,6 +29,8 @@ const ANDROID_SETTINGS_EXTRA_APP_PACKAGE: &str = "android.provider.extra.APP_PAC
 struct AndroidForegroundSnapshot {
     process_name: String,
     process_title: String,
+    screen_locked: Option<bool>,
+    screen_interactive: Option<bool>,
     usage_access_granted: bool,
     error: Option<String>,
 }
@@ -70,13 +72,18 @@ pub fn get_foreground_snapshot_for_reporting(
     if let Some(error) = snapshot.error.filter(|value| !value.trim().is_empty()) {
         return Err(error);
     }
-    if !snapshot.usage_access_granted {
-        return Ok(ForegroundSnapshot::default());
-    }
+    let screen_locked = snapshot
+        .screen_locked
+        .ok_or("Android foreground snapshot is missing screenLocked.")?;
+    let screen_interactive = snapshot
+        .screen_interactive
+        .ok_or("Android foreground snapshot is missing screenInteractive.")?;
 
     Ok(ForegroundSnapshot {
         process_name: snapshot.process_name,
         process_title: snapshot.process_title,
+        screen_locked: Some(screen_locked),
+        screen_interactive: Some(screen_interactive),
     })
 }
 

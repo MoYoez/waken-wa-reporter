@@ -87,6 +87,8 @@ fn get_foreground_snapshot_gnome_focused_window_dbus() -> Result<ForegroundSnaps
     Ok(ForegroundSnapshot {
         process_name,
         process_title,
+        screen_locked: None,
+        screen_interactive: None,
     })
 }
 
@@ -124,6 +126,8 @@ fn get_foreground_snapshot_kde_kdotool_for_reporting(
     Ok(ForegroundSnapshot {
         process_name,
         process_title,
+        screen_locked: None,
+        screen_interactive: None,
     })
 }
 

@@ -33,6 +33,8 @@ static MACOS_MEDIAREMOTE_ADAPTER_ROOT: OnceLock<PathBuf> = OnceLock::new();
 pub struct ForegroundSnapshot {
     pub process_name: String,
     pub process_title: String,
+    pub screen_locked: Option<bool>,
+    pub screen_interactive: Option<bool>,
 }
 
 #[derive(Clone, Debug, Default)]

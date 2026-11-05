@@ -347,7 +347,9 @@ fn run_reporter_loop(
         let mut iteration_had_error = false;
         let mut iteration_permission_denied = false;
 
-        let collect_foreground = config.report_foreground_app || config.report_window_title;
+        let collect_foreground = cfg!(target_os = "android")
+            || config.report_foreground_app
+            || config.report_window_title;
         let collect_media =
             config.report_media || config.report_play_source || config.report_playback_app_icon;
         let include_play_source_for_capture =
@@ -425,13 +427,15 @@ fn run_reporter_loop(
                 };
 
                 let signature = format!(
-                    "{}\u{1e}{}\u{1e}{}",
+                    "{}\u{1e}{}\u{1e}{}\u{1e}{:?}\u{1e}{:?}",
                     snapshot.process_name,
                     snapshot.process_title,
                     media.signature_for_reporting(
                         config.report_media,
                         include_play_source_for_capture
-                    )
+                    ),
+                    snapshot.screen_locked,
+                    snapshot.screen_interactive,
                 );
                 let same_as_last = last_signature
                     .as_ref()
@@ -689,6 +693,8 @@ fn update_snapshot(
     inner.current_activity = Some(ReporterActivity {
         process_name: snapshot.process_name.clone(),
         process_title: Some(snapshot.process_title.clone()),
+        screen_locked: snapshot.screen_locked,
+        screen_interactive: snapshot.screen_interactive,
         updated_at: Some(now_iso_string()),
         media_cover_url,
     });

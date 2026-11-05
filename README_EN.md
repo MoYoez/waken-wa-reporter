@@ -38,6 +38,8 @@ Both Simplified Chinese and English are available in the docs, and the app UI it
 | Android | Supports the full current feature set, with a phone and tablet friendly UI, persistent notifications, manual activity reporting, inspiration publishing, and related platform capabilities |
 | iOS | Not yet fully adapted and is currently not provided as a fully supported platform |
 
+Android realtime reports sample lock and interactive state on every poll and send `metadata.screen_locked` and `metadata.screen_interactive`. Locked or non-interactive samples contain no foreground app or window title; media follows the existing capture settings. Deploy server support for these fields and screen-only reports before updating the Android client. This does not change the background Service lifecycle or Android power restrictions.
+
 ## Installation
 
 Download the package for your platform from [Releases](https://github.com/MoYoez/waken-wa-reporter/releases).

@@ -38,6 +38,8 @@
 | Android | 支持除 iOS 外的全部当前特性，提供手机与平板自适应 UI，并支持常驻通知、手动活动上报、灵感发布与相关平台能力 |
 | iOS | 暂未完整适配，当前不作为完整支持平台提供 |
 
+Android 实时上报会在每次轮询中采集锁屏与交互状态，通过 `metadata.screen_locked` 和 `metadata.screen_interactive` 发送。锁屏或非交互时不再上报旧应用和窗口标题；媒体仍按设置采集。升级 Android 客户端前，请先部署支持这两个字段及空应用状态上报的服务端。此能力不改变后台 Service 的生命周期与系统省电限制。
+
 ## 安装
 
 请直接前往 [Releases](https://github.com/MoYoez/waken-wa-reporter/releases) 下载对应平台的安装包或构建产物。
