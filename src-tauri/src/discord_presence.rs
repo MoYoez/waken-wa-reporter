@@ -356,7 +356,10 @@ fn mark_stopped(state: &Arc<Mutex<DiscordPresenceInner>>, run_id: u64) {
 
 fn build_http_client(config: &ClientConfig, locale: BackendLocale) -> Result<Client, String> {
     build_blocking_client(
-        concat!("waken-wa-tauri-discord-presence/", env!("CARGO_PKG_VERSION")),
+        concat!(
+            "waken-wa-tauri-discord-presence/",
+            env!("CARGO_PKG_VERSION")
+        ),
         Some(Duration::from_secs(15)),
         config.use_system_proxy,
         &config.proxy_url,
