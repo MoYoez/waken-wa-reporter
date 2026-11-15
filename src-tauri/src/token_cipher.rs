@@ -3,11 +3,11 @@ const DPAPI_MARKER: &str = "dpapi:";
 #[cfg(target_os = "windows")]
 mod windows_impl {
     use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
+    use windows::core::PCWSTR;
     use windows::Win32::Foundation::{LocalFree, HLOCAL};
     use windows::Win32::Security::Cryptography::{
         CryptProtectData, CryptUnprotectData, CRYPTPROTECT_UI_FORBIDDEN, CRYPT_INTEGER_BLOB,
     };
-    use windows::core::PCWSTR;
 
     pub fn protect(plaintext: &str) -> Result<String, String> {
         if plaintext.is_empty() {

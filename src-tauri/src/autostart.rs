@@ -8,16 +8,17 @@ mod windows_impl {
     const RUN_REGKEY: &str = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
     const STARTUP_APPROVED_REGKEY: &str =
         "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run";
-    const STARTUP_APPROVED_ENABLED_VALUE: [u8; 12] =
-        [0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+    const STARTUP_APPROVED_ENABLED_VALUE: [u8; 12] = [
+        0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    ];
 
     fn app_name<R: Runtime>(app: &AppHandle<R>) -> String {
         app.package_info().name.clone()
     }
 
     fn run_command(args: &[&str]) -> Result<String, String> {
-        let exe = std::env::current_exe()
-            .map_err(|error| format!("无法获取可执行文件路径：{error}"))?;
+        let exe =
+            std::env::current_exe().map_err(|error| format!("无法获取可执行文件路径：{error}"))?;
         let joined_args = args.join(" ");
         if joined_args.is_empty() {
             Ok(exe.display().to_string())

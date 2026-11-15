@@ -1,7 +1,7 @@
-mod backend_locale;
-mod commands;
 #[cfg(desktop)]
 mod autostart;
+mod backend_locale;
+mod commands;
 mod discord_presence;
 mod http_client;
 mod import_config;
@@ -137,8 +137,7 @@ pub fn run() {
                     .map_err(|error| -> Box<dyn std::error::Error> { error.into() })?;
 
                 if saved_state.config.launch_on_startup {
-                    if let Err(error) =
-                        autostart::ensure_protected(app.handle(), &[AUTOSTART_ARG])
+                    if let Err(error) = autostart::ensure_protected(app.handle(), &[AUTOSTART_ARG])
                     {
                         eprintln!("恢复开机自启动失败：{error}");
                     }

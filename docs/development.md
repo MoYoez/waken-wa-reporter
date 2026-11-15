@@ -37,7 +37,7 @@ sudo apt install playerctl
 pnpm install
 ```
 
-> pnpm 默认会阻止依赖的构建脚本。本项目在 [`pnpm-workspace.yaml`](../pnpm-workspace.yaml) 的 `onlyBuiltDependencies` 中放行了 `core-js` 与 `esbuild`。首次安装若仍提示 `ERR_PNPM_IGNORED_BUILDS`，执行一次 `pnpm approve-builds --all` 运行其构建脚本即可。
+> pnpm 默认会阻止依赖的构建脚本。本项目在 [`pnpm-workspace.yaml`](../pnpm-workspace.yaml)（pnpm 10+）与 [`package.json`](../package.json) 的 `pnpm.onlyBuiltDependencies`（pnpm 9，CI 使用）中均放行了 `core-js` 与 `esbuild`。首次安装若仍提示 `ERR_PNPM_IGNORED_BUILDS`，执行一次 `pnpm approve-builds --all` 运行其构建脚本即可。
 
 启动桌面开发环境：
 
