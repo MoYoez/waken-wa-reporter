@@ -37,6 +37,18 @@ pub fn restart_app(app: AppHandle) -> Result<(), String> {
     app_state::restart_app(app)
 }
 
+#[cfg(desktop)]
+#[tauri::command]
+pub fn set_autostart_enabled(app: AppHandle, enabled: bool) -> Result<ApiResult<bool>, String> {
+    runtime::set_autostart_enabled(app, enabled)
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub fn is_autostart_enabled(app: AppHandle) -> Result<ApiResult<bool>, String> {
+    runtime::is_autostart_enabled(app)
+}
+
 #[tauri::command]
 pub fn parse_imported_integration_config(
     input: String,

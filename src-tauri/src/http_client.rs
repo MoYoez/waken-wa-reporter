@@ -46,7 +46,7 @@ pub async fn request_json(
     body: Option<Value>,
 ) -> ApiResult<Value> {
     let client = match get_or_create_async_client(
-        "waken-wa-tauri-client/0.1.0",
+        concat!("waken-wa-tauri-client/", env!("CARGO_PKG_VERSION")),
         Some(Duration::from_secs(15)),
         use_system_proxy,
         proxy_url,
@@ -143,7 +143,7 @@ pub async fn request_json_payload(
     body: Option<Value>,
 ) -> ApiResult<Value> {
     let client = match get_or_create_async_client(
-        "waken-wa-tauri-client/0.1.0",
+        concat!("waken-wa-tauri-client/", env!("CARGO_PKG_VERSION")),
         Some(Duration::from_secs(15)),
         use_system_proxy,
         proxy_url,
