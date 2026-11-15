@@ -54,7 +54,7 @@ pub(super) fn build_http_client(
     locale: BackendLocale,
 ) -> Result<Client, String> {
     build_blocking_client(
-        "waken-wa-tauri-reporter/0.1.0",
+        concat!("waken-wa-tauri-reporter/", env!("CARGO_PKG_VERSION")),
         Some(Duration::from_secs(15)),
         config.use_system_proxy,
         &config.proxy_url,

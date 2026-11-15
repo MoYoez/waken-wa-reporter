@@ -9,6 +9,7 @@ use tauri::{AppHandle, Manager};
 use uuid::Uuid;
 
 use crate::models::AppStatePayload;
+use crate::token_cipher;
 
 const APP_STATE_FILE_NAME: &str = "client-state.json";
 
@@ -88,6 +89,8 @@ pub fn load_app_state(app: &AppHandle) -> Result<AppStatePayload, String> {
         Err(error) => return Err(format!("读取状态文件失败：{error}")),
     };
 
+    payload.config.api_token = token_cipher::decrypt_from_storage(&payload.config.api_token);
+
     let generated_hash_changed = ensure_generated_hash_key(&mut payload);
     let discord_source_changed = ensure_discord_source_id(&mut payload);
     if generated_hash_changed || discord_source_changed {
@@ -103,6 +106,7 @@ pub fn save_app_state(app: &AppHandle, payload: &AppStatePayload) -> Result<(), 
     let mut payload = payload.clone();
     let _ = ensure_generated_hash_key(&mut payload);
     let _ = ensure_discord_source_id(&mut payload);
+    payload.config.api_token = token_cipher::encrypt_for_storage(&payload.config.api_token);
     let content = serde_json::to_string_pretty(&payload)
         .map_err(|error| format!("序列化状态失败：{error}"))?;
     atomic_write(&path, &content)?;

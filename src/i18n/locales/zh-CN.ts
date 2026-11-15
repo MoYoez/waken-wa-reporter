@@ -52,6 +52,9 @@ const zhCN = {
     qrScanFailed: "二维码扫描失败。",
     settingsConfigInvalid: "设置参数错误。",
     settingsPayloadInvalid: "设置数据格式错误。",
+    autostartEnableFailed: "启用开机自启动失败。",
+    autostartDisableFailed: "禁用开机自启动失败。",
+    autostartQueryFailed: "查询开机自启动状态失败。",
   },
   platformSelfTest: {
     summary: {

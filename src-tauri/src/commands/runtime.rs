@@ -41,6 +41,57 @@ pub fn get_realtime_reporter_snapshot(
 }
 
 #[cfg(desktop)]
+pub fn set_autostart_enabled(app: AppHandle, enabled: bool) -> Result<ApiResult<bool>, String> {
+    use crate::autostart;
+
+    let outcome = if enabled {
+        autostart::enable(&app, &[crate::AUTOSTART_ARG])
+    } else {
+        autostart::disable(&app)
+    };
+
+    if let Err(error) = outcome {
+        let code = if enabled {
+            "backendErrors.autostartEnableFailed"
+        } else {
+            "backendErrors.autostartDisableFailed"
+        };
+        return Ok(ApiResult::failure_localized(
+            500,
+            Some(code.to_string()),
+            error,
+            None,
+            None,
+        ));
+    }
+
+    match autostart::is_enabled(&app) {
+        Ok(state) => Ok(ApiResult::success(200, state)),
+        Err(error) => Ok(ApiResult::failure_localized(
+            500,
+            Some("backendErrors.autostartQueryFailed".to_string()),
+            error,
+            None,
+            None,
+        )),
+    }
+}
+
+#[cfg(desktop)]
+pub fn is_autostart_enabled(app: AppHandle) -> Result<ApiResult<bool>, String> {
+    match crate::autostart::is_enabled(&app) {
+        Ok(state) => Ok(ApiResult::success(200, state)),
+        Err(error) => Ok(ApiResult::failure_localized(
+            500,
+            Some("backendErrors.autostartQueryFailed".to_string()),
+            error,
+            None,
+            None,
+        )),
+    }
+}
+
+#[cfg(desktop)]
 pub fn start_discord_presence_sync(
     app: AppHandle,
     discord_presence_runtime: State<'_, DiscordPresenceRuntime>,

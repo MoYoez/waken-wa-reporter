@@ -52,6 +52,9 @@ const enUS = {
     qrScanFailed: "QR scan failed.",
     settingsConfigInvalid: "Settings parameter error.",
     settingsPayloadInvalid: "Settings payload format is invalid.",
+    autostartEnableFailed: "Failed to enable launch on startup.",
+    autostartDisableFailed: "Failed to disable launch on startup.",
+    autostartQueryFailed: "Failed to query the launch-on-startup state.",
   },
   platformSelfTest: {
     summary: {

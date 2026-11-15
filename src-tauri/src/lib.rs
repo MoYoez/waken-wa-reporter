@@ -1,5 +1,7 @@
 mod backend_locale;
 mod commands;
+#[cfg(desktop)]
+mod autostart;
 mod discord_presence;
 mod http_client;
 mod import_config;
@@ -9,6 +11,7 @@ mod realtime_reporter;
 mod reporter_config;
 mod runtime_utils;
 mod state_store;
+mod token_cipher;
 #[cfg(desktop)]
 mod tray;
 
@@ -30,7 +33,7 @@ use realtime_reporter::{config_is_ready, ReporterRuntime};
 #[cfg(desktop)]
 const SINGLE_INSTANCE_EVENT: &str = "single-instance-attempted";
 #[cfg(desktop)]
-const AUTOSTART_ARG: &str = "--from-autostart";
+pub(crate) const AUTOSTART_ARG: &str = "--from-autostart";
 #[cfg(desktop)]
 const DEEP_LINK_SCHEME_PREFIX: &str = "waken-wa-reporter://";
 
@@ -133,6 +136,14 @@ pub fn run() {
                 let saved_state = state_store::load_app_state(app.handle())
                     .map_err(|error| -> Box<dyn std::error::Error> { error.into() })?;
 
+                if saved_state.config.launch_on_startup {
+                    if let Err(error) =
+                        autostart::ensure_protected(app.handle(), &[AUTOSTART_ARG])
+                    {
+                        eprintln!("恢复开机自启动失败：{error}");
+                    }
+                }
+
                 if saved_state.config.reporter_enabled && config_is_ready(&saved_state.config) {
                     let reporter = app.state::<ReporterRuntime>();
                     let _ = reporter.start(
@@ -191,6 +202,8 @@ pub fn run() {
         commands::load_app_state,
         commands::save_app_state,
         commands::restart_app,
+        commands::set_autostart_enabled,
+        commands::is_autostart_enabled,
         commands::parse_imported_integration_config,
         commands::get_client_capabilities,
         commands::submit_activity_report,
