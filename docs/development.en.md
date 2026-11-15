@@ -37,7 +37,7 @@ Install dependencies:
 pnpm install
 ```
 
-> pnpm blocks dependency build scripts by default. This project allows `core-js` and `esbuild` via `onlyBuiltDependencies` in [`pnpm-workspace.yaml`](../pnpm-workspace.yaml). If the first install still reports `ERR_PNPM_IGNORED_BUILDS`, run `pnpm approve-builds --all` once to execute their build scripts.
+> pnpm blocks dependency build scripts by default. This project allows `core-js` and `esbuild` via `onlyBuiltDependencies` in both [`pnpm-workspace.yaml`](../pnpm-workspace.yaml) (pnpm 10+) and [`package.json`](../package.json) under `pnpm.onlyBuiltDependencies` (pnpm 9, used by CI). If the first install still reports `ERR_PNPM_IGNORED_BUILDS`, run `pnpm approve-builds --all` once to execute their build scripts.
 
 Start the desktop development environment:
 
