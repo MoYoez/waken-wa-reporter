@@ -94,6 +94,7 @@ pub fn get_now_playing() -> Result<MediaInfo, String> {
 pub fn get_now_playing_for_reporting(
     include_media: bool,
     include_play_source: bool,
+    _netease_native_smtc: bool,
 ) -> Result<MediaInfo, String> {
     read_now_playing(include_media, include_play_source, false, false)
 }
@@ -101,6 +102,7 @@ pub fn get_now_playing_for_reporting(
 pub fn get_now_playing_artwork_for_reporting(
     include_play_source: bool,
     include_source_icon: bool,
+    _netease_native_smtc: bool,
 ) -> Result<MediaInfo, String> {
     read_now_playing(true, include_play_source, true, include_source_icon)
 }

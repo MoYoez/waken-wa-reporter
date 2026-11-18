@@ -3,6 +3,7 @@ import type { ClientCapabilities, ClientConfig } from "../../types";
 
 const DEFAULT_CAPABILITIES: ClientCapabilities = {
   realtimeReporter: true,
+  neteaseNativeSmtc: false,
   tray: true,
   platformSelfTest: true,
   discordPresence: true,

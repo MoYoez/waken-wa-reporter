@@ -36,6 +36,7 @@ export function detectPerformanceMode(
 
 export interface ClientCapabilities {
   realtimeReporter: boolean;
+  neteaseNativeSmtc: boolean;
   tray: boolean;
   platformSelfTest: boolean;
   discordPresence: boolean;
@@ -66,6 +67,7 @@ export interface ClientConfig {
   reportMediaArtwork: boolean;
   reportPlaybackAppIcon: boolean;
   reportMediaGenre: boolean;
+  neteaseNativeSmtc: boolean;
   mediaPlaySourceRules: MediaPlaySourceRule[];
   discordEnabled: boolean;
   discordApplicationId: string;

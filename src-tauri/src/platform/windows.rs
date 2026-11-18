@@ -1,3 +1,5 @@
+mod netease;
+
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -255,6 +257,7 @@ fn get_now_playing_native(
     include_play_source: bool,
     include_artwork: bool,
     include_source_icon: bool,
+    netease_native_smtc: bool,
 ) -> Result<MediaInfo, String> {
     let _com_guard = init_com_for_media()?;
 
@@ -269,7 +272,7 @@ fn get_now_playing_native(
         }
     };
 
-    let source_app_id = if include_play_source {
+    let source_app_id = if include_play_source || (include_media && netease_native_smtc) {
         session
             .SourceAppUserModelId()
             .ok()
@@ -313,8 +316,6 @@ fn get_now_playing_native(
         })
         .unwrap_or((None, None));
     let reported_at_ms = now_unix_millis_i64();
-    let (start_timestamp_ms, end_timestamp_ms) =
-        media_timestamps_from_position(&playback_state, position_ms, duration_ms, reported_at_ms);
 
     let (title, artist, album, cover_url, genre) = if include_media {
         let request = session
@@ -356,6 +357,23 @@ fn get_now_playing_native(
             String::new(),
         )
     };
+
+    // inflink-rs shares the same source ID and tags its tracks with NCM-{id}.
+    let (position_ms, duration_ms, reported_at_ms) = if include_media
+        && netease_native_smtc
+        && source_app_id.eq_ignore_ascii_case(netease::PROCESS_NAME)
+        && matches!(playback_state.as_str(), "playing" | "paused")
+        && (position_ms.is_none() || duration_ms.is_none())
+        && !genre.split(", ").any(|value| value.starts_with("NCM-"))
+    {
+        let (position, duration) = netease::read_timeline(&title)?;
+        (Some(position), Some(duration), now_unix_millis_i64())
+    } else {
+        (position_ms, duration_ms, reported_at_ms)
+    };
+    let (start_timestamp_ms, end_timestamp_ms) =
+        media_timestamps_from_position(&playback_state, position_ms, duration_ms, reported_at_ms);
+
     let source_icon_url = if include_play_source && include_source_icon {
         read_source_app_icon_data_url(&source_app_id).unwrap_or_default()
     } else {
@@ -401,7 +419,7 @@ fn timespan_to_ms(value: windows::Foundation::TimeSpan) -> Option<i64> {
 }
 
 pub fn get_now_playing() -> Result<MediaInfo, String> {
-    let media = get_now_playing_native(true, true, false, false)?;
+    let media = get_now_playing_native(true, true, false, false, false)?;
     if media.is_empty() {
         return Ok(MediaInfo::default());
     }
@@ -412,19 +430,33 @@ pub fn get_now_playing() -> Result<MediaInfo, String> {
 pub fn get_now_playing_for_reporting(
     include_media: bool,
     include_play_source: bool,
+    netease_native_smtc: bool,
 ) -> Result<MediaInfo, String> {
     if !include_media && !include_play_source {
         return Ok(MediaInfo::default());
     }
 
-    get_now_playing_native(include_media, include_play_source, false, false)
+    get_now_playing_native(
+        include_media,
+        include_play_source,
+        false,
+        false,
+        netease_native_smtc,
+    )
 }
 
 pub fn get_now_playing_artwork_for_reporting(
     include_play_source: bool,
     include_source_icon: bool,
+    netease_native_smtc: bool,
 ) -> Result<MediaInfo, String> {
-    get_now_playing_native(true, include_play_source, true, include_source_icon)
+    get_now_playing_native(
+        true,
+        include_play_source,
+        true,
+        include_source_icon,
+        netease_native_smtc,
+    )
 }
 
 pub fn run_self_test() -> PlatformSelfTestResult {

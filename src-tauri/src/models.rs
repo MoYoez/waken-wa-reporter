@@ -135,6 +135,7 @@ pub fn default_android_reporter_notification_enabled() -> bool {
 #[serde(rename_all = "camelCase")]
 pub struct ClientCapabilities {
     pub realtime_reporter: bool,
+    pub netease_native_smtc: bool,
     pub tray: bool,
     pub platform_self_test: bool,
     pub discord_presence: bool,
@@ -148,6 +149,7 @@ pub struct ClientCapabilities {
 pub fn default_client_capabilities() -> ClientCapabilities {
     ClientCapabilities {
         realtime_reporter: true,
+        netease_native_smtc: cfg!(all(windows, target_pointer_width = "64")),
         tray: true,
         platform_self_test: true,
         discord_presence: true,
@@ -162,6 +164,7 @@ pub fn default_client_capabilities() -> ClientCapabilities {
 pub fn default_client_capabilities() -> ClientCapabilities {
     ClientCapabilities {
         realtime_reporter: true,
+        netease_native_smtc: false,
         tray: false,
         platform_self_test: true,
         discord_presence: false,
@@ -176,6 +179,7 @@ pub fn default_client_capabilities() -> ClientCapabilities {
 pub fn default_client_capabilities() -> ClientCapabilities {
     ClientCapabilities {
         realtime_reporter: false,
+        netease_native_smtc: false,
         tray: false,
         platform_self_test: false,
         discord_presence: false,
@@ -190,6 +194,7 @@ pub fn default_client_capabilities() -> ClientCapabilities {
 pub fn default_client_capabilities() -> ClientCapabilities {
     ClientCapabilities {
         realtime_reporter: false,
+        netease_native_smtc: false,
         tray: false,
         platform_self_test: false,
         discord_presence: false,
@@ -263,6 +268,8 @@ pub struct ClientConfig {
     #[serde(default = "default_report_media_genre")]
     pub report_media_genre: bool,
     #[serde(default)]
+    pub netease_native_smtc: bool,
+    #[serde(default)]
     pub media_play_source_rules: Vec<MediaPlaySourceRule>,
     #[serde(default)]
     pub media_play_source_blocklist: Vec<String>,
@@ -301,6 +308,7 @@ impl Default for ClientConfig {
             report_media_artwork: default_report_media_artwork(),
             report_playback_app_icon: default_report_playback_app_icon(),
             report_media_genre: default_report_media_genre(),
+            netease_native_smtc: false,
             media_play_source_rules: Vec::new(),
             media_play_source_blocklist: Vec::new(),
             discord_enabled: false,

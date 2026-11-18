@@ -381,6 +381,7 @@ fn run_reporter_loop(
                         cached_media = match get_now_playing_for_reporting(
                             config.report_media,
                             include_play_source_for_capture,
+                            config.netease_native_smtc,
                         ) {
                             Ok(mut media) => {
                                 last_media_error = None;
@@ -663,6 +664,7 @@ fn media_with_artwork_for_payload(media: &MediaInfo, config: &ClientConfig) -> M
     let Ok(artwork_media) = get_now_playing_artwork_for_reporting(
         include_play_source_for_assets,
         config.report_playback_app_icon,
+        config.report_media && config.netease_native_smtc,
     ) else {
         return payload_media;
     };

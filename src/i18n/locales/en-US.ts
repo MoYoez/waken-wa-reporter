@@ -560,6 +560,7 @@ const enUS = {
       mediaArtwork: { label: "Media artwork", description: "Attach cover artwork when media changes" },
       playbackAppIcon: { label: "Report playback app icon", description: "Attach the playback app icon when media changes" },
       mediaGenre: { label: "Report media genre", description: "Attach genre info (e.g. NCM-{id} from inflink-rs) for song linking" },
+      neteaseNativeSmtc: { label: "NetEase native SMTC compatibility", description: "Fill in missing playback position and duration for the native NetEase Cloud Music 3.x session when reporting media." },
     },
     toggles: {
       enabled: "Enabled",

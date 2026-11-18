@@ -42,6 +42,8 @@ Notes:
 - Heartbeat may be set to `0`
 - If "auto-start background sync on launch" is enabled, sync starts automatically next time the app opens
 
+On 64-bit Windows, enable **NetEase native SMTC compatibility** under **Settings → Auto-sync content**. This option is off by default. When media reporting is enabled, Reporter fills in the missing playback position and duration for native NetEase Cloud Music 3.x sessions. If background sync is running, restart it after saving the setting.
+
 ## Device Pending Approval
 
 When the site does not auto-accept new devices and the current device has not been approved yet, the backend may return HTTP `202`. In that case, the client will:

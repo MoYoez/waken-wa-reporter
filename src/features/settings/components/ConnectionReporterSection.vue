@@ -27,6 +27,7 @@ interface ReporterContentOption {
     | "reportPlaySource"
     | "reportMediaArtwork"
     | "reportPlaybackAppIcon"
+    | "neteaseNativeSmtc"
     | "reportMediaGenre";
   label: string;
   description: string;

@@ -14,6 +14,7 @@ import type {
 function createDefaultCapabilities(): ClientCapabilities {
   return {
     realtimeReporter: true,
+    neteaseNativeSmtc: false,
     tray: true,
     platformSelfTest: true,
     discordPresence: true,
