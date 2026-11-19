@@ -4,6 +4,8 @@ export type PushMode = "realtime" | "active";
 
 export type PerformanceMode = "realtime" | "balanced" | "powersave" | "custom";
 
+export type NeteaseMediaSource = "system" | "native" | "inflink";
+
 export interface PerformancePresetValues {
   pollIntervalMs: number;
   heartbeatIntervalMs: number;
@@ -67,7 +69,7 @@ export interface ClientConfig {
   reportMediaArtwork: boolean;
   reportPlaybackAppIcon: boolean;
   reportMediaGenre: boolean;
-  neteaseNativeSmtc: boolean;
+  neteaseMediaSource: NeteaseMediaSource;
   mediaPlaySourceRules: MediaPlaySourceRule[];
   discordEnabled: boolean;
   discordApplicationId: string;

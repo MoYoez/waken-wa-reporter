@@ -59,12 +59,6 @@ export function useConnectionPanel(
       description: t("connectionPanel.reportContent.media.description"),
       inputId: "report-media",
     },
-    ...(props.capabilities.neteaseNativeSmtc ? [{
-      key: "neteaseNativeSmtc" as const,
-      label: t("connectionPanel.reportContent.neteaseNativeSmtc.label"),
-      description: t("connectionPanel.reportContent.neteaseNativeSmtc.description"),
-      inputId: "netease-native-smtc",
-    }] : []),
     {
       key: "reportPlaySource" as const,
       label: t("connectionPanel.reportContent.playSource.label"),

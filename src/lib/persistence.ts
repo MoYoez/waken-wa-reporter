@@ -75,7 +75,7 @@ export const defaultClientConfig = (): ClientConfig => ({
   reportMediaArtwork: false,
   reportPlaybackAppIcon: false,
   reportMediaGenre: false,
-  neteaseNativeSmtc: false,
+  neteaseMediaSource: "system",
   mediaPlaySourceRules: [],
   discordEnabled: false,
   discordApplicationId: "",

@@ -99,6 +99,7 @@ const {
                   help-key="connectionPanel.help.reporterOnboarding"
                   head-class="settings-section-head settings-disclosure-subhead"
                   :reporter-content-options="reporterContentOptions"
+                  :netease-media-source-supported="capabilities.neteaseNativeSmtc"
                   @update-field="updateField"
                   @update-fields="updateFields"
                 />
@@ -155,6 +156,7 @@ const {
             help-key="connectionPanel.help.reporter"
             :show-heading="false"
             :reporter-content-options="reporterContentOptions"
+            :netease-media-source-supported="capabilities.neteaseNativeSmtc"
             head-class="settings-section-head"
             @update-field="updateField"
             @update-fields="updateFields"

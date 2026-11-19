@@ -16,7 +16,7 @@ use super::{
     build_self_test_result, image_bytes_to_png_data_url, localized_text, make_probe,
     media_timestamps_from_position, now_unix_millis_i64, ForegroundSnapshot, MediaInfo,
 };
-use crate::models::PlatformSelfTestResult;
+use crate::models::{NeteaseMediaSource, PlatformSelfTestResult};
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 #[cfg(target_os = "windows")]
 use image::{codecs::png::PngEncoder, ColorType, ImageEncoder};
@@ -27,8 +27,9 @@ use windows::{
     ApplicationModel::AppInfo,
     Foundation::Size,
     Media::Control::{
+        GlobalSystemMediaTransportControlsSession as MediaSession,
         GlobalSystemMediaTransportControlsSessionManager,
-        GlobalSystemMediaTransportControlsSessionMediaProperties,
+        GlobalSystemMediaTransportControlsSessionMediaProperties as MediaProperties,
         GlobalSystemMediaTransportControlsSessionPlaybackStatus,
     },
     Storage::Streams::{DataReader, RandomAccessStreamReference},
@@ -251,28 +252,86 @@ fn clear_cached_media_session_manager() {
     });
 }
 
+fn read_media_properties(session: &MediaSession) -> Result<MediaProperties, String> {
+    session
+        .TryGetMediaPropertiesAsync()
+        .map_err(|error| format!("请求媒体属性失败：{error}"))?
+        .join()
+        .map_err(|error| format!("读取媒体属性失败：{error}"))
+}
+
+fn select_netease_session(
+    manager: &GlobalSystemMediaTransportControlsSessionManager,
+    use_inflink: bool,
+) -> Result<(MediaSession, MediaProperties, String), String> {
+    let sessions = manager
+        .GetSessions()
+        .map_err(|error| format!("枚举媒体会话失败：{error}"))?;
+    let count = sessions
+        .Size()
+        .map_err(|error| format!("读取媒体会话数量失败：{error}"))?;
+    let source_name = if use_inflink {
+        "InfLink-rs"
+    } else {
+        "网易云原版"
+    };
+    let mut selected = None;
+
+    for index in 0..count {
+        let session = sessions
+            .GetAt(index)
+            .map_err(|error| format!("读取媒体会话失败：{error}"))?;
+        let source = session
+            .SourceAppUserModelId()
+            .map_err(|error| format!("读取媒体会话来源失败：{error}"))?;
+        if !source
+            .to_string()
+            .eq_ignore_ascii_case(netease::PROCESS_NAME)
+        {
+            continue;
+        }
+
+        let properties = read_media_properties(&session)?;
+        let genre = read_media_genre(&properties)?;
+        // Both sessions have the same application ID. InfLink-rs puts the song ID in Genres.
+        let is_inflink = genre.split(", ").any(|value| value.starts_with("NCM-"));
+        if is_inflink == use_inflink {
+            if selected.is_some() {
+                return Err(format!(
+                    "找到多条 {source_name} SMTC 会话，无法确定播放来源。"
+                ));
+            }
+            selected = Some((session, properties, genre));
+        }
+    }
+
+    selected.ok_or_else(|| format!("当前没有 {source_name} SMTC 会话。"))
+}
+
 #[cfg(target_os = "windows")]
 fn get_now_playing_native(
     include_media: bool,
     include_play_source: bool,
     include_artwork: bool,
     include_source_icon: bool,
-    netease_native_smtc: bool,
+    netease_media_source: NeteaseMediaSource,
 ) -> Result<MediaInfo, String> {
     let _com_guard = init_com_for_media()?;
 
-    let manager = get_cached_media_session_manager()?;
+    let mut manager = get_cached_media_session_manager()?;
     let session = match manager.GetCurrentSession() {
         Ok(session) => session,
         Err(_) => {
             clear_cached_media_session_manager();
-            get_cached_media_session_manager()?
+            manager = get_cached_media_session_manager()?;
+            manager
                 .GetCurrentSession()
                 .map_err(|error| format!("读取当前媒体会话失败：{error}"))?
         }
     };
 
-    let source_app_id = if include_play_source || (include_media && netease_native_smtc) {
+    let source_app_id = if include_play_source || netease_media_source != NeteaseMediaSource::System
+    {
         session
             .SourceAppUserModelId()
             .ok()
@@ -280,6 +339,17 @@ fn get_now_playing_native(
             .unwrap_or_default()
     } else {
         String::new()
+    };
+    let select_netease = netease_media_source != NeteaseMediaSource::System
+        && source_app_id.eq_ignore_ascii_case(netease::PROCESS_NAME);
+    let (session, selected_properties) = if select_netease {
+        let (session, properties, genre) = select_netease_session(
+            &manager,
+            netease_media_source == NeteaseMediaSource::Inflink,
+        )?;
+        (session, Some((properties, genre)))
+    } else {
+        (session, None)
     };
     let source_app_name = if include_play_source {
         resolve_source_app_name(&source_app_id).unwrap_or_default()
@@ -318,12 +388,14 @@ fn get_now_playing_native(
     let reported_at_ms = now_unix_millis_i64();
 
     let (title, artist, album, cover_url, genre) = if include_media {
-        let request = session
-            .TryGetMediaPropertiesAsync()
-            .map_err(|error| format!("请求媒体属性失败：{error}"))?;
-        let properties = request
-            .join()
-            .map_err(|error| format!("读取媒体属性失败：{error}"))?;
+        let (properties, genre) = match selected_properties {
+            Some(selected) => selected,
+            None => {
+                let properties = read_media_properties(&session)?;
+                let genre = read_media_genre(&properties).unwrap_or_default();
+                (properties, genre)
+            }
+        };
 
         let title = properties
             .Title()
@@ -345,8 +417,6 @@ fn get_now_playing_native(
         } else {
             String::new()
         };
-        let genre = read_media_genre(&properties).unwrap_or_default();
-
         (title, artist, album, cover_url, genre)
     } else {
         (
@@ -358,13 +428,11 @@ fn get_now_playing_native(
         )
     };
 
-    // inflink-rs shares the same source ID and tags its tracks with NCM-{id}.
     let (position_ms, duration_ms, reported_at_ms) = if include_media
-        && netease_native_smtc
-        && source_app_id.eq_ignore_ascii_case(netease::PROCESS_NAME)
+        && select_netease
+        && netease_media_source == NeteaseMediaSource::Native
         && matches!(playback_state.as_str(), "playing" | "paused")
         && (position_ms.is_none() || duration_ms.is_none())
-        && !genre.split(", ").any(|value| value.starts_with("NCM-"))
     {
         let (position, duration) = netease::read_timeline(&title)?;
         (Some(position), Some(duration), now_unix_millis_i64())
@@ -419,7 +487,7 @@ fn timespan_to_ms(value: windows::Foundation::TimeSpan) -> Option<i64> {
 }
 
 pub fn get_now_playing() -> Result<MediaInfo, String> {
-    let media = get_now_playing_native(true, true, false, false, false)?;
+    let media = get_now_playing_native(true, true, false, false, NeteaseMediaSource::System)?;
     if media.is_empty() {
         return Ok(MediaInfo::default());
     }
@@ -430,7 +498,7 @@ pub fn get_now_playing() -> Result<MediaInfo, String> {
 pub fn get_now_playing_for_reporting(
     include_media: bool,
     include_play_source: bool,
-    netease_native_smtc: bool,
+    netease_media_source: NeteaseMediaSource,
 ) -> Result<MediaInfo, String> {
     if !include_media && !include_play_source {
         return Ok(MediaInfo::default());
@@ -441,21 +509,21 @@ pub fn get_now_playing_for_reporting(
         include_play_source,
         false,
         false,
-        netease_native_smtc,
+        netease_media_source,
     )
 }
 
 pub fn get_now_playing_artwork_for_reporting(
     include_play_source: bool,
     include_source_icon: bool,
-    netease_native_smtc: bool,
+    netease_media_source: NeteaseMediaSource,
 ) -> Result<MediaInfo, String> {
     get_now_playing_native(
         true,
         include_play_source,
         true,
         include_source_icon,
-        netease_native_smtc,
+        netease_media_source,
     )
 }
 
@@ -566,9 +634,7 @@ pub fn run_self_test() -> PlatformSelfTestResult {
     build_self_test_result(foreground, window_title, media)
 }
 
-fn read_media_genre(
-    properties: &GlobalSystemMediaTransportControlsSessionMediaProperties,
-) -> Result<String, String> {
+fn read_media_genre(properties: &MediaProperties) -> Result<String, String> {
     let genres = properties
         .Genres()
         .map_err(|e| format!("请求媒体流派失败：{e}"))?;
@@ -586,9 +652,7 @@ fn read_media_genre(
     Ok(parts.join(", "))
 }
 
-fn read_media_artwork(
-    properties: &GlobalSystemMediaTransportControlsSessionMediaProperties,
-) -> Result<String, String> {
+fn read_media_artwork(properties: &MediaProperties) -> Result<String, String> {
     let thumbnail = properties
         .Thumbnail()
         .map_err(|e| format!("请求媒体缩略图失败：{e}"))?;

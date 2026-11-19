@@ -22,7 +22,7 @@ pub fn get_now_playing() -> Result<MediaInfo, String> {
 pub fn get_now_playing_for_reporting(
     _include_media: bool,
     _include_play_source: bool,
-    _netease_native_smtc: bool,
+    _netease_media_source: crate::models::NeteaseMediaSource,
 ) -> Result<MediaInfo, String> {
     Ok(MediaInfo::default())
 }
@@ -30,7 +30,7 @@ pub fn get_now_playing_for_reporting(
 pub fn get_now_playing_artwork_for_reporting(
     _include_play_source: bool,
     _include_source_icon: bool,
-    _netease_native_smtc: bool,
+    _netease_media_source: crate::models::NeteaseMediaSource,
 ) -> Result<MediaInfo, String> {
     Ok(MediaInfo::default())
 }

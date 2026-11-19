@@ -42,7 +42,13 @@ Notes:
 - Heartbeat may be set to `0`
 - If "auto-start background sync on launch" is enabled, sync starts automatically next time the app opens
 
-On 64-bit Windows, enable **NetEase native SMTC compatibility** under **Settings → Auto-sync content**. This option is off by default. When media reporting is enabled, Reporter fills in the missing playback position and duration for native NetEase Cloud Music 3.x sessions. If background sync is running, restart it after saving the setting.
+On 64-bit Windows, choose **NetEase playback source** under **Settings → Auto-sync content**. This setting applies when media reporting is enabled.
+
+- **Follow Windows** (default) uses the current Windows media session.
+- **Native only (fill in progress)** uses the native session when Windows selects NetEase and fills in missing playback position and duration.
+- **InfLink-rs SMTC only** uses the plugin session tagged with a `NCM-{ID}` genre when Windows selects NetEase. [InfLink-rs documentation](https://github.com/apoint123/inflink-rs#支持上传到-smtc-的信息)
+
+If the selected session is unavailable, Reporter skips the NetEase media sample and logs the reason. On upgrade, the previous NetEase native SMTC switch, if enabled, becomes **Native only**. Restart any running background sync after saving to apply the setting.
 
 ## Device Pending Approval
 

@@ -19,7 +19,8 @@ use serde_json::{json, Value};
 use crate::{
     backend_locale::BackendLocale,
     models::{
-        ApiResult, ClientConfig, RealtimeReporterSnapshot, ReporterActivity, ReporterLogEntry,
+        ApiResult, ClientConfig, NeteaseMediaSource, RealtimeReporterSnapshot, ReporterActivity,
+        ReporterLogEntry,
     },
     platform::{
         get_foreground_snapshot_for_reporting, get_now_playing_artwork_for_reporting,
@@ -328,6 +329,11 @@ fn run_reporter_loop(
             config.heartbeat_interval_ms.max(1_000),
         ))
     };
+    let netease_media_source = if config.report_media {
+        config.netease_media_source
+    } else {
+        NeteaseMediaSource::System
+    };
 
     let mut last_signature: Option<String> = None;
     let mut last_report_at: Option<SystemTime> = None;
@@ -381,7 +387,7 @@ fn run_reporter_loop(
                         cached_media = match get_now_playing_for_reporting(
                             config.report_media,
                             include_play_source_for_capture,
-                            config.netease_native_smtc,
+                            netease_media_source,
                         ) {
                             Ok(mut media) => {
                                 last_media_error = None;
@@ -454,7 +460,8 @@ fn run_reporter_loop(
 
                 if should_send {
                     let is_heartbeat = same_as_last;
-                    let mut payload_media = media_with_artwork_for_payload(&media, &config);
+                    let mut payload_media =
+                        media_with_artwork_for_payload(&media, &config, netease_media_source);
                     if cached_media.signature_for_reporting(
                         config.report_media,
                         include_play_source_for_capture,
@@ -639,7 +646,11 @@ fn run_reporter_loop(
     mark_stopped(&state, None, run_id);
 }
 
-fn media_with_artwork_for_payload(media: &MediaInfo, config: &ClientConfig) -> MediaInfo {
+fn media_with_artwork_for_payload(
+    media: &MediaInfo,
+    config: &ClientConfig,
+    netease_media_source: NeteaseMediaSource,
+) -> MediaInfo {
     let mut payload_media = media.clone();
     let needs_cover = config.report_media
         && config.report_media_artwork
@@ -664,7 +675,7 @@ fn media_with_artwork_for_payload(media: &MediaInfo, config: &ClientConfig) -> M
     let Ok(artwork_media) = get_now_playing_artwork_for_reporting(
         include_play_source_for_assets,
         config.report_playback_app_icon,
-        config.report_media && config.netease_native_smtc,
+        netease_media_source,
     ) else {
         return payload_media;
     };

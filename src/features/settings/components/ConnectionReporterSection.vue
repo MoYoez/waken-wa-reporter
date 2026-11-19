@@ -16,6 +16,7 @@ import {
   detectPerformanceMode,
   PERFORMANCE_PRESETS,
   type ClientConfig,
+  type NeteaseMediaSource,
   type PerformanceMode,
 } from "@/types";
 
@@ -27,7 +28,6 @@ interface ReporterContentOption {
     | "reportPlaySource"
     | "reportMediaArtwork"
     | "reportPlaybackAppIcon"
-    | "neteaseNativeSmtc"
     | "reportMediaGenre";
   label: string;
   description: string;
@@ -40,6 +40,7 @@ const props = defineProps<{
   titleKey: string;
   helpKey: string;
   reporterContentOptions: ReporterContentOption[];
+  neteaseMediaSourceSupported: boolean;
   showHeading?: boolean;
   headClass?: string;
 }>();
@@ -50,6 +51,13 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+
+const neteaseMediaSources = computed(() =>
+  (["system", "native", "inflink"] as const).map((value) => ({
+    value,
+    label: t(`connectionPanel.neteaseMediaSource.options.${value}`),
+  })),
+);
 
 const pollIntervalInput = ref(String(props.modelValue.pollIntervalMs));
 const heartbeatIntervalInput = ref(String(props.modelValue.heartbeatIntervalMs));
@@ -291,5 +299,18 @@ const heartbeatCeilingHint = computed(() => {
       </div>
     </div>
 
-      </div>
+    <label v-if="props.neteaseMediaSourceSupported" class="field-block field-span-2">
+      <span class="field-label">{{ t("connectionPanel.neteaseMediaSource.label") }}</span>
+      <Select
+        :model-value="props.modelValue.neteaseMediaSource"
+        :options="neteaseMediaSources"
+        :disabled="!props.modelValue.reportMedia"
+        :aria-label="t('connectionPanel.neteaseMediaSource.label')"
+        option-label="label"
+        option-value="value"
+        @update:model-value="emit('updateField', 'neteaseMediaSource', $event as NeteaseMediaSource)"
+      />
+      <small class="field-help">{{ t("connectionPanel.neteaseMediaSource.help") }}</small>
+    </label>
+  </div>
 </template>

@@ -560,7 +560,15 @@ const zhCN = {
       mediaArtwork: { label: "媒体封面", description: "媒体变化时附带封面图" },
       playbackAppIcon: { label: "上报播放程序的 ICON", description: "媒体变化时附带播放程序图标" },
       mediaGenre: { label: "上报流派信息", description: "附带流派信息（例如 inflink-rs 的 NCM-{id}）用于歌曲链接" },
-      neteaseNativeSmtc: { label: "适配网易云原版 SMTC", description: "上报媒体时补齐网易云音乐 3.x 原版会话的播放进度和总时长。" },
+    },
+    neteaseMediaSource: {
+      label: "网易云播放来源",
+      help: "开启「播放内容」后生效。指定的会话不可用时，跳过网易云媒体上报。",
+      options: {
+        system: "跟随系统",
+        native: "仅原版（补齐进度）",
+        inflink: "仅 InfLink-rs SMTC",
+      },
     },
     toggles: {
       enabled: "已开启",

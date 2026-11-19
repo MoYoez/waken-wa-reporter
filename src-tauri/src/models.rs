@@ -224,6 +224,33 @@ pub struct MediaPlaySourceRule {
     pub default: bool,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum NeteaseMediaSource {
+    #[default]
+    System,
+    Native,
+    Inflink,
+}
+
+fn deserialize_netease_media_source<'de, D>(deserializer: D) -> Result<NeteaseMediaSource, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum SavedSource {
+        Source(NeteaseMediaSource),
+        LegacySwitch(bool),
+    }
+
+    Ok(match SavedSource::deserialize(deserializer)? {
+        SavedSource::Source(source) => source,
+        SavedSource::LegacySwitch(true) => NeteaseMediaSource::Native,
+        SavedSource::LegacySwitch(false) => NeteaseMediaSource::System,
+    })
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClientConfig {
@@ -267,8 +294,12 @@ pub struct ClientConfig {
     pub report_playback_app_icon: bool,
     #[serde(default = "default_report_media_genre")]
     pub report_media_genre: bool,
-    #[serde(default)]
-    pub netease_native_smtc: bool,
+    #[serde(
+        default,
+        alias = "neteaseNativeSmtc",
+        deserialize_with = "deserialize_netease_media_source"
+    )]
+    pub netease_media_source: NeteaseMediaSource,
     #[serde(default)]
     pub media_play_source_rules: Vec<MediaPlaySourceRule>,
     #[serde(default)]
@@ -308,7 +339,7 @@ impl Default for ClientConfig {
             report_media_artwork: default_report_media_artwork(),
             report_playback_app_icon: default_report_playback_app_icon(),
             report_media_genre: default_report_media_genre(),
-            netease_native_smtc: false,
+            netease_media_source: NeteaseMediaSource::System,
             media_play_source_rules: Vec::new(),
             media_play_source_blocklist: Vec::new(),
             discord_enabled: false,
