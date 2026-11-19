@@ -88,7 +88,7 @@ pub fn get_foreground_snapshot_for_reporting(
 }
 
 pub fn get_now_playing() -> Result<MediaInfo, String> {
-    get_now_playing_for_reporting(true, true)
+    read_now_playing(true, true, false, false)
 }
 
 pub fn get_now_playing_for_reporting(
